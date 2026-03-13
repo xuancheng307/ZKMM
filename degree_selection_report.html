@@ -292,7 +292,7 @@
                 <li><a href="#BN254限制">BN254 場限制</a></li>
                 <li><a href="#pp24基準">電路成本模型與基準測試</a></li>
                 <li><a href="#成本估算">全流程成本估算</a></li>
-                <li><a href="#ORV分析">ORV 分析</a></li>
+                <li><a href="#output-analysis">輸出範圍分析</a></li>
                 <li><a href="#交叉驗證">交叉驗證</a></li>
                 <li><a href="#結論">結論</a></li>
             </ol>
@@ -320,7 +320,7 @@
             </div>
 
             <div class="key-finding">
-                <strong>pp × d 關鍵關係</strong>：pp* = log₂(1/E_minimax(d)) 決定了達成 ULP=1 的最小次數；每增加 4 bits 精度（pp +4）約需增加 1 degree；BN254 限制：d·pp < 253 bits，實際上限 pp ≈ 24~28（pp>28 時 d_max≤9，大幅限制可用函數）。
+                <strong>pp &times; d 關鍵關係</strong>：pp* = log₂(1/E_minimax(d)) 決定了達成 ULP=1 的最小次數；每增加 4 bits 精度（pp +4）約需增加 1 degree；BN254 限制：(d+1)&times;pp &lt; 254 bits，實際上限 pp &approx; 24（pp=28 時 d_max=8，部分中等收斂函數受限）。
             </div>
 
             <div class="key-finding">
@@ -827,7 +827,7 @@
                     <th>寬區間</th>
                     <th>寬 ULP</th>
                     <th>惡化倍數</th>
-                    <th>ORV 通過</th>
+                    <th>w &lt; S</th>
                 </tr>
             </thead>
             <tbody>
@@ -1140,7 +1140,7 @@
         <ul>
             <li><strong>pp 擴展規律</strong>：隨著 pp 增加，達成 ULP=1 所需的 d 線性增長，但速率因函數而異。快速收斂函數（exp, sin）每增加 4 bits 僅需多 ~0.8 degree；慢收斂函數（tan, erf）每增加 4 bits 需多 ~1.6 degree（見 Section 8 pp* 分析）。</li>
             <li><strong>函數差異</strong>：易逼近函數（exp, sin, sigmoid）在低 pp 下可用低 d 達成；困難函數（tan, erf, 1-exp(-x²)）需要高 d，更容易超出 BN254 限制。</li>
-            <li><strong>BN254 限制明顯</strong>：pp≥32 時，多數函數無法在 d≤9 内達成 ULP=1，表明實際應用中 pp ≈ 16~24 是比較現實的選擇。</li>
+            <li><strong>BN254 限制明顯</strong>：pp=28 時 d_max=8（d=9 不可用），pp&ge;32 時 d_max&le;6，多數函數無法達成 ULP=1。實際應用中 pp &isin; [16, 24] 是比較現實的選擇。</li>
         </ul>
 
         <div class="figure-container">
@@ -1150,7 +1150,7 @@
 
         <div class="figure-container">
             <img src="pp_sensitivity/fig_pp_d_all13_frontier.png" alt="pp x d Frontier">
-            <p class="figure-caption">圖 7-2：達成 ULP=1 所需最低次數 vs pp。紅色虛線為 BN254 限制（d = 253/pp）。</p>
+            <p class="figure-caption">圖 7-2：達成 ULP=1 所需最低次數 vs pp。紅色虛線為 BN254 限制（(d+1)&times;pp = 254）。</p>
         </div>
 
         <h3>7.3 設計決策矩陣</h3>
@@ -1173,7 +1173,7 @@
                 <tr>
                     <td><strong>12</strong></td>
                     <td>2.4×10⁻⁴</td>
-                    <td>21</td>
+                    <td>20</td>
                     <td>13/13</td>
                     <td>13/13</td>
                     <td>13/13</td>
@@ -1182,7 +1182,7 @@
                 <tr style="background: #e8f5e9;">
                     <td><strong>16</strong></td>
                     <td>1.5×10⁻⁵</td>
-                    <td>15</td>
+                    <td>14</td>
                     <td>10/13</td>
                     <td>13/13</td>
                     <td>13/13</td>
@@ -1191,7 +1191,7 @@
                 <tr>
                     <td><strong>20</strong></td>
                     <td>9.5×10⁻⁷</td>
-                    <td>12</td>
+                    <td>11</td>
                     <td>6/13</td>
                     <td>10/13</td>
                     <td>13/13</td>
@@ -1200,7 +1200,7 @@
                 <tr>
                     <td><strong>24</strong></td>
                     <td>6.0×10⁻⁸</td>
-                    <td>10</td>
+                    <td>9</td>
                     <td>1/13</td>
                     <td>10/13</td>
                     <td>12/13</td>
@@ -1209,7 +1209,7 @@
                 <tr>
                     <td><strong>28</strong></td>
                     <td>3.7×10⁻⁹</td>
-                    <td>9</td>
+                    <td>8</td>
                     <td>0/13</td>
                     <td>6/13</td>
                     <td>10/13</td>
@@ -1218,7 +1218,7 @@
                 <tr style="opacity: 0.7;">
                     <td><strong>32†</strong></td>
                     <td>2.3×10⁻¹⁰</td>
-                    <td>7</td>
+                    <td>6</td>
                     <td>0/13</td>
                     <td>3/13</td>
                     <td>3/13</td>
@@ -1227,7 +1227,7 @@
                 <tr style="opacity: 0.7;">
                     <td><strong>36†</strong></td>
                     <td>1.5×10⁻¹¹</td>
-                    <td>7</td>
+                    <td>6</td>
                     <td>0/13</td>
                     <td>0/13</td>
                     <td>0/13</td>
@@ -1240,9 +1240,10 @@
         <div class="summary-box">
             <p><strong>設計決策分析：</strong></p>
             <ul>
-                <li><strong>pp=16 是最佳實用點</strong>：精度 1.5×10⁻⁵（約 5 位有效十進位數），d≤7 即可覆蓋全部 13 個函數。BN254 容許 d_max=15，有充分餘裕。</li>
-                <li><strong>pp=24 適合高精度需求</strong>：精度 6.0×10⁻⁸（約 7 位），d≤7 覆蓋 10/13 函數，d≤9 覆蓋 12/13。BN254 容許 d_max=10，空間緊張。</li>
-                <li><strong>pp≥32 不可行</strong>：BN254 限制 d_max=7，即使取樣數據也僅 3/13 函數達成 ULP=1。高精度需求應透過區間歸約策略而非增加 pp 來實現。</li>
+                <li><strong>pp=16 是最佳實用點</strong>：精度 1.5&times;10⁻⁵（約 5 位有效十進位數），d&le;7 即可覆蓋全部 13 個函數。BN254 容許 d_max=14，有充分餘裕。</li>
+                <li><strong>pp=24 適合高精度需求</strong>：精度 6.0&times;10⁻⁸（約 7 位），d&le;7 覆蓋 10/13 函數，d&le;9 覆蓋 12/13。BN254 容許 d_max=9，與搜索範圍上限吻合。</li>
+                <li><strong>pp=28 受限</strong>：d_max=8，d=9 不可用。數學上可達 ULP=1 的 10/13 函數中，ln、arcsin、GELU 需要 d=9，實際僅 7/13 可部署。</li>
+                <li><strong>pp&ge;32 不可行</strong>：BN254 限制 d_max&le;6，多數函數難達 ULP=1。高精度需求應透過區間歸約策略而非增加 pp 來實現。</li>
             </ul>
         </div>
 
@@ -1295,8 +1296,8 @@
             <ul>
                 <li><strong>pp≤20：全部 13 函數 p<sub>eff</sub>=pp</strong>（ULP=1），精度 100% 利用。意味著在 d≤9 範圍內，逼近誤差完全不是瓶頸。</li>
                 <li><strong>pp=24：僅 tan 開始損失</strong>（ULP=2，損失 1 bit）。其餘 12 函數仍可完美利用。</li>
-                <li><strong>pp=28：慢收斂函數（tan, 1-exp(-x²), erf）在 d≤9 內無法達成 ULP=1</strong>。其餘 10 個函數（含修正區間後的 arctan、sinh）仍可完美利用。</li>
-                <li><strong>pp≥32（取樣數據）：多數函數損失 &gt;5 bits</strong>。BN254 限制 d≤7，僅 3/13 函數（exp, sin, sinh）達成 ULP=1；其餘函數精度浪費嚴重。</li>
+                <li><strong>pp=28：BN254 限制 d_max=8</strong>。慢收斂函數（tan, 1-exp(-x²), erf）在 d&le;9 內仍無法達標；中等收斂函數（ln, arcsin, GELU）需要 d=9 但受 BN254 限制不可部署。實際可達 ULP=1 的僅 7/13 函數。</li>
+                <li><strong>pp&ge;32（取樣數據）：多數函數損失 &gt;5 bits</strong>。BN254 限制 d&le;6，僅 3/13 函數（exp, sin, sinh）達成 ULP=1；其餘函數精度浪費嚴重。</li>
             </ul>
             <p><strong>結論：</strong>在 d≤9 的約束下，pp=20 是「零浪費」的上限。超過此值，提高 pp 的邊際收益遞減——應透過<strong>區間歸約</strong>（縮小逼近區間）而非增加 pp 來提升精度。</p>
         </div>
@@ -1511,7 +1512,7 @@
 
         <div class="figure-container">
             <img src="pp_sensitivity/fig_pp_d_all13_crossover.png" alt="Crossover pp* vs Degree">
-            <p class="figure-caption">圖 8-1：pp* vs 次數 d（全 13 函數）。曲線越陡 = 增加 d 帶來越多精度增益。灰色水平線標示各 pp 等級；從水平線往右找到曲線交點即為該函數所需的最小 d。紅色虛線為 BN254 上限 pp=253/d。</p>
+            <p class="figure-caption">圖 8-1：pp* vs 次數 d（全 13 函數）。曲線越陡 = 增加 d 帶來越多精度增益。灰色水平線標示各 pp 等級；從水平線往右找到曲線交點即為該函數所需的最小 d。紅色虛線為 BN254 上限（(d+1)&times;pp = 254）。</p>
         </div>
 
         <div class="summary-box">
@@ -1527,7 +1528,7 @@
 
         <p>部分函數的 pp* 增益在偶數度和奇數度之間呈現顯著交替。例如 erf：d=4→5 僅增加 0.7 bits，但 d=5→6 增加 5.2 bits。這源於函數的對稱性——當 h(x) = f(x)/x 為偶函數時（如 sin(x)/x, erf(x)/x），奇數次多項式的額外項對精度幾乎無貢獻。此現象在圖 8-1 中表現為部分曲線的鋸齒狀波動。</p>
 
-        <p><strong>設計意義：</strong>慢收斂函數（tan, erf, 1-exp(-x²)）在高精度設計（pp≥24）下需要 d≥8~9，容易觸碰 BN254 限制（d ≤ 253/pp）。這類函數的精度提升應優先透過<strong>縮小逼近區間</strong>（範圍歸約）而非增加 d 來實現。</p>
+        <p><strong>設計意義：</strong>慢收斂函數（tan, erf, 1-exp(-x²)）在高精度設計（pp≥24）下需要 d≥8~9，容易觸碰 BN254 限制（(d+1)&times;pp &lt; 254）。這類函數的精度提升應優先透過<strong>縮小逼近區間</strong>（範圍歸約）而非增加 d 來實現。</p>
 
         <!-- Section 9: BN254 Field Constraint -->
         <h2 id="BN254限制">9. BN254 場限制</h2>
@@ -1536,8 +1537,9 @@
         <p>BN254 是一條廣泛應用於 ZK 證明的橢圓曲線，其標量域大小為 253 bits：</p>
         <p style="text-align: center; font-weight: bold; margin: 15px 0;">p = 21888242871839275222246405745257275088548364400416034343698204186575808495617 ≈ 2²⁵³</p>
 
-        <p>在 ZK 電路中，多項式係數被表示為域元素。為確保整數係數 D_i 在舍入後仍可表示為域元素，必須滿足：</p>
-        <p style="text-align: center; font-weight: bold; margin: 15px 0;">max(D_i) < p  ⟹  d · pp < 253 bits</p>
+        <p>在 deferred truncation 架構中，Horner 累積值 P(R) = &sum; D<sub>i</sub> &times; R<sup>i</sup> 不做中間截斷，因此可達到 (d+1)&times;pp bits。為確保 P(R) 在 BN254 域內不發生溢位，必須滿足：</p>
+        <p style="text-align: center; font-weight: bold; margin: 15px 0;">P(R) < p  ⟹  (d+1) &times; pp < 254 bits</p>
+        <p style="font-size: 0.9em; color: #666; text-align: center;">（注意：舊版文獻中使用的 d&times;pp &lt; 253 是基於係數大小的必要條件，但不是充分條件。累積值的約束更嚴格。）</p>
 
         <p>這個約束限制了可行的 (d, pp) 組合。</p>
 
@@ -1547,58 +1549,58 @@
             <thead>
                 <tr>
                     <th>精度等級 pp</th>
-                    <th>最大次數 d_max = ⌊253/pp⌋</th>
+                    <th>最大次數 d_max = ⌊254/pp⌋ &minus; 1</th>
                     <th>說明</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
                     <td>12</td>
-                    <td>21</td>
+                    <td>20</td>
                     <td>高度數自由度，但逼近過度</td>
                 </tr>
                 <tr>
                     <td>16</td>
-                    <td>15</td>
+                    <td>14</td>
                     <td>標準設置，次數充足</td>
                 </tr>
                 <tr>
                     <td>20</td>
-                    <td>12</td>
+                    <td>11</td>
                     <td>中等精度，次數足以覆蓋複雜函數</td>
                 </tr>
                 <tr>
                     <td>24</td>
-                    <td>10</td>
-                    <td>高精度，次數開始受限</td>
+                    <td>9</td>
+                    <td>高精度，次數剛好涵蓋 d&le;9 搜索範圍</td>
                 </tr>
                 <tr>
                     <td>28</td>
-                    <td>9</td>
-                    <td>更高精度，容納困難函數上限</td>
+                    <td>8</td>
+                    <td class="highlight">d=9 不可用，部分函數受限</td>
                 </tr>
                 <tr>
                     <td>32</td>
-                    <td>7</td>
+                    <td>6</td>
                     <td class="highlight">次數嚴格受限，多數函數難達 ULP=1</td>
                 </tr>
                 <tr>
                     <td>36</td>
-                    <td>7</td>
+                    <td>6</td>
                     <td class="highlight">幾乎無法支持高要求函數</td>
                 </tr>
                 <tr>
                     <td>40</td>
-                    <td>6</td>
-                    <td>實際上不可用（pp×d > 253）</td>
+                    <td>5</td>
+                    <td>實際上不可用（(d+1)&times;pp &ge; 254）</td>
                 </tr>
             </tbody>
         </table>
 
         <h3>實踐含義</h3>
         <div class="summary-box">
-            <p><strong>BN254 的實際上限是 pp ≈ 24~28。</strong>超過 pp=28 後，d_max ≤ 9，而慢收斂函數（tan, erf, 1-exp(-x²)）需要 d ≥ 8~9 才能達成 ULP=1。這使得 pp > 28 的設置基本不可行。</p>
-            <p>反過來，pp ∈ [16, 24] 是合理的選擇區間：pp=16 已廣泛應用且足以覆蓋簡單函數（d_max=15 綽綽有餘）；pp=24 提供 256× 更高精度（256 倍精度），但實現成本（電路規模、證明時間）增加 1.5~2×。</p>
+            <p><strong>BN254 的實際上限是 pp ≈ 24。</strong>pp=28 時 d_max=8，d=9 不可用，部分中等收斂函數（ln, arcsin, GELU）無法達成 ULP=1。pp&ge;32 時 d_max&le;6，大部分函數不可行。</p>
+            <p>pp &isin; [16, 24] 是合理的選擇區間：pp=16 已廣泛應用且足以覆蓋全部 13 個函數（d_max=14 綽綽有餘）；pp=24 提供 256&times; 更高精度，d_max=9 剛好涵蓋搜索範圍，但電路成本增加 1.5~2&times;。</p>
         </div>
 
         <!-- Section 10: Circuit Cost Model -->
@@ -1626,13 +1628,13 @@
             <tbody>
                 <tr>
                     <td><strong>Gates</strong></td>
-                    <td>5（固定）</td>
-                    <td>1 Horner + 1 truncation + 3 byte-decomp</td>
+                    <td>6（固定）</td>
+                    <td>1 Horner + 1 truncation + 3 byte-decomp + 1 range-check</td>
                 </tr>
                 <tr>
                     <td><strong>Lookups</strong></td>
-                    <td><strong>2×⌈pp/8⌉ + ⌈d×pp/8⌉</strong></td>
-                    <td>r_bytes + w_bytes + rem_bytes</td>
+                    <td><strong>⌈pp/8⌉ + ⌈d×pp/8⌉</strong></td>
+                    <td>shared_bytes (R/w/gap via selector union) + rem_bytes</td>
                 </tr>
                 <tr>
                     <td><strong>Rows</strong></td>
@@ -1672,24 +1674,24 @@
                     <td>16</td><td>11</td><td>公式估算</td>
                 </tr>
                 <tr style="background:#e8f5e9;">
-                    <td>24</td><td>5</td><td>3</td><td>3</td><td>15</td>
-                    <td><strong>21</strong></td><td><strong>9</strong></td><td>已實測 ✓</td>
+                    <td>24</td><td>5</td><td>3</td><td>(共用)</td><td>15</td>
+                    <td><strong>18</strong></td><td><strong>9</strong></td><td>已實測 ✓</td>
                 </tr>
                 <tr>
-                    <td>24</td><td>7</td><td>3</td><td>3</td><td>21</td>
-                    <td>27</td><td>11</td><td>公式估算</td>
+                    <td>24</td><td>7</td><td>3</td><td>(共用)</td><td>21</td>
+                    <td>24</td><td>11</td><td>公式估算</td>
                 </tr>
                 <tr>
-                    <td>24</td><td>9</td><td>3</td><td>3</td><td>27</td>
-                    <td>33</td><td>13</td><td>公式估算</td>
+                    <td>24</td><td>9</td><td>3</td><td>(共用)</td><td>27</td>
+                    <td>30</td><td>13</td><td>公式估算</td>
                 </tr>
                 <tr>
-                    <td>28</td><td>9</td><td>4</td><td>4</td><td>32</td>
-                    <td>40</td><td>13</td><td>公式估算</td>
+                    <td>28</td><td>9</td><td>4</td><td>(共用)</td><td>32</td>
+                    <td>36</td><td>14</td><td>公式估算；<span style="color:#e53e3e;">d_max=8，d=9 不可行</span></td>
                 </tr>
             </tbody>
         </table>
-        <p style="font-size: 0.9em; color: #666;">pp=16 時 R 與 w 共用 byte 欄位（最佳化），節省 2 lookups。pp≥24 時使用獨立欄位。</p>
+        <p style="font-size: 0.9em; color: #666;">所有 pp 等級皆共用 byte 欄位（R/w/gap 透過 selector union 共享），公式為 ⌈pp/8⌉ + ⌈d×pp/8⌉。</p>
 
         <h3>實測基準：pp=16 d=5 vs pp=24 d=5</h3>
 
@@ -1708,8 +1710,8 @@
                 <tr>
                     <td><strong>Lookups</strong></td>
                     <td>12</td>
-                    <td>21</td>
-                    <td>1.75×</td>
+                    <td>18</td>
+                    <td>1.50×</td>
                 </tr>
                 <tr>
                     <td><strong>Rows</strong></td>
@@ -1737,9 +1739,9 @@
                 </tr>
                 <tr>
                     <td><strong>證明大小</strong></td>
-                    <td>4,960 B</td>
-                    <td>6,880 B</td>
-                    <td>1.39×</td>
+                    <td>4,992 B</td>
+                    <td>6,912 B</td>
+                    <td>1.38×</td>
                 </tr>
                 <tr>
                     <td><strong>Table entries</strong></td>
@@ -1757,116 +1759,91 @@
             <ul>
                 <li><strong>增加 pp</strong>：主要增加 rem_bytes（⌈d×pp/8⌉ 中的 pp 變大），證明時間約 2× per 8-bit pp 增加。Table entries 不變（始終 256）。</li>
                 <li><strong>增加 d</strong>：每 +1 degree 增加 ⌈pp/8⌉ lookups + 1 row。例如 pp=24 下，d 從 5→7 增加 6 lookups + 2 rows。</li>
-                <li><strong>BN254 約束</strong>：d×pp < 253，限制了可行組合（見 Section 9）。</li>
+                <li><strong>BN254 約束</strong>：(d+1)×pp < 254，限制了可行組合（見 Section 9）。</li>
             </ul>
             <p>設計者應根據目標函數查閱 Section 7 的 min-d 表和 Section 8 的 pp* 表，確定所需的 (pp, d)，再用上述公式估算電路成本。</p>
         </div>
 
-        <!-- Section 11: Cost Estimation -->
-        <h2 id="成本估算">11. 全流程成本估算 (Range Reduction)</h2>
+        <!-- Section 11: E2E Measured Cost (EXP07) -->
+        <h2 id="成本估算">11. 全流程實測成本 (E2E KZG Benchmark)</h2>
 
-        <p>實際應用中，多數函數需要範圍歸約預處理才能達到窄區間。下表估算了包含範圍歸約的完整流程成本。</p>
+        <p>以下為全部 13 個函數的 End-to-End 電路<b>實測結果</b>（EXP07, pp=16, d=5, BN254 + SHPLONK, release mode, median of 5 KZG runs）。
+        所有數據已通過獨立 Python 數學驗證（14 kernel ≤4 ULP, 13 E2E pipelines 全部通過）。</p>
 
-        <h3>成本分解 — exp 完整流水線</h3>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>流程組件</th>
-                    <th>邏輯閘</th>
-                    <th>查表</th>
-                    <th>行數</th>
-                    <th>K</th>
-                    <th>說明</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>Horner 核心 (d=5)</strong></td>
-                    <td>5</td>
-                    <td>12</td>
-                    <td>9</td>
-                    <td>9</td>
-                    <td>多項式計算，pp=16</td>
-                </tr>
-                <tr>
-                    <td><strong>範圍歸約前置</strong></td>
-                    <td>4</td>
-                    <td>4</td>
-                    <td>~4</td>
-                    <td>9</td>
-                    <td>log 查表、除法、取餘</td>
-                </tr>
-                <tr>
-                    <td><strong>完整管道 (總計)</strong></td>
-                    <td><strong>9</strong></td>
-                    <td><strong>16</strong></td>
-                    <td><strong>13</strong></td>
-                    <td><strong>9</strong></td>
-                    <td>~44% 行數開銷</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <h3>實際證明成本 (exp 完整管道)</h3>
-
-        <ul>
-            <li><strong>電路規模</strong>：k=9, 約 512 行限制，實際用 13 行（2.5% 利用率），可輕鬆容納 100+ 個並行實例。</li>
-            <li><strong>證明大小</strong>：估計 ~5 KB（相比 Horner 核心 4.96 KB 增加 1 KB 開銷）。</li>
-            <li><strong>證明時間</strong>：估計 ~160 ms（相比核心 ~136 ms 增加約 18% 開銷）。</li>
-            <li><strong>驗證時間</strong>：估計 ~2.2 ms（線性與證明複雜度）。</li>
-        </ul>
-
-        <h3>ln, sin, arctan 等其他函數類似估算</h3>
+        <h3>13 函數 E2E KZG Benchmark</h3>
 
         <table>
             <thead>
                 <tr>
                     <th>函數</th>
-                    <th>完整流程行數</th>
-                    <th>Horner 核心行數</th>
-                    <th>開銷比例</th>
+                    <th>k</th>
+                    <th>Gates</th>
+                    <th>Lookups</th>
+                    <th>Proof (B)</th>
+                    <th>Prove (ms)</th>
+                    <th>Verify (ms)</th>
+                    <th>Pipeline</th>
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td>ln (d=5)</td>
-                    <td>13</td>
-                    <td>9</td>
-                    <td>44%</td>
-                </tr>
-                <tr>
-                    <td>sin (d=4)</td>
-                    <td>12</td>
-                    <td>8</td>
-                    <td>50%</td>
-                </tr>
-                <tr>
-                    <td>arctan (d=4)</td>
-                    <td>12</td>
-                    <td>8</td>
-                    <td>50%</td>
-                </tr>
-                <tr>
-                    <td>tan (d=7)</td>
-                    <td>15</td>
-                    <td>11</td>
-                    <td>36%</td>
-                </tr>
+                <tr><td>exp(x)−1</td><td>10</td><td>8</td><td>17</td><td>7,456</td><td>274</td><td>3.9</td><td>IntDiv+Pow2</td></tr>
+                <tr><td>ln(1+x)</td><td>11</td><td>8</td><td>17</td><td>7,392</td><td>373</td><td>4.0</td><td>LeadBit+MulAdd</td></tr>
+                <tr><td>sin(x)</td><td>11</td><td>17</td><td>32</td><td>9,504</td><td>494</td><td>4.7</td><td>Quad+Half+Dual</td></tr>
+                <tr><td>1−cos(x)</td><td>11</td><td>17</td><td>32</td><td>9,504</td><td>454</td><td>4.7</td><td>Quad+Half+Dual</td></tr>
+                <tr><td>tan(x)</td><td>10</td><td>8</td><td>12</td><td>5,568</td><td>195</td><td>3.6</td><td>Sign</td></tr>
+                <tr><td>arctan(x)</td><td>10</td><td>11</td><td>18</td><td>8,416</td><td>292</td><td>4.3</td><td>Sign+Cmp+FDiv</td></tr>
+                <tr><td>arcsin(x)</td><td>10</td><td>11</td><td>19</td><td>8,736</td><td>295</td><td>4.3</td><td>Sign+Cmp+Sqrt</td></tr>
+                <tr><td>sinh(x)</td><td>11</td><td>15</td><td>29</td><td>8,352</td><td>384</td><td>4.3</td><td>Sign+Div+Dual+Hyp</td></tr>
+                <tr><td>erf(x)</td><td>10</td><td>8</td><td>12</td><td>5,568</td><td>198</td><td>3.6</td><td>Sign</td></tr>
+                <tr><td>sigmoid(x)</td><td>10</td><td>8</td><td>12</td><td>5,568</td><td>199</td><td>3.7</td><td>Sign+Symm</td></tr>
+                <tr><td>GELU(x)</td><td>10</td><td>6</td><td>12</td><td>4,992</td><td>180</td><td>3.2</td><td>Kernel-only</td></tr>
+                <tr><td>1−exp(−x)</td><td>10</td><td>6</td><td>12</td><td>4,992</td><td>179</td><td>3.4</td><td>Kernel-only</td></tr>
+                <tr><td>1−exp(−x²)</td><td>10</td><td>7</td><td>12</td><td>5,440</td><td>194</td><td>3.4</td><td>Sign(abs)</td></tr>
             </tbody>
         </table>
 
-        <h3>結論</h3>
+        <h3>成本分解 — 組件級分析</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>組件</th>
+                    <th>Gates</th>
+                    <th>Lookups</th>
+                    <th>使用於</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Horner Kernel (d=5, pp=16)</td><td>6</td><td>12</td><td>全部 13 函數</td></tr>
+                <tr><td>IntDiv (3-byte gap)</td><td>1</td><td>4</td><td>exp, sinh</td></tr>
+                <tr><td>LeadBit</td><td>1</td><td>5</td><td>ln</td></tr>
+                <tr><td>QuadrantMod</td><td>1</td><td>1</td><td>sin, 1−cos</td></tr>
+                <tr><td>Comparison (3-byte gap)</td><td>1</td><td>3</td><td>arctan, arcsin</td></tr>
+                <tr><td>SignExtend</td><td>1</td><td>0</td><td>tan, arctan, arcsin, sinh, erf, sigmoid, 1−exp(−x²)</td></tr>
+                <tr><td>FieldDiv (3-byte gap)</td><td>1</td><td>3</td><td>arctan</td></tr>
+                <tr><td>IntSqrt</td><td>1</td><td>4</td><td>arcsin</td></tr>
+                <tr><td>Pow2 Table lookup</td><td>0</td><td>1</td><td>exp</td></tr>
+                <tr><td>Hyp Table lookup</td><td>0</td><td>1</td><td>sinh</td></tr>
+            </tbody>
+        </table>
+
+        <h3>成本範圍總結</h3>
         <div class="summary-box">
-            <p><strong>範圍歸約成本低廉。</strong>完整流程（範圍歸約 + Horner 計算）相比純 Horner 核心，額外開銷僅 36~50%（行數和時間）。鑒於無範圍歸約時寬區間函數完全不可用（ULP > 1000），範圍歸約是必要且高性價比的投資。</p>
+            <p><strong>實測範圍（非估計）：</strong></p>
+            <ul>
+                <li><b>最輕</b>（Kernel-only: GELU, 1−exp）：6 gates, 12 lookups, 4,992B proof, ~180ms prove, ~3.3ms verify</li>
+                <li><b>最重</b>（Dual kernel: sin, 1−cos）：17 gates, 32 lookups, 9,504B proof, ~474ms prove, ~4.7ms verify</li>
+                <li><b>所有函數</b>：verify &lt; 5ms, prove &lt; 500ms, proof &lt; 10KB</li>
+                <li>範圍歸約開銷：Kernel-only 0%（無 RR） → Dual kernel +183%（gates: 6→17）。典型開銷 +33%~+83%（gates: 6→8 或 6→11）</li>
+            </ul>
         </div>
 
-        <!-- Section 12: ORV Analysis -->
-        <h2 id="ORV分析">12. ORV (Output Range Verification) 分析</h2>
+        <!-- Section 12: Output Range Analysis -->
+        <h2 id="output-analysis">12. 輸出範圍分析</h2>
 
-        <p>ORV 驗證確保多項式計算輸出 w = p(r) 落在預期的值域 [0, S-1] 内，其中 S = 2<sup>pp</sup> 為量化模數（pp=16 時 S=65536）。若 w_max ≥ S，則輸出超出 pp bits 可表示範圍，需要額外處理。注意：此處 S 為數值範圍上界，非查表大小——我們的電路使用 256-entry ByteTable 進行範圍檢查。下表統計了 13 個函數在其最佳次數 d* 與 pp=16 時的 ORV 結果。</p>
+        <p>驗證多項式計算輸出 w = p(r) 是否落在預期的值域 [0, S-1] 内，其中 S = 2<sup>pp</sup> 為量化模數（pp=16 時 S=65536）。若 w_max &ge; S，則輸出超出 pp bits 可表示範圍，需要額外處理。注意：此處 S 為數值範圍上界，非查表大小——我們的電路使用 256-entry ByteTable 進行範圍檢查。下表統計了 13 個函數在其最佳次數 d* 與 pp=16 時的輸出範圍結果。</p>
 
-        <h3>ORV 通過情況</h3>
+        <h3>輸出範圍驗證結果</h3>
 
         <table>
             <thead>
@@ -1875,7 +1852,7 @@
                     <th>次數 d*</th>
                     <th>w_max</th>
                     <th>w_max < S-1?</th>
-                    <th>ORV 狀態</th>
+                    <th>w &lt; S 狀態</th>
                     <th>備註</th>
                 </tr>
             </thead>
@@ -1989,14 +1966,14 @@
 
         <h3>觀察</h3>
         <ul>
-            <li><strong>全部 13 函數通過 ORV</strong>：在各函數的標準歸約區間下，所有 13 個函數通過 ORV，驗證了區間設計的妥當性。</li>
-            <li><strong>sinh 透過區間修正解決</strong>：將 sinh 區間從 [0, 1] 修正為 [0, ln 2)（與 exp 的範圍歸約一致）後，sinh(ln 2) = 0.75 < 1，w_max=49151 < S−1=65535，順利通過 ORV。</li>
-            <li><strong>Type B/C 窄區間版本</strong>：erf [0,1], sigmoid [0,1] 等都順利通過 ORV，進一步驗證了窄區間版本的實用性。</li>
+            <li><strong>全部 13 函數輸出落在合法範圍</strong>：在各函數的標準歸約區間下，所有 13 個函數的 w_max &lt; S，驗證了區間設計的妥當性。</li>
+            <li><strong>sinh 透過區間修正解決</strong>：將 sinh 區間從 [0, 1] 修正為 [0, ln 2)（與 exp 的範圍歸約一致）後，sinh(ln 2) = 0.75 &lt; 1，w_max=49151 &lt; S&minus;1=65535，輸出落在合法範圍。</li>
+            <li><strong>Type B/C 窄區間版本</strong>：erf [0,1], sigmoid [0,1] 等輸出均在合法範圍內，進一步驗證了窄區間版本的實用性。</li>
         </ul>
 
         <div class="figure-container">
-            <img src="phase3_analysis/fig5_orv.png" alt="ORV Analysis">
-            <p class="figure-caption">圖 12-1：ORV 驗證結果。綠色表示 PASS（w ∈ [0, S-1]），紅色表示 FAIL。</p>
+            <img src="phase3_analysis/fig5_orv.png" alt="Output Range Analysis">
+            <p class="figure-caption">圖 12-1：輸出範圍驗證結果。綠色表示 PASS（w &isin; [0, S-1]），紅色表示 FAIL。</p>
         </div>
 
         <!-- Section 13: Cross-Validation -->
@@ -2103,8 +2080,8 @@
         </div>
 
         <div class="key-finding">
-            <strong>5. BN254 的實際上限是 pp ≈ 24~28</strong><br>
-            BN254 標量域 253 bits 的限制導致 d·pp < 253。當 pp > 28 時，d_max ≤ 9，大幅限制了複雜函數的實現可能。pp ∈ [16, 24] 是實際應用的合理選擇區間：pp=16 足以覆蓋簡單函數（d_max=15），pp=24 提供 256× 更高精度但電路成本增加 2~1.5×。pp > 28 的設置基本不可用。
+            <strong>5. BN254 的實際上限是 pp &approx; 24</strong><br>
+            BN254 標量域 ~254 bits 的限制導致 (d+1)&times;pp &lt; 254。pp=24 時 d_max=9（與搜索上限吻合），pp=28 時 d_max=8（d=9 不可用，ln/arcsin/GELU 受限），pp&ge;32 時 d_max&le;6（大部分函數不可行）。pp &isin; [16, 24] 是實際應用的合理選擇區間：pp=16 足以覆蓋全部函數（d_max=14），pp=24 提供 256&times; 更高精度但電路成本增加 1.5~2&times;。
         </div>
 
         <div class="key-finding">
@@ -2196,7 +2173,7 @@
                 </tr>
             </tbody>
         </table>
-        <p style="font-size: 0.9em; color: #666;">pp ≤ 28 為窮舉驗證（精確上界）；† pp ≥ 32 為取樣 2M 點（觀測下界）。>9 表示 d=9 仍未達 ULP=1 或 d·pp > 253（BN254 溢位）。</p>
+        <p style="font-size: 0.9em; color: #666;">pp ≤ 28 為窮舉驗證（精確上界）；† pp ≥ 32 為取樣 2M 點（觀測下界）。>9 表示 d=9 仍未達 ULP=1 或 (d+1)&times;pp &ge; 254（BN254 溢位）。pp=28 時 d_max=8，d*=9 的函數（ln、arcsin、GELU）實際不可部署。</p>
 
         <h3>實踐建議</h3>
 
@@ -2215,7 +2192,7 @@
 
             <li><strong>避免過度提升 d</strong>：在達成 ULP=1 目標後，繼續提升 d 通常無益甚至有害。重點應轉向優化電路約束（K、row 數量）和 ZK 後端選擇。</li>
 
-            <li><strong>驗證 ORV 約束</strong>：確保多項式輸出 w_max 不超過 S-1 = 2<sup>pp</sup>-1（pp=16 時為 65535）。在標準歸約區間下，全部 13 個函數均通過 ORV。</li>
+            <li><strong>驗證輸出範圍約束</strong>：確保多項式輸出 w_max 不超過 S&minus;1 = 2<sup>pp</sup>&minus;1（pp=16 時為 65535）。在標準歸約區間下，全部 13 個函數的輸出均在合法範圍內。</li>
 
             <li><strong>設計完整流水線</strong>：不應孤立地考慮 Horner 核心，而應在範圍歸約 + Horner + 輸出映射的完整流程框架内評估開銷和可行性。</li>
         </ol>

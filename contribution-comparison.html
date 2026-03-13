@@ -114,7 +114,7 @@
 </table>
 
 <div class="key-insight">
-  <strong>所有查表系統均無 Remez、無 ORV。</strong>差異僅在 lookup 機制（logUP / CQ2 / tlookup / Caulk）與系統規模最佳化，與我們的多項式方法論在技術路線上無交集。以下重點對比<b>多項式/代數近似</b>方法。
+  <strong>所有查表系統均無 Remez、無 deferred truncation。</strong>差異僅在 lookup 機制（logUP / CQ2 / tlookup / Caulk）與系統規模最佳化，與我們的多項式方法論在技術路線上無交集。以下重點對比<b>多項式/代數近似</b>方法。
 </div>
 
 <h2><span class="section-num">1.3</span>多項式/代數系統</h2>
@@ -130,7 +130,7 @@
     <td><b>ZKFixedPointChip</b></td>
     <td>2023 (hackathon)</td>
     <td>Minimax (lolremez) + Halo2</td>
-    <td>最接近先行工作。但：無 ORV、per-step truncation、無正式誤差分析、無 Minimax vs Taylor 對照</td>
+    <td>最接近先行工作。但：per-step truncation、無正式誤差分析、無 Minimax vs Taylor 對照</td>
   </tr>
   <tr>
     <td>zkTaylor</td>
@@ -148,13 +148,13 @@
     <td>ZIP</td>
     <td>CCS'25</td>
     <td>Piecewise poly + Caulk lookup</td>
-    <td>不覆蓋 ln；approximation soundness 是查表機制（&ne; ORV）</td>
+    <td>不覆蓋 ln；approximation soundness 依賴查表機制</td>
   </tr>
   <tr>
     <td>Kurik &amp; Laud</td>
     <td>ARES'25 (LNCS)</td>
     <td>代數函數取代多項式</td>
-    <td>互補方向——論證代數近似優於多項式。無 ULP/ORV/截斷分析</td>
+    <td>互補方向——論證代數近似優於多項式。無 ULP 分析、無截斷優化</td>
   </tr>
   <tr style="color: #718096;">
     <td>SHAFT</td>
@@ -166,7 +166,7 @@
     <td>Compact</td>
     <td>PoPETS'24</td>
     <td>MPC, Chebyshev piecewise</td>
-    <td>非 ZK（MPC），無 Horner/ORV/deferred truncation</td>
+    <td>非 ZK（MPC），無 Horner/deferred truncation</td>
   </tr>
   <tr style="color: #718096;">
     <td>zkLLM</td>
@@ -183,7 +183,7 @@
 <!-- ============================================================ -->
 <h1><span class="section-num">2</span>文獻空白分析</h1>
 
-<p>以下整理 5 個具體的文獻空白，每個空白列出最接近的現有工作及其缺口：</p>
+<p>以下整理 4 個具體的文獻空白，每個空白列出最接近的現有工作及其缺口：</p>
 
 <table>
   <tr>
@@ -199,25 +199,19 @@
     <td>同電路、同表、同域，僅換係數 → <b>12x</b> 精度改善</td>
   </tr>
   <tr>
-    <td><b>G2: 無 Output Range Verification</b></td>
-    <td>ZIP（"approximation soundness"）<br>EZKL（field overflow 假設）</td>
-    <td>ZIP 是查表機制（Caulk）<br>EZKL 是被動假設（仍用 explicit RC）</td>
-    <td>利用多項式單調性做 implicit input validation，省 1 gate</td>
-  </tr>
-  <tr>
-    <td><b>G3: 無 Horner 內部 deferred truncation</b></td>
+    <td><b>G2: 無 Horner 內部 deferred truncation</b></td>
     <td>Kaizen / zkRNN（layer-level 延後）<br>PoPETs'25（MPC truncation SoK）</td>
     <td>粒度是 DNN layer，非 Horner chain<br>確認「一次乘法一次截斷」為標準</td>
-    <td>BN254 254-bit 容量 vs d&times;pp bit，d 次合併為 1 次 → <b>2x</b></td>
+    <td>BN254 254-bit 容量 vs (d+1)&times;pp bit，d 次合併為 1 次 → <b>2x</b></td>
   </tr>
   <tr>
-    <td><b>G4: 無正式誤差預算</b></td>
+    <td><b>G3: 無正式誤差預算</b></td>
     <td>ZKFixedPointChip（引用 lolremez 輸出）</td>
     <td>未分解誤差來源</td>
     <td>&epsilon;<sub>total</sub> = &epsilon;<sub>approx</sub> + &epsilon;<sub>quant</sub> + &epsilon;<sub>trunc</sub> + 窮舉驗證</td>
   </tr>
   <tr>
-    <td><b>G5: ln/erf 無小表方案</b></td>
+    <td><b>G4: ln/erf 無小表方案</b></td>
     <td>Lagrange Labs（erf, rational）<br>ZKFixedPointChip（log2, degree 14）</td>
     <td>rational 需除法電路<br>log2 &ne; ln，4,096-entry table</td>
     <td>純多項式 256-entry：ln ULP=1, erf ULP=3</td>
@@ -225,7 +219,7 @@
 </table>
 
 <div class="key-insight">
-  <strong>5 個空白中，G1-G4 為通用方法論空白（適用於任何函數），G5 為具體函數覆蓋空白。</strong>每個空白的詳細論證與原文引用見<a href="contribution-comparison-full-reference.html">完整參考版</a>。
+  <strong>4 個空白中，G1-G3 為通用方法論空白（適用於任何函數），G4 為具體函數覆蓋空白。</strong>每個空白的詳細論證與原文引用見<a href="contribution-comparison-full-reference.html">完整參考版</a>。
 </div>
 
 <!-- ============================================================ -->
@@ -241,7 +235,6 @@
     <th>年份/會議</th>
     <th>Proof System</th>
     <th>Remez?</th>
-    <th>ORV?</th>
     <th>Deferred?</th>
     <th>Formal?</th>
     <th>Table size</th>
@@ -251,7 +244,6 @@
     <td><b>查表/非多項式系統 (&times;14)</b><br><span style="font-size:12px; color:#718096;">ezkl, ZKML Compiler, ZKMath*, zkGPT, zkLLM, ZKTorch, zkVC, Kaizen*, zkRNN*, SUMMER, zkPyTorch, zkLoRA, ZK-DeepSeek, RISC Zero</span></td>
     <td>2022–2026</td>
     <td>Various</td>
-    <td>No</td>
     <td>No</td>
     <td>Partial*</td>
     <td>No</td>
@@ -265,7 +257,6 @@
     <td>No</td>
     <td>No</td>
     <td>No</td>
-    <td>No</td>
     <td class="num">N/A</td>
     <td>exp</td>
   </tr>
@@ -274,7 +265,6 @@
     <td>2023</td>
     <td>Halo2/KZG</td>
     <td class="em">Yes</td>
-    <td>No</td>
     <td>No</td>
     <td>No</td>
     <td class="num">4,096</td>
@@ -287,7 +277,6 @@
     <td>No (代數)</td>
     <td>No</td>
     <td>No</td>
-    <td>No</td>
     <td class="num">N/A</td>
     <td>exp/log/trig</td>
   </tr>
@@ -295,7 +284,6 @@
     <td>Lagrange Labs</td>
     <td>ePrint'25</td>
     <td>Noir/BB</td>
-    <td>No</td>
     <td>No</td>
     <td>No</td>
     <td>Partial</td>
@@ -306,7 +294,6 @@
     <td>ZIP</td>
     <td>CCS'25</td>
     <td>gnark/PlonK</td>
-    <td>No</td>
     <td>No</td>
     <td>No</td>
     <td>Partial</td>
@@ -320,7 +307,6 @@
     <td class="em">Yes</td>
     <td class="em">Yes</td>
     <td class="em">Yes</td>
-    <td class="em">Yes</td>
     <td class="num em">256</td>
     <td>13 函數 (exp/ln/sin/erf/GELU...)</td>
   </tr>
@@ -331,7 +317,7 @@
 </p>
 
 <div class="result-box">
-  <strong>我們是據我們所知唯一同時具備 Remez 最優係數、Output Range Verification、Deferred Truncation 和完整正式分析的系統。</strong>
+  <strong>我們是據我們所知唯一同時具備 Remez 最優係數、Deferred Truncation（Horner chain 內部）和完整正式 ULP 分析的系統。</strong>
 </div>
 
 <h2><span class="section-num">3.2</span>表 2：函數覆蓋與 Table 成本</h2>
@@ -441,17 +427,17 @@
     <td class="num">1,467</td>
     <td class="num">~138</td>
     <td class="num">~1.8</td>
-    <td class="num">4,960</td>
+    <td class="num">4,992</td>
   </tr>
   <tr class="ours">
-    <td><b>Ours (Minimax+Def+ORV)</b></td>
+    <td><b>Ours (Minimax+Def+ExplicitRC)</b></td>
     <td class="num em">256</td>
     <td class="num em">1</td>
     <td class="num em">1</td>
     <td class="num em">3</td>
     <td class="num em">137.8</td>
     <td class="num em">1.75</td>
-    <td class="num em">4,960</td>
+    <td class="num em">4,992</td>
   </tr>
 </table>
 
@@ -490,8 +476,8 @@
   <tr>
     <td>Proof size</td>
     <td class="num em">736 B (A)</td>
-    <td class="num">4,960 B</td>
-    <td>查表 <b>6.7x 小</b> *</td>
+    <td class="num">4,992 B</td>
+    <td>查表 <b>6.8x 小</b> *</td>
   </tr>
   <tr>
     <td>Verify time</td>
@@ -523,7 +509,7 @@
 </p>
 
 <div class="key-insight">
-  <strong>範式選擇的權衡：</strong>我們用 proof size（6.7x 大）換取 prove time（9x 快）、table 經濟性（256 vs 65K/函數）和可擴展性（加新函數零電路修改）。在鏈下 prover 效率和多函數部署場景中，這是值得的交換。4,960B 在絕對值上仍可接受（&lt; 5KB）。反之，在需要最小化鏈上 calldata 或零精度損失的場景中，查表法仍然更優。
+  <strong>範式選擇的權衡：</strong>我們用 proof size（6.8x 大）換取 prove time（9x 快）、table 經濟性（256 vs 65K/函數）和可擴展性（加新函數零電路修改）。在鏈下 prover 效率和多函數部署場景中，這是值得的交換。4,992B 在絕對值上仍可接受（&lt; 5KB）。反之，在需要最小化鏈上 calldata 或零精度損失的場景中，查表法仍然更優。
 </div>
 
 <!-- ============================================================ -->
@@ -569,12 +555,12 @@
     <td class="em">Deferred（2x&uarr;）</td>
   </tr>
   <tr>
-    <td>ORV</td>
+    <td>Input RC</td>
     <td>&mdash;</td>
     <td>&mdash;</td>
     <td>&mdash;</td>
     <td>&mdash;</td>
-    <td class="em">&check;（novel）</td>
+    <td class="em">ExplicitRC（gap decomp）</td>
   </tr>
   <tr>
     <td>Error budget</td>
@@ -590,7 +576,7 @@
     <td>&mdash;</td>
     <td>&mdash;</td>
     <td>&mdash;</td>
-    <td class="em">&check;（585 configs）</td>
+    <td class="em">&check;（546 configs）</td>
   </tr>
   <tr>
     <td>(pp, d) 可配置</td>
@@ -627,12 +613,12 @@
 </table>
 
 <div class="key-insight">
-  <strong>在多項式範式中，我們補上了所有缺失的環節。</strong>ZKFixedPointChip 已使用 Minimax 但缺乏 ORV、deferred truncation 和正式分析。zkTaylor 使用次優的 Taylor 基底。Lagrange Labs 需要除法電路（rational function）。我們是據我們所知首個同時具備 L<sup>&infin;</sup>-optimal 係數、ORV、deferred truncation、三層誤差預算和窮舉驗證的系統——且在 (pp, d) 設計空間中對 13 個函數、585 個可行配置點全面驗證（455 窮舉 + 130 取樣）。
+  <strong>在多項式範式中，我們補上了所有缺失的環節。</strong>ZKFixedPointChip 已使用 Minimax 但缺乏 deferred truncation 和正式分析。zkTaylor 使用次優的 Taylor 基底。Lagrange Labs 需要除法電路（rational function）。我們是據我們所知首個同時具備 L<sup>&infin;</sup>-optimal 係數、Horner chain 內部 deferred truncation、三層誤差預算和窮舉驗證的系統——且在 (pp, d) 設計空間中對 13 個函數、546 個可行配置點全面驗證（442 窮舉 + 104 取樣）。
 </div>
 
 <h2><span class="section-num">3.6</span>表 6：Minimax vs Taylor d* 統計摘要</h2>
 
-<p>在 13 函數 &times; 4 精度等級（pp=16/20/24/28）= 52 組配置中，比較達到 ULP &le; 1 所需的最低多項式次數 d*（d=3&ndash;9 搜索，同一 Horner 電路，僅換係數）：</p>
+<p>在 13 函數 &times; 4 精度等級（pp=16/20/24/28）= 52 組配置中，比較達到 ULP &le; 1 所需的最低多項式次數 d*（搜索範圍 d=3&ndash;d<sub>max</sub>(pp)，同一 Horner 電路，僅換係數）：</p>
 
 <table>
   <tr><th>結果分類</th><th>配置數</th><th>佔比</th><th>說明</th></tr>
@@ -644,12 +630,17 @@
   <tr>
     <td>兩者均達標</td>
     <td class="num">15</td><td class="num">29%</td>
-    <td>Minimax 平均節省 <b>2.9 度</b>（對應 30&ndash;45% lookup 節省）</td>
+    <td>Minimax 平均節省 <b>2.8 度</b>（對應 30&ndash;45% lookup 節省）</td>
   </tr>
   <tr>
     <td>Taylor 勝出</td>
     <td class="num">0</td><td class="num">0%</td>
     <td>不存在</td>
+  </tr>
+  <tr>
+    <td>兩者均不可行</td>
+    <td class="num">4</td><td class="num">8%</td>
+    <td>tan (pp=28), ln/arcsin/GELU (pp=28, d*=9 &gt; d<sub>max</sub>=8)</td>
   </tr>
 </table>
 
@@ -674,55 +665,50 @@
   同一電路（Horner deg-5）、同一表（256-entry）、同一域（BN254），僅替換 Taylor &rarr; Minimax 係數。窮舉驗證（156,390 合法輸入）結果：<b>在固定電路條件下，Minimax 的精度改善從數十倍到數千倍不等</b>，倍率取決於函數的 Taylor 收斂結構（詳見 &sect;3.6 表格）。vs ZKFixedPointChip：已用 lolremez 但無 Taylor 對照、無 ULP 量化、無窮舉驗證。vs FHE：Minimax 是標準，但 ZK 需處理有限域量化、顯式截斷與對抗式 prover soundness。
 </p>
 
-<h2><span class="section-num">4.2</span>Contribution 2：Output Range Verification (ORV)</h2>
+<h2><span class="section-num">4.2</span>Contribution 2：Deferred Truncation</h2>
 
 <p>
-  對於單調多項式 <span class="math">P</span>，若 <span class="math">w</span> = &lfloor;<span class="math">P</span>(<span class="math">R</span>) / <span class="math">S<sup>d</sup></span>&rfloor; &isin; [0, <span class="math">S</span>)，則 <span class="math">R</span> 必在合法範圍內。透過 byte decomposition 驗證 <span class="math">w</span> &lt; <span class="math">S</span>，即<b>同時</b>驗證輸入合法性——省掉 1 gate + 1 row（5 gates / 9 rows vs explicit RC 的 6 gates / 10 rows）。據我們的文獻回顧，沒有現有系統利用多項式單調性來驗證輸入範圍。不適用 ORV 的配置可使用 Explicit Range Check 變體（+1 gate, +1 row）。
+  BN254 有 254-bit 域容量，而 Horner 中間值僅需 (d+1)&times;pp bit（如 d=5, pp=16 &rarr; 96 bit，剩餘 158 bits headroom）。將 d 次截斷合併為最終 1 次，避免 d&minus;1 次累積誤差 &rarr; <b>2.0x</b> 精度改善（三函數窮舉驗證：exp ULP 2&rarr;1、ln ULP 2&rarr;1、erf ULP 6&rarr;3），且 lookup 數量節省約 40%。前提：(d+1)&times;pp &lt; 254。概念最近鄰為 IEEE 754 的 Compensated Horner / FMA，但從未在 ZK 有限域中實作。Kaizen/zkRNN 的延後是 DNN layer 粒度（非 Horner 內部），ZKFixedPointChip 承認 BN254 headroom 但未利用。
 </p>
 
-<h2><span class="section-num">4.3</span>Contribution 3：Deferred Truncation</h2>
+<h2><span class="section-num">4.3</span>Contribution 3：Universal Kernel</h2>
 
 <p>
-  BN254 有 254-bit 域容量，而 Horner 中間值僅需 d&times;pp bit（如 d=5, pp=16 &rarr; 80 bit）。將 d 次截斷合併為最終 1 次，避免 d&minus;1 次累積誤差 &rarr; <b>2.0x</b> 精度改善（三函數窮舉驗證：exp ULP 2&rarr;1、ln ULP 2&rarr;1、erf ULP 6&rarr;3）。前提：d&times;pp &lt; 253。概念最近鄰為 IEEE 754 的 Compensated Horner / FMA，但從未在 ZK 有限域中實作。Kaizen/zkRNN 的延後是 DNN layer 粒度（非 Horner 內部），ZKFixedPointChip 承認 BN254 headroom 但未利用。
+  電路結構由 (pp, d) 參數化：6 gates, &lceil;pp/8&rceil; + &lceil;d&times;pp/8&rceil; lookups（R/w/gap 透過 selector union 共用 byte 欄位）, d+4 rows, 256-entry ByteTable。以 pp=16, d=5 為例：2+10 = 12 lookups。切換函數只需替換 d 個係數。實測 4 函數（exp, ln, erf, GELU）prove time 差異 &lt; 1.4%，proof size 完全相同（4,992 B）。已驗證推廣至 13 個函數、546 個可行配置點（442 窮舉 + 104 取樣）。exp-ln 對偶性：共用 [0, ln2) 區間，兩者 d=5 均 ULP=1，僅 5 個係數不同。
 </p>
 
-<h2><span class="section-num">4.4</span>Contribution 4：Universal Kernel</h2>
+<h2><span class="section-num">4.4</span>Function Coverage Criteria</h2>
 
 <p>
-  電路結構由 (pp, d) 參數化：5 gates, 2&lceil;pp/8&rceil; + &lceil;d&times;pp/8&rceil; lookups, d+4 rows, 256-entry ByteTable（pp=16 時 R/w 共用 byte 欄位，lookup 數為 &lceil;pp/8&rceil; + &lceil;d&times;pp/8&rceil; = 12）。切換函數只需替換 d 個係數。實測 4 函數（exp, ln, erf, GELU）prove time 差異 &lt; 1.4%，proof size 完全相同（4,960 B）。已驗證推廣至 13 個函數、585 個可行配置點（455 窮舉 + 130 取樣）。exp-ln 對偶性：共用 [0, ln2) 區間，兩者 d=5 均 ULP=1，僅 5 個係數不同。
+  提出充分條件 C1-C6（零錨點、嚴格單調、輸出有界、多項式可近似、係數量化、輸入分解），判定函數是否可由 universal kernel 處理。13 個常見函數（exp、ln、sin、1-cos、arcsin、arctan、tan、sinh、erf、GELU、sigmoid、1-exp(-x)、1-exp(-x&sup2;)）均滿足所有條件。Coverage 分析將系統從「支援特定函數的實作」提升為「可覆蓋任意滿足條件之函數的方法論」。
 </p>
 
-<h2><span class="section-num">4.5</span>Contribution 5：Function Coverage Criteria (C1-C6)</h2>
+<h2><span class="section-num">4.5</span>寬區間驗證與有害次數效應</h2>
 
 <p>
-  提出充分條件 C1-C6（零錨點、嚴格單調、輸出有界、多項式可近似、係數量化、輸入分解），判定函數是否可由 universal kernel 處理。13 個常見函數（exp、ln、sin、1-cos、arcsin、arctan、tan、sinh、erf、GELU、sigmoid、1-exp(-x)、1-exp(-x&sup2;)）均滿足 C1、C2、C4-C6。對於 C3（ORV 適用性）：<b>11/13 在所有配置通過</b>，2 個（1-cos, 1-exp(-x&sup2;)）需 d&ge;5-6。pp=16 d=5 時 12/13 通過，d&ge;6 時 13/13 全數通過。Coverage 分析將系統從「支援特定函數的實作」提升為「可覆蓋任意滿足條件之函數的方法論」。
-</p>
-
-<h2><span class="section-num">4.6</span>Contribution 6：寬區間驗證與有害次數效應</h2>
-
-<p>
-  <b>寬區間 Minimax 優勢：</b>5 個飽和/組合函數在寬區間（未做範圍歸約）下 Minimax 贏 Taylor <b>139x&ndash;3,741x</b>（如 erf [0,2.5] 的 3,741x）。Taylor 更出現大量 ORV 失敗（w&ge;S 的輸入點數達 83K&ndash;381K）和負多項式輸出，直接導致 proof 無法生成。
+  <b>寬區間 Minimax 優勢：</b>5 個飽和/組合函數在寬區間（未做範圍歸約）下 Minimax 贏 Taylor <b>139x&ndash;3,741x</b>（如 erf [0,2.5] 的 3,741x）。Taylor 更出現大量溢出（w&ge;S 的輸入點數達 83K&ndash;381K）和負多項式輸出，直接導致 proof 無法生成。
 </p>
 <p>
   <b>有害次數效應 (Harmful Degree Effect)：</b>寬區間上更高的 d 可能<b>反而增加</b> ULP——如 sigmoid [0,8] 從 d=4 的 ULP=508 惡化至 d=5 的 ULP=14,230（28x 惡化）。原因是量化放大：高 d 導致整數係數位寬指數增長，量化誤差通過 Horner 鏈累積，壓倒逼近誤差的改善。據我們所知，此效應首次在 ZK 文獻中被記錄。設計意義：<b>優先縮窄區間（範圍歸約）而非盲目提升 d</b>。詳見<a href="contribution-comparison-full-reference.html">完整參考版 &sect;4.6</a>。
 </p>
 
-<h2><span class="section-num">4.7</span>Contribution 7：(pp, d) 設計空間全探索</h2>
+<h2><span class="section-num">4.6</span>(pp, d) 設計空間全探索</h2>
 
 <p>
-  首次對 (pp, d) 設計空間進行系統性探索：覆蓋 pp &isin; {12&ndash;36} &times; d &isin; {3&ndash;9} &times; 13 函數，共 <b>637 個格點</b>（585 可行 + 52 BN254 溢出排除），其中 pp&le;28 為窮舉驗證。核心發現：
+  首次對 (pp, d) 設計空間進行系統性探索：覆蓋 pp &isin; {12&ndash;36} &times; d &isin; {3&ndash;9} &times; 13 函數，共 <b>637 個格點</b>（546 可行 + 91 BN254 溢出排除），其中 pp&le;24 為全數窮舉、pp=28 為 d&le;8 窮舉。核心發現：
 </p>
 <ul style="margin:8px 0 8px 24px;">
   <li><b>pp=16 + d&le;7 是唯一覆蓋 13/13 函數的實用配置</b></li>
-  <li><b>pp=24 + d&le;9 亦幾乎全數滿足 ULP=1</b>：12/13 函數 ULP=1，僅 tan 為 ULP=2（&lt;3）。但 pp=24 已是查表法實用邊界（d<sub>max</sub>=10，BN254 空間緊張）——即使在此上限，方法仍近乎完美</li>
+  <li><b>pp=24 + d&le;9 亦幾乎全數滿足 ULP=1</b>：12/13 函數 ULP=1，僅 tan 為 ULP=2（&lt;3）。pp=24 時 d<sub>max</sub>=9（與搜索上限吻合）——即使在此邊界，方法仍近乎完美</li>
   <li>d*=4 佔 6 函數、d*&le;5 佔 10/13（77%）——<b>d=5 是甜蜜點</b>（12/13 達 ULP&le;3）</li>
   <li>函數難度三群組：快速收斂（exp/sin 等，pp*&gt;40）、中等（GELU/ln 等，30&ndash;40）、慢收斂（erf/tan 等，&lt;30）</li>
-  <li>pp&ge;32 基本不可行（BN254 d<sub>max</sub>&le;7，僅 3/13 函數 ULP=1）</li>
-  <li>pp=16&rarr;24 成本：prove time 2.0x、proof size 1.39x（table 不變，仍 256）</li>
+  <li>pp=28 受限：d<sub>max</sub>=8，ln/arcsin/GELU 需 d=9 不可部署，實際 7/13 函數可達 ULP=1</li>
+  <li>pp&ge;32 基本不可行（BN254 d<sub>max</sub>&le;6，僅 3/13 函數 ULP=1）</li>
+  <li>pp=16&rarr;24 成本：prove time 2.1x、proof size 1.38x（table 不變，仍 256）</li>
   <li>範圍歸約僅增加 36&ndash;50% 行數——比無歸約時的 ULP&gt;1000 失敗，是高性價比投資</li>
 </ul>
 
-<h2><span class="section-num">4.8</span>Contribution 8：交叉驗證體系</h2>
+<h2><span class="section-num">4.7</span>交叉驗證體系</h2>
 
 <p>
   所有數據經 3 個獨立路徑交叉驗證：Python Remez（150-bit）、Python 整數 Horner、Rust/Halo2 ZK 電路。<b>499 個測試點全數一致</b>（78 主要 + 48 補充 + 360 pp 敏感性 + 13 跨語言）。詳見<a href="contribution-comparison-full-reference.html">完整參考版 &sect;4.7</a>。
@@ -734,19 +720,19 @@
 <h1><span class="section-num">5</span>誠實的限制</h1>
 
 <div class="problem-box">
-  <strong>1. ULP 範圍限制：</strong>max ULP claims 僅限於 Horner evaluation kernel 本身。End-to-end 精度取決於 range reduction 的實作品質——例如 exp 需要先將輸入分解為整數部分與小數部分。Range reduction 的精度損失不在本論文範圍內。
+  <strong>1. ULP 範圍限制：</strong>max ULP claims 僅限於 Horner evaluation kernel 本身（14 個 kernel 均 ≤4 ULP）。E2E 電路已為全部 13 個函數實測（EXP07, KZG verified）：12/13 函數 E2E ULP ≤3。exp 在 k=16 時因 LN2_S 量化誤差被 2<sup>16</sup> 放大至 ~98K ULP（kernel 本身僅 1 ULP），此為整數範圍歸約的固有特性。仍有限制：GELU 僅覆蓋 [0,1]、arctan |x| ≤ 16M（FieldDiv 3-byte gap）。
 </div>
 
 <div class="problem-box">
-  <strong>2. Batch 場景：</strong>N=1,000 時，我們的 prove time 為 1,011ms，而 Method B（Chunk lookup）僅需 135ms（7.5x 劣勢）。每次求值需要 9 rows，而查表法只需 1 row。在大量批次計算中，查表法的效率優勢明顯。
+  <strong>2. Batch 場景：</strong>N=1,000 時，我們的 prove time 為 1,011ms，而 Method B（Chunk lookup）僅需 135ms（7.5x 劣勢）。每次求值需要 9 rows（d+4，d=5），而查表法只需 1 row。在大量批次計算中，查表法的效率優勢明顯。
 </div>
 
 <div class="problem-box">
-  <strong>3. Proof size：</strong>4,960B vs Method A（Direct lookup）的 736B，大了 6.7x。雖然在絕對值上仍然可接受（不到 5KB），但並非最小。
+  <strong>3. Proof size：</strong>4,992B vs Method A（Direct lookup）的 736B，大了 6.8x。雖然在絕對值上仍然可接受（不到 5KB），但並非最小。
 </div>
 
 <div class="problem-box">
-  <strong>4. ORV 適用性：</strong>13 個函數中，11 個在所有 (pp, <span class="math">d</span>) 配置下通過 ORV；2 個（1-cos, 1-exp(-x²)）需要 <span class="math">d</span>&ge;5-6 以避免多項式振盪。pp=16 d=5 時 12/13 通過，d&ge;6 時 13/13 全數通過。不適用 ORV 的配置可使用 Explicit Range Check 變體（+1 gate, +1 row）。
+  <strong>4. Deferred truncation bit budget：</strong>需滿足 (d+1)&times;pp &lt; 254（BN254 域容量限制）。pp=16 時 d_max=14（綽綽有餘），但 pp=32 時 d_max=6。超高精度場景需退回 per-step truncation 或使用部分延遲策略。
 </div>
 
 <!-- ============================================================ -->
@@ -755,15 +741,15 @@
 <h1><span class="section-num">6</span>結語——定位總結</h1>
 
 <div class="result-box">
-  <p><b>文獻涵蓋：</b>22 個系統（CCS、USENIX、CRYPTO、NDSS、ePrint、arXiv 等主要會議）。<b>實驗規模：</b>637 格點、499 交叉驗證、13 函數。</p>
+  <p><b>文獻涵蓋：</b>22 個系統（CCS、USENIX、CRYPTO、NDSS、ePrint、arXiv 等主要會議）。<b>實驗規模：</b>637 格點（546 可行）、499 交叉驗證、13 函數。</p>
   <table style="margin:12px 0;">
     <tr><th>vs</th><th>他們</th><th>我們</th></tr>
-    <tr><td>ZKFixedPointChip</td><td>Minimax 但無正式分析</td><td>+ORV +deferred trunc +誤差預算 +窮舉驗證</td></tr>
+    <tr><td>ZKFixedPointChip</td><td>Minimax 但無正式分析</td><td>+deferred trunc +誤差預算 +窮舉驗證 +13 函數</td></tr>
     <tr><td>查表法 (&times;14)</td><td>16K-65K entries/函數</td><td>256-entry ByteTable（所有函數共用）</td></tr>
     <tr><td>Lagrange Labs</td><td>Pad&eacute; rational（需除法電路）</td><td>純多項式 Horner 求值，不需除法</td></tr>
     <tr><td>Kurik &amp; Laud</td><td>代數恆等式（互動式 ZK 協議，無精度分析）</td><td>多項式近似 + 三層誤差預算 + ULP 驗證</td></tr>
     <tr><td>Kaizen / zkRNN</td><td>Layer-level 延後 + 3 段線性</td><td>Horner 內部延後 + Minimax 多項式</td></tr>
-    <tr><td>所有先前工作</td><td>固定配置，無設計空間分析</td><td>(pp,d) 全探索：637 格點、499 交叉驗證</td></tr>
+    <tr><td>所有先前工作</td><td>固定配置，無設計空間分析</td><td>(pp,d) 全探索：637 格點（546 可行）、499 交叉驗證</td></tr>
     <tr><td>所有先前工作</td><td>未記錄有害次數效應</td><td>首次記錄：寬區間高 d 反而惡化（最高 28x）</td></tr>
   </table>
   <p>
