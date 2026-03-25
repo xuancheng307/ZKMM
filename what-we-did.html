@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>我們到底做了什麼 — 給密碼學同學的說明</title>
+<title>我們到底做了什麼 — 以密碼學的角度</title>
 <style>
   :root {
     --bg: #fafafa;
@@ -110,26 +110,10 @@
 <small>給密碼學同學的技術說明 — 精確定義每一件事</small>
 </h1>
 
-<div class="toc">
-<strong>目錄</strong>
-<ul>
-  <li><a href="#s0">0. 一句話版本</a></li>
-  <li><a href="#s1">1. 名詞定義：超越函數、定點數、ULP</a></li>
-  <li><a href="#s1b">1.5 Before vs After：我們的工作改變了什麼</a></li>
-  <li><a href="#s2">2. 問題是什麼</a></li>
-  <li><a href="#s3">3. 我們用了什麼 ZK 系統</a></li>
-  <li><a href="#s4">4. 我們改了 ZK 架構嗎？</a></li>
-  <li><a href="#s5">5. 我們實際做了什麼（三個貢獻）</a></li>
-  <li><a href="#s6">6. 安全性：我們證明了什麼、沒證明什麼</a></li>
-  <li><a href="#s7">7. 我們有完整證明 ZK 嗎？</a></li>
-  <li><a href="#s8">8. 誠實的定位：這篇論文是什麼層級的工作</a></li>
-  <li><a href="#s9">9. 數值分析的貢獻 vs 密碼學的貢獻</a></li>
-  <li><a href="#s10">10. 總結對照表</a></li>
-</ul>
-</div>
+
 
 <!-- ===== Section 0 ===== -->
-<h2 id="s0">0. 一句話版本</h2>
+<h2 id="s0">0. 一句話</h2>
 
 <div class="card card-info">
 我們<strong>沒有</strong>發明新的零知識證明系統。我們設計了一套<strong>電路層級的方法論</strong>，讓現有的 ZK 系統（Halo2）能精確計算 exp、ln、sin 等超越函數。類比：我們不是設計 CPU 的人，我們是寫高效組合語言程式的人。
