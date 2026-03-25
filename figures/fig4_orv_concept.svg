@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="400" viewBox="0 0 700 400">
+  <style>
+    text { font-family: "Times New Roman", "Latin Modern Roman", Georgia, serif; }
+    .axis-label { font-size: 15px; fill: #1a202c; }
+    .tick-label { font-size: 12px; fill: #4a5568; }
+    .annotation { font-size: 13px; fill: #1a202c; }
+    .annotation-box { font-size: 13px; }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#2d3748"/>
+    </marker>
+    <clipPath id="validClip">
+      <rect x="80" y="45" width="370" height="310"/>
+    </clipPath>
+    <clipPath id="plotArea">
+      <rect x="80" y="45" width="560" height="310"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="700" height="400" fill="white"/>
+
+  <!-- Valid region: green shaded area under S line, for R in [0, R_MAX] -->
+  <rect x="80" y="75" width="370" height="280" fill="#38a169" opacity="0.10" rx="2"/>
+
+  <!-- Invalid region: red shaded area above S line -->
+  <rect x="80" y="45" width="560" height="30" fill="#e53e3e" opacity="0.08" rx="2"/>
+
+  <!-- S horizontal dashed line -->
+  <line x1="80" y1="75" x2="640" y2="75" stroke="#718096" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="68" y="79" text-anchor="end" class="tick-label" font-style="italic">S</text>
+  <text x="68" y="93" text-anchor="end" class="tick-label" font-size="10" fill="#718096">= 65,536</text>
+
+  <!-- Axes -->
+  <!-- X-axis -->
+  <line x1="80" y1="355" x2="650" y2="355" stroke="#2d3748" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <!-- Y-axis -->
+  <line x1="80" y1="365" x2="80" y2="35" stroke="#2d3748" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+  <!-- X-axis label -->
+  <text x="645" y="380" class="axis-label" text-anchor="end" font-style="italic">R</text>
+  <text x="660" y="380" class="axis-label" text-anchor="end" font-size="12" fill="#718096">(input)</text>
+
+  <!-- Y-axis label -->
+  <text x="30" y="40" class="axis-label" text-anchor="middle">output</text>
+
+  <!-- X-axis ticks -->
+  <!-- 0 -->
+  <line x1="80" y1="355" x2="80" y2="360" stroke="#2d3748" stroke-width="1"/>
+  <text x="80" y="375" text-anchor="middle" class="tick-label">0</text>
+
+  <!-- R_MAX at x=450 -->
+  <line x1="450" y1="355" x2="450" y2="360" stroke="#2d3748" stroke-width="1"/>
+  <text x="450" y="375" text-anchor="middle" class="tick-label" font-style="italic">R</text>
+  <text x="450" y="388" text-anchor="middle" class="tick-label" font-size="10" font-style="normal">MAX</text>
+
+  <!-- Vertical dashed line at R_MAX -->
+  <line x1="450" y1="355" x2="450" y2="45" stroke="#a0aec0" stroke-width="1" stroke-dasharray="4,4"/>
+
+  <!-- Monotone increasing curve f(R) from (0,0) to (R_MAX, ~0.85*S) -->
+  <!-- Y range: 355 (y=0) to 75 (y=S), so 0.85*S maps to 355 - 0.85*280 = 117 -->
+  <path d="M 80,355 C 150,340 250,280 320,210 S 400,140 450,117"
+        fill="none" stroke="#2b6cb0" stroke-width="2.5" clip-path="url(#validClip)"/>
+
+  <!-- Curve label -->
+  <text x="260" y="235" class="annotation" fill="#2b6cb0" font-style="italic" transform="rotate(-32, 260, 235)">f(R) -- monotone</text>
+
+  <!-- Valid region label -->
+  <text x="265" y="330" class="annotation" fill="#2f855a" font-weight="bold" text-anchor="middle">Valid: w &lt; S</text>
+  <text x="313" y="330" class="annotation" fill="#2f855a" font-weight="bold" font-size="14"> &#x2713;</text>
+
+  <!-- Invalid region label -->
+  <text x="560" y="63" class="annotation" fill="#c53030" font-weight="bold" text-anchor="middle">Invalid: w &#x2265; S</text>
+  <text x="607" y="63" class="annotation" fill="#c53030" font-weight="bold" font-size="14"> &#x2717;</text>
+
+  <!-- Random red dots for R > R_MAX (representing P(R) mod p) -->
+  <circle cx="490" cy="250" r="5" fill="#e53e3e" opacity="0.85"/>
+  <circle cx="530" cy="120" r="5" fill="#e53e3e" opacity="0.85"/>
+  <circle cx="560" cy="310" r="5" fill="#e53e3e" opacity="0.85"/>
+  <circle cx="600" cy="175" r="5" fill="#e53e3e" opacity="0.85"/>
+
+  <!-- Label for red dots -->
+  <text x="580" y="145" class="tick-label" fill="#c53030" text-anchor="middle" font-style="italic" font-size="11">P(R) mod p</text>
+  <text x="580" y="160" class="tick-label" fill="#c53030" text-anchor="middle" font-size="10">random ~2</text>
+  <text x="612" y="155" class="tick-label" fill="#c53030" text-anchor="middle" font-size="8">254</text>
+
+  <!-- Annotation box 1 -->
+  <rect x="100" y="15" width="230" height="24" rx="4" fill="#EBF8FF" stroke="#2b6cb0" stroke-width="1" opacity="0.9"/>
+  <text x="215" y="32" text-anchor="middle" class="annotation-box" fill="#2b6cb0" font-size="13">
+    w &lt; S  &#x27F9;  R &#x2208; [0, R<tspan font-size="9" dy="3">MAX</tspan><tspan dy="-3">]</tspan>
+  </text>
+
+  <!-- Annotation box 2 -->
+  <rect x="370" y="15" width="230" height="24" rx="4" fill="#FFF5F5" stroke="#c53030" stroke-width="1" opacity="0.9"/>
+  <text x="485" y="32" text-anchor="middle" class="annotation-box" fill="#c53030" font-size="13">
+    Forgery prob &#x2264; 2<tspan font-size="9" dy="-5">-156</tspan>
+  </text>
+</svg>

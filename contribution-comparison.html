@@ -52,9 +52,29 @@
     tr.ours { background: #ebf8ff !important; font-weight: 600; }
     tr.ours td { border-bottom: 2px solid var(--accent); }
     @media print { body { font-size: 12pt; padding: 0; } h1 { page-break-before: always; } }
+  .site-nav {
+    display: flex; flex-wrap: wrap;
+    background: #1a365d; border-radius: 8px; overflow: hidden;
+    margin-bottom: 32px;
+    font-family: -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 14px;
+  }
+  .site-nav a {
+    color: #cbd5e0; text-decoration: none;
+    padding: 10px 18px; transition: background 0.2s;
+  }
+  .site-nav a:hover { background: #2b6cb0; color: #fff; }
+  .site-nav a.active { background: #2b6cb0; color: #fff; font-weight: 600; }
   </style>
 </head>
 <body>
+
+<nav class="site-nav">
+  <a href="proposal.html">總報告</a>
+  <a href="research-background.html">研究背景</a>
+  <a href="contribution-comparison.html" class="active">差異比較</a>
+  <a href="what-we-did.html">技術說明</a>
+</nav>
 
 <!-- ============================================================ -->
 <!-- Title                                                        -->
@@ -202,7 +222,7 @@
     <td><b>G2: 無 Horner 內部 deferred truncation</b></td>
     <td>Kaizen / zkRNN（layer-level 延後）<br>PoPETs'25（MPC truncation SoK）</td>
     <td>粒度是 DNN layer，非 Horner chain<br>確認「一次乘法一次截斷」為標準</td>
-    <td>BN254 254-bit 容量 vs (d+1)&times;pp bit，d 次合併為 1 次 → <b>2x</b></td>
+    <td>BN254 254-bit 容量 vs d&times;pp bit，d 次合併為 1 次 → <b>2x</b></td>
   </tr>
   <tr>
     <td><b>G3: 無正式誤差預算</b></td>
@@ -552,7 +572,7 @@
     <td>Per-step</td>
     <td>N/A</td>
     <td>N/A（浮點）</td>
-    <td class="em">Deferred（2x&uarr;）</td>
+    <td class="em">Deferred（2&times;&ndash;7&times;&uarr;）</td>
   </tr>
   <tr>
     <td>Input RC</td>
@@ -618,38 +638,38 @@
 
 <h2><span class="section-num">3.6</span>表 6：Minimax vs Taylor d* 統計摘要</h2>
 
-<p>在 13 函數 &times; 4 精度等級（pp=16/20/24/28）= 52 組配置中，比較達到 ULP &le; 1 所需的最低多項式次數 d*（搜索範圍 d=3&ndash;d<sub>max</sub>(pp)，同一 Horner 電路，僅換係數）：</p>
+<p>在 13 函數 &times; 4 精度等級（pp=16/20/24/28）= 52 組配置中，比較達到 ULP &le; 1 所需的最低多項式次數 d*（d=3&ndash;9 搜索，同一 Horner 電路，僅換係數）：</p>
 
 <table>
   <tr><th>結果分類</th><th>配置數</th><th>佔比</th><th>說明</th></tr>
   <tr>
     <td class="em">Minimax 獨勝</td>
-    <td class="num em">33</td><td class="num em">63%</td>
+    <td class="num em">32</td><td class="num em">62%</td>
     <td>Minimax 達 ULP&le;1，Taylor 在 d&le;9 內完全無法達到</td>
   </tr>
   <tr>
     <td>兩者均達標</td>
-    <td class="num">15</td><td class="num">29%</td>
-    <td>Minimax 平均節省 <b>2.8 度</b>（對應 30&ndash;45% lookup 節省）</td>
+    <td class="num">16</td><td class="num">31%</td>
+    <td>Minimax 平均節省 <b>3.0 度</b>（對應 35&ndash;45% lookup 節省）</td>
+  </tr>
+  <tr>
+    <td>兩者均失敗</td>
+    <td class="num">4</td><td class="num">8%</td>
+    <td>tan(pp&ge;24)、erf(pp=28)、1-exp(-x&sup2;)(pp=28) 均需 d&gt;9</td>
   </tr>
   <tr>
     <td>Taylor 勝出</td>
     <td class="num">0</td><td class="num">0%</td>
     <td>不存在</td>
   </tr>
-  <tr>
-    <td>兩者均不可行</td>
-    <td class="num">4</td><td class="num">8%</td>
-    <td>tan (pp=28), ln/arcsin/GELU (pp=28, d*=9 &gt; d<sub>max</sub>=8)</td>
-  </tr>
 </table>
 
 <p>
-  <b>8/13 函數</b>（ln, tan, arcsin, erf, sigmoid, GELU, 1-exp(-x), 1-exp(-x&sup2;)）Taylor 在所有 4 個 pp 值下均無法達到 ULP&le;1——原因是兩個結構性限制：<b>對稱零項浪費</b>（奇函數如 erf、arcsin、tan 的偶數次 Taylor 係數恆為零，degree-5 實際只用 3 個非零項）和<b>收斂緩慢或收斂半徑不足</b>（如 ln 的 1/<span class="math">n</span> 衰減、sigmoid 收斂半徑僅 &pi;），每個無法達標的函數至少受其一影響。完整 13&times;4 d* 對照表見<a href="contribution-comparison-full-reference.html">完整參考版 &sect;4.1</a>。
+  <b>6/13 函數</b>（ln, tan, arcsin, erf, GELU, 1-exp(-x&sup2;)）Taylor 在所有 4 個 pp 值下均無法達到 ULP&le;1——原因是兩個結構性限制：<b>對稱零項浪費</b>（奇函數如 erf、arcsin、tan 的偶數次 Taylor 係數恆為零，degree-5 實際只用 3 個非零項）和<b>收斂緩慢或收斂半徑不足</b>（如 ln 的 1/<span class="math">n</span> 衰減），每個無法達標的函數至少受其一影響。完整 13&times;4 d* 對照表見<a href="contribution-comparison-full-reference.html">完整參考版 &sect;4.1</a>。
 </p>
 
 <div class="result-box">
-  <strong>Minimax 不僅是精度改善，更是可行性門檻</strong>——Taylor 在 63% 的設計空間中根本無法達到目標精度。選擇 Taylor 意味著直接排除大部分 (函數, pp) 組合。
+  <strong>Minimax 不僅是精度改善，更是可行性門檻</strong>——Taylor 在 62% 的設計空間中根本無法達到目標精度。選擇 Taylor 意味著直接排除大部分 (函數, pp) 組合。
 </div>
 
 <!-- ============================================================ -->
@@ -695,20 +715,19 @@
 <h2><span class="section-num">4.6</span>(pp, d) 設計空間全探索</h2>
 
 <p>
-  首次對 (pp, d) 設計空間進行系統性探索：覆蓋 pp &isin; {12&ndash;36} &times; d &isin; {3&ndash;9} &times; 13 函數，共 <b>637 個格點</b>（546 可行 + 91 BN254 溢出排除），其中 pp&le;24 為全數窮舉、pp=28 為 d&le;8 窮舉。核心發現：
+  首次對 (pp, d) 設計空間進行系統性探索：覆蓋 pp &isin; {12&ndash;36} &times; d &isin; {3&ndash;9} &times; 13 函數，共 <b>637 個格點</b>（546 可行 + 91 BN254 溢出排除），其中 pp&le;28 為窮舉驗證。核心發現：
 </p>
 <ul style="margin:8px 0 8px 24px;">
   <li><b>pp=16 + d&le;7 是唯一覆蓋 13/13 函數的實用配置</b></li>
-  <li><b>pp=24 + d&le;9 亦幾乎全數滿足 ULP=1</b>：12/13 函數 ULP=1，僅 tan 為 ULP=2（&lt;3）。pp=24 時 d<sub>max</sub>=9（與搜索上限吻合）——即使在此邊界，方法仍近乎完美</li>
+  <li><b>pp=24 + d&le;9 亦幾乎全數滿足 ULP=1</b>：12/13 函數 ULP=1，僅 tan 為 ULP=2（&lt;3）。但 pp=24 已是查表法實用邊界（d<sub>max</sub>=10，BN254 空間緊張）——即使在此上限，方法仍近乎完美</li>
   <li>d*=4 佔 6 函數、d*&le;5 佔 10/13（77%）——<b>d=5 是甜蜜點</b>（12/13 達 ULP&le;3）</li>
   <li>函數難度三群組：快速收斂（exp/sin 等，pp*&gt;40）、中等（GELU/ln 等，30&ndash;40）、慢收斂（erf/tan 等，&lt;30）</li>
-  <li>pp=28 受限：d<sub>max</sub>=8，ln/arcsin/GELU 需 d=9 不可部署，實際 7/13 函數可達 ULP=1</li>
-  <li>pp&ge;32 基本不可行（BN254 d<sub>max</sub>&le;6，僅 3/13 函數 ULP=1）</li>
+  <li>pp&ge;32 基本不可行（BN254 d<sub>max</sub>&le;7，僅 3/13 函數 ULP=1）</li>
   <li>pp=16&rarr;24 成本：prove time 2.1x、proof size 1.38x（table 不變，仍 256）</li>
   <li>範圍歸約僅增加 36&ndash;50% 行數——比無歸約時的 ULP&gt;1000 失敗，是高性價比投資</li>
 </ul>
 
-<h2><span class="section-num">4.7</span>交叉驗證體系</h2>
+<h2><span class="section-num">4.8</span>Contribution 8：交叉驗證體系</h2>
 
 <p>
   所有數據經 3 個獨立路徑交叉驗證：Python Remez（150-bit）、Python 整數 Horner、Rust/Halo2 ZK 電路。<b>499 個測試點全數一致</b>（78 主要 + 48 補充 + 360 pp 敏感性 + 13 跨語言）。詳見<a href="contribution-comparison-full-reference.html">完整參考版 &sect;4.7</a>。
@@ -720,11 +739,11 @@
 <h1><span class="section-num">5</span>誠實的限制</h1>
 
 <div class="problem-box">
-  <strong>1. ULP 範圍限制：</strong>max ULP claims 僅限於 Horner evaluation kernel 本身（14 個 kernel 均 ≤4 ULP）。E2E 電路已為全部 13 個函數實測（EXP07, KZG verified）：12/13 函數 E2E ULP ≤3。exp 在 k=16 時因 LN2_S 量化誤差被 2<sup>16</sup> 放大至 ~98K ULP（kernel 本身僅 1 ULP），此為整數範圍歸約的固有特性。仍有限制：GELU 僅覆蓋 [0,1]、arctan |x| ≤ 16M（FieldDiv 3-byte gap）。
+  <strong>1. ULP 範圍限制：</strong>max ULP claims 僅限於 Horner evaluation kernel 本身。End-to-end 精度取決於 range reduction 的實作品質——例如 exp 需要先將輸入分解為整數部分與小數部分。Range reduction 的精度損失不在本論文範圍內。
 </div>
 
 <div class="problem-box">
-  <strong>2. Batch 場景：</strong>N=1,000 時，我們的 prove time 為 1,011ms，而 Method B（Chunk lookup）僅需 135ms（7.5x 劣勢）。每次求值需要 9 rows（d+4，d=5），而查表法只需 1 row。在大量批次計算中，查表法的效率優勢明顯。
+  <strong>2. Batch 場景：</strong>N=1,000 時，我們的 prove time 為 1,011ms，而 Method B（Chunk lookup）僅需 135ms（7.5x 劣勢）。每次求值需要 9 rows，而查表法只需 1 row。在大量批次計算中，查表法的效率優勢明顯。
 </div>
 
 <div class="problem-box">
@@ -741,7 +760,7 @@
 <h1><span class="section-num">6</span>結語——定位總結</h1>
 
 <div class="result-box">
-  <p><b>文獻涵蓋：</b>22 個系統（CCS、USENIX、CRYPTO、NDSS、ePrint、arXiv 等主要會議）。<b>實驗規模：</b>637 格點（546 可行）、499 交叉驗證、13 函數。</p>
+  <p><b>文獻涵蓋：</b>22 個系統（CCS、USENIX、CRYPTO、NDSS、ePrint、arXiv 等主要會議）。<b>實驗規模：</b>637 格點、499 交叉驗證、13 函數。</p>
   <table style="margin:12px 0;">
     <tr><th>vs</th><th>他們</th><th>我們</th></tr>
     <tr><td>ZKFixedPointChip</td><td>Minimax 但無正式分析</td><td>+deferred trunc +誤差預算 +窮舉驗證 +13 函數</td></tr>
@@ -749,7 +768,7 @@
     <tr><td>Lagrange Labs</td><td>Pad&eacute; rational（需除法電路）</td><td>純多項式 Horner 求值，不需除法</td></tr>
     <tr><td>Kurik &amp; Laud</td><td>代數恆等式（互動式 ZK 協議，無精度分析）</td><td>多項式近似 + 三層誤差預算 + ULP 驗證</td></tr>
     <tr><td>Kaizen / zkRNN</td><td>Layer-level 延後 + 3 段線性</td><td>Horner 內部延後 + Minimax 多項式</td></tr>
-    <tr><td>所有先前工作</td><td>固定配置，無設計空間分析</td><td>(pp,d) 全探索：637 格點（546 可行）、499 交叉驗證</td></tr>
+    <tr><td>所有先前工作</td><td>固定配置，無設計空間分析</td><td>(pp,d) 全探索：637 格點、499 交叉驗證</td></tr>
     <tr><td>所有先前工作</td><td>未記錄有害次數效應</td><td>首次記錄：寬區間高 d 反而惡化（最高 28x）</td></tr>
   </table>
   <p>

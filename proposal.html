@@ -211,9 +211,29 @@
     table { break-inside: avoid; }
     h1 { break-before: page; }
   }
+  .site-nav {
+    display: flex; flex-wrap: wrap;
+    background: #1a365d; border-radius: 8px; overflow: hidden;
+    margin-bottom: 32px;
+    font-family: -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 14px;
+  }
+  .site-nav a {
+    color: #cbd5e0; text-decoration: none;
+    padding: 10px 18px; transition: background 0.2s;
+  }
+  .site-nav a:hover { background: #2b6cb0; color: #fff; }
+  .site-nav a.active { background: #2b6cb0; color: #fff; font-weight: 600; }
 </style>
 </head>
 <body>
+
+<nav class="site-nav">
+  <a href="proposal.html" class="active">總報告</a>
+  <a href="research-background.html">研究背景</a>
+  <a href="contribution-comparison.html">差異比較</a>
+  <a href="what-we-did.html">技術說明</a>
+</nav>
 
 <!-- ===== 封面 ===== -->
 <div style="text-align:center; padding: 60px 0 40px 0;">
@@ -226,8 +246,8 @@
     Transcendental Functions in Zero-Knowledge Circuits
   </p>
   <p style="margin-top:32px; color:#4a5568;">
-    研究生：高璿程<br>
-    指導教授：左瑞麟<br>
+    研究生：[姓名]<br>
+    指導教授：[教授姓名]<br>
     日期：2026 年 3 月
   </p>
 </div>
@@ -348,16 +368,16 @@
   <tr><td>arctan(x)</td><td>[0, tan(&pi;/8)]</td><td class="num em">4</td><td class="num">9</td><td class="num">5 次</td></tr>
   <tr><td>arcsin(x)</td><td>[0, 0.5]</td><td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td><td class="num">—</td></tr>
   <tr><td>erf(x)</td><td>[0, 1]</td><td class="num em">6</td><td class="num" style="color:#e53e3e;">&gt;9</td><td class="num">—</td></tr>
-  <tr><td>sigmoid(x)</td><td>[0, 1]</td><td class="num em">4</td><td class="num" style="color:#e53e3e;">&gt;9</td><td class="num">—</td></tr>
+  <tr><td>sigmoid(x)</td><td>[0, 1]</td><td class="num em">4</td><td class="num">9</td><td class="num">5 次</td></tr>
   <tr><td>GELU(x)</td><td>[0, 1]</td><td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td><td class="num">—</td></tr>
   <tr><td>sinh(x)</td><td>[0, ln2)</td><td class="num em">4</td><td class="num">7</td><td class="num">3 次</td></tr>
-  <tr><td>1-exp(-x)</td><td>[0, 1]</td><td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td><td class="num">—</td></tr>
+  <tr><td>1-exp(-x)</td><td>[0, 1]</td><td class="num em">5</td><td class="num">7</td><td class="num">2 次</td></tr>
   <tr><td>1-exp(-x&sup2;)</td><td>[0, 1]</td><td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td><td class="num">—</td></tr>
 </table>
 <p style="font-size:14px; color:#718096;">
-  d* = 達到 ULP &le; 1 的最低多項式次數（d = 3&ndash;9 搜索）。<b>8/13 函數</b>（<span style="color:#e53e3e;">紅色</span>）Taylor 在 d &le; 9 內完全無法達到 ULP &le; 1。
-  跨 4 個 pp 值（16/20/24/28）共 52 組配置中，<b>30 組</b> Taylor 無法達標，
-  <b>15 組</b>兩者達標（Minimax 平均節省 <b>2.8 次</b>），<b>0 組</b> Taylor 優於 Minimax，<b>7 組</b>兩者均不可行（tan pp&ge;24, erf/1-exp(-x&sup2;) pp=28 需 d&gt;9；ln/arcsin/GELU pp=28 需 d=9 但 BN254 限制 d<sub>max</sub>=8）。
+  d* = 達到 ULP &le; 1 的最低多項式次數（d = 3&ndash;9 搜索）。<b>6/13 函數</b>（<span style="color:#e53e3e;">紅色</span>）Taylor 在 d &le; 9 內完全無法達到 ULP &le; 1。
+  跨 4 個 pp 值（16/20/24/28）共 52 組配置中，<b>32 組</b> Taylor 無法達標，
+  <b>16 組</b>兩者達標（Minimax 平均節省 <b>3.0 次</b>），<b>4 組</b>兩者均失敗（tan/erf/1-exp(-x&sup2;) 在高 pp），<b>0 組</b> Taylor 優於 Minimax。
 </p>
 
 <hr>
@@ -620,7 +640,7 @@
 <table>
   <tr><th>步驟</th><th>傳統做法</th><th>我們的改進</th><th>效果</th></tr>
   <tr><td>Step 2</td><td>Taylor 係數</td><td class="em">Minimax (Remez) 係數</td><td>精度改善 12x (exp)</td></tr>
-  <tr><td>Step 5</td><td>每步截斷 (Per-step)</td><td class="em">Deferred Truncation</td><td>精度改善 2x</td></tr>
+  <tr><td>Step 5</td><td>每步截斷 (Per-step)</td><td class="em">Deferred Truncation</td><td>精度改善 2&times;&ndash;7&times;</td></tr>
   <tr><td>Step 6</td><td>無範圍驗證（不安全）</td><td class="em">ExplicitRC：gap decomposition</td><td>確定性安全</td></tr>
 </table>
 
@@ -758,13 +778,13 @@
       <td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td>
       <td class="num em">6</td><td class="num" style="color:#e53e3e;">&gt;9</td>
       <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
-      <td class="num" style="color:#e53e3e;" title="BN254 d_max=8, infeasible">9†</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">9</td><td class="num" style="color:#e53e3e;">&gt;9</td>
     </tr>
     <tr><td>sin(x)</td><td>[0, &pi;/4]</td>
       <td class="num em">4</td><td class="num">7</td>
       <td class="num em">5</td><td class="num">7</td>
       <td class="num em">6</td><td class="num">9</td>
-      <td class="num em">7</td><td class="num">9</td>
+      <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
     </tr>
     <tr><td>1-cos(x)</td><td>[0, &pi;/4]</td>
       <td class="num em">4</td><td class="num">6</td>
@@ -788,7 +808,7 @@
       <td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td>
       <td class="num em">6</td><td class="num" style="color:#e53e3e;">&gt;9</td>
       <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
-      <td class="num" style="color:#e53e3e;" title="BN254 d_max=8, infeasible">9†</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">9</td><td class="num" style="color:#e53e3e;">&gt;9</td>
     </tr>
     <tr><td>erf(x)</td><td>[0, 1]</td>
       <td class="num em">6</td><td class="num" style="color:#e53e3e;">&gt;9</td>
@@ -797,7 +817,7 @@
       <td class="num" style="color:#e53e3e;">&gt;9</td><td class="num" style="color:#e53e3e;">&gt;9</td>
     </tr>
     <tr><td>sigmoid(x)</td><td>[0, 1]</td>
-      <td class="num em">4</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">4</td><td class="num">9</td>
       <td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td>
       <td class="num em">6</td><td class="num" style="color:#e53e3e;">&gt;9</td>
       <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
@@ -806,17 +826,17 @@
       <td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td>
       <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
       <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
-      <td class="num" style="color:#e53e3e;" title="BN254 d_max=8, infeasible">9†</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">9</td><td class="num" style="color:#e53e3e;">&gt;9</td>
     </tr>
     <tr><td>sinh(x)</td><td>[0, ln2)</td>
       <td class="num em">4</td><td class="num">7</td>
       <td class="num em">5</td><td class="num">7</td>
       <td class="num em">5</td><td class="num">9</td>
-      <td class="num em">7</td><td class="num">9</td>
+      <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
     </tr>
     <tr><td>1-exp(-x)</td><td>[0, 1]</td>
-      <td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td>
-      <td class="num em">6</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">5</td><td class="num">7</td>
+      <td class="num em">6</td><td class="num">9</td>
       <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
       <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
     </tr>
@@ -829,9 +849,9 @@
   </table>
   <p style="font-size:14px; color:#718096; margin-top:8px;">
     d* = 達到 ULP &le; 1 的最低多項式次數。MM = Minimax, TL = Taylor。
-    52 組配置中：<b>33 組</b> Minimax 達標但 Taylor 無法，
-    <b>15 組</b>兩者均達標但 Minimax 平均節省 <b>2.8 次</b>，
-    <b>0 組</b> Taylor 優於 Minimax，<b>4 組</b>兩者均不可行。
+    52 組配置中：<b>32 組</b> Minimax 達標但 Taylor 無法（<span style="color:#e53e3e;">紅色</span>），
+    <b>16 組</b>兩者均達標但 Minimax 平均節省 <b>3.0 次</b>，
+    <b>0 組</b> Taylor 優於 Minimax。
   </p>
 </div>
 
@@ -856,13 +876,13 @@
   ln(1+x) 的 Taylor 係數僅以 1/n 衰減（非 1/n!），
   sigmoid 的收斂半徑僅 &pi; &approx; 3.14，
   erf 等複合函數的高階係數衰減受限於內層函數結構。
-  不具對稱性的 ln、sigmoid、GELU、1-exp(-x)、1-exp(-x&sup2;) 同樣因收斂不足而 d*&gt;9。
-  8/13 無法達標的函數各受至少一個原因（部分兩者兼具）的強烈影響。
+  不具對稱性的 ln、GELU、1-exp(-x&sup2;) 同樣因收斂不足而在所有 pp 值下 d*&gt;9。
+  6/13 無法達標的函數各受至少一個原因（部分兩者兼具）的強烈影響。
 </p>
 
 <div class="key-insight">
   <strong>關鍵洞見：</strong>
-  兩個結構性原因解釋了 8/13 函數的 Taylor d* &gt; 9：
+  兩個結構性原因解釋了 6/13 函數的 Taylor d* &gt; 9：
   (1) 對稱零項浪費一半係數，(2) 收斂緩慢或收斂半徑不足。
   每個無法達標的函數至少受其一影響（erf、arcsin、tan 兩者兼具）。
   Minimax 避開了這兩個限制——所有係數均為自由參數，不受 Taylor 結構約束。
@@ -880,8 +900,8 @@
   <tr><td>Lookups (&lceil;pp/8&rceil; + &lceil;d&times;pp/8&rceil;)</td><td class="num em">10</td><td class="num">20</td><td class="num">50%</td></tr>
 </table>
 <p style="font-size:14px; color:#718096; margin-top:8px;">
-  在 15 組兩者均達標的配置中，Minimax 平均節省 2.8 次多項式次數，對應約 30% 的 lookup 節省。
-  而 33 組 Taylor 無法達標的配置中，差距更為顯著——Taylor 即使付出更高電路成本仍無法滿足精度要求。
+  在 16 組兩者均達標的配置中，Minimax 平均節省 3.0 次多項式次數，對應約 35% 的 lookup 節省。
+  而 32 組 Taylor 無法達標的配置中，差距更為顯著——Taylor 即使付出更高電路成本仍無法滿足精度要求。
 </p>
 
 <p>
@@ -917,7 +937,7 @@
 <h3>Deferred Truncation（我們的做法）</h3>
 <p>
   利用 BN254 有限域有 <b>254 bits</b> 的容量，而 <span class="math">d</span> 次 Horner 的中間值最多只需要
-  <b><span class="math">(d+1)</span>&times;<span class="math">pp</span> bits</b>（例如 d=5, pp=16 時 96 bits，遠小於 254），
+  <b>(<span class="math">d</span>+1)&times;<span class="math">pp</span> bits</b>（例如 d=5, pp=16 時 ~96 bits，遠小於 254），
   因此可以在整個 Horner chain 中<b>完全不截斷</b>，讓精度一直保持到最後才做一次截斷：
 </p>
 <p style="font-family:monospace; font-size:14px; background:var(--code-bg); padding:12px; border-radius:8px;">
@@ -958,13 +978,10 @@
 <table>
   <tr><th>資源</th><th>通用公式</th><th>pp=16, d=5</th><th>pp=24, d=5</th></tr>
   <tr><td>Gates</td><td>6（固定）</td><td class="num">6</td><td class="num">6</td></tr>
-  <tr><td>Lookups</td><td>2&lceil;<span class="math">pp</span>/8&rceil; + &lceil;<span class="math">d&times;pp</span>/8&rceil;</td><td class="num">12</td><td class="num">21</td></tr>
+  <tr><td>Lookups</td><td>&lceil;<span class="math">pp</span>/8&rceil; + &lceil;<span class="math">d&times;pp</span>/8&rceil;</td><td class="num">12</td><td class="num">18</td></tr>
   <tr><td>Rows</td><td><span class="math">d</span> + 4</td><td class="num">9</td><td class="num">9</td></tr>
   <tr><td>Table entries</td><td>256（固定，ByteTable）</td><td class="num">256</td><td class="num">256</td></tr>
 </table>
-<p style="font-size:14px; color:#718096; margin-top:8px;">
-  註：pp=16 時 R 與 w 共用 byte 欄位（selector union sharing），實際 lookup 數為 &lceil;pp/8&rceil; + &lceil;d&times;pp/8&rceil; = 12，低於通用公式的 14。pp&ge;24 時無此共用，通用公式直接適用。
-</p>
 
 <div class="result-box">
   <strong>通用性：</strong>
@@ -983,7 +1000,7 @@
   <tr><td>GELU(x)</td><td>[0, 1]</td><td class="num em">1</td><td class="num">137.5</td><td class="num">1.76</td><td class="num">4,992 B</td></tr>
 </table>
 <p style="font-size:14px; color:#718096;">
-  以上數據來自 ExplicitRC 配置。提高 pp 會增加 lookup 數量和 prove time。例如 pp=24, d=5 的 prove time 約 280 ms（18 lookups, 6,912 B proof）。
+  提高 pp 會增加 lookup 數量和 prove time。例如 pp=24, d=5 的 prove time 約 280 ms（18 lookups, 6,912 B proof）。
 </p>
 
 <hr>
@@ -1005,10 +1022,10 @@
 
 <p><b>窄區間（13 個函數，完整數據見 &sect;3.2 表格）：</b></p>
 <ul style="margin:8px 0 8px 24px;">
-  <li>52 組 (函數 &times; pp) 配置中，<b>33 組</b> Minimax 達到 ULP &le; 1 但 Taylor 在 d &le; 9 內無法達到</li>
-  <li><b>15 組</b>兩者均達標，Minimax 平均節省 <b>2.8 次</b>多項式</li>
+  <li>52 組 (函數 &times; pp) 配置中，<b>32 組</b> Minimax 達到 ULP &le; 1 但 Taylor 在 d &le; 9 內無法達到</li>
+  <li><b>16 組</b>兩者均達標，Minimax 平均節省 <b>3.0 次</b>多項式</li>
   <li><b>0 組</b> Taylor 優於 Minimax</li>
-  <li>8/13 函數（ln, tan, arcsin, erf, sigmoid, GELU, 1-exp(-x), 1-exp(-x&sup2;)）Taylor 在<b>所有 pp 值</b>下均無法達到 ULP &le; 1</li>
+  <li>6/13 函數（ln, tan, arcsin, erf, GELU, 1-exp(-x&sup2;)）Taylor 在<b>所有 pp 值</b>下均無法達到 ULP &le; 1</li>
 </ul>
 
 <p><b>寬區間（3-byte R，5 個飽和/組合函數）：</b></p>
@@ -1027,14 +1044,14 @@
 </p>
 
 <p style="font-size:14px; color:#718096;">
-  <b>窄區間</b>：52 組配置中 33 組 Minimax 獨勝，15 組兩者達標（Minimax 省 2.8 次），4 組兩者不可行，0 組 Taylor 勝出。
+  <b>窄區間</b>：52 組配置中 32 組 Minimax 獨勝，16 組兩者達標（Minimax 省 3.0 次），0 組 Taylor 勝出。
   <b>寬區間</b>：5/5 配置 Minimax 全勝（d=5 pp=16），Taylor 出現大量溢出和負輸出。
 </p>
 
 <div class="key-insight">
   <strong>Ablation 1 的設計意義：</strong>
   Minimax 不僅是精度改善，更是<b>可行性門檻</b>。
-  Taylor 在 63% 的窄區間配置中無法達到 ULP&le;1，意味著選擇 Taylor 係數
+  Taylor 在 62% 的窄區間配置中無法達到 ULP&le;1，意味著選擇 Taylor 係數
   會直接排除大部分 (函數, pp) 設計空間。Minimax 使這些配置變得可用，
   且不增加電路複雜度——同一 Horner kernel，同樣的 gate 數量，只換常數值。
   其結構性原因（對稱零項、收斂限制）已在 &sect;3.2 分析。
@@ -1060,7 +1077,7 @@
   <tr><th>策略</th><th>Gates</th><th>Rows</th><th>安全性</th><th>說明</th></tr>
   <tr><td>無檢查（baseline）</td><td class="num">4</td><td class="num">8</td><td class="num" style="color:red;">不安全</td><td>prover 可提供越界 R，外推產生錯誤結果</td></tr>
   <tr><td>ORV（探索方案）</td><td class="num">5</td><td class="num">9</td><td class="num" style="color:#ed8936;">6/13 安全</td><td>依賴 w_max = S&minus;1，7 函數有缺口</td></tr>
-  <tr><td class="em">ExplicitRC（採用）</td><td class="num em">6</td><td class="num em">9</td><td class="num em" style="color:#38a169;">確定性安全</td><td>gap decomposition，所有函數統一</td></tr>
+  <tr><td class="em">ExplicitRC（採用）</td><td class="num em">6</td><td class="num">9</td><td class="num em" style="color:#38a169;">確定性安全</td><td>gap decomposition，所有函數統一</td></tr>
 </table>
 <p style="font-size:14px; color:#718096;">
   ORV 在 7/13 函數中存在安全缺口：w_max &lt; S&minus;1 時，超出 R_MAX 的輸入仍可產生合法 w 值。
@@ -1074,7 +1091,7 @@
   <tr><th>方法</th><th>Table entries</th><th>Prove (ms)</th><th>Proof size</th><th>Max ULP</th><th>適用函數</th></tr>
   <tr><td>A (Direct Lookup)</td><td class="num">65,536</td><td class="num">1,244</td><td class="num">736 B</td><td class="num">0</td><td>任意</td></tr>
   <tr><td>B (Chunk Decomp)</td><td class="num">768</td><td class="num">61</td><td class="num">2,048 B</td><td class="num">2</td><td><b>僅 exp</b></td></tr>
-  <tr><td class="em">G (Ours)</td><td class="num em">256</td><td class="num">132</td><td class="num">4,992 B</td><td class="num">1-3</td><td>已驗證 13 個函數</td></tr>
+  <tr><td class="em">G (Ours)</td><td class="num em">256</td><td class="num">138</td><td class="num">4,992 B</td><td class="num">1-3</td><td>已驗證 13 個函數</td></tr>
 </table>
 
 <div class="key-insight">
@@ -1115,16 +1132,14 @@
 <figure style="margin:24px 0; text-align:center;">
   <img src="figures/fig6_pipeline.svg" alt="Pipeline scope diagram" style="width:100%; max-width:900px;">
   <figcaption style="font-size:14px; color:#718096; margin-top:8px;">
-    圖 5：系統 pipeline。綠色方框為本論文核心方法（Horner Kernel + ExplicitRC）。灰色虛框為 function-specific 範圍歸約——EXP07 已為全部 13 個函數實作 E2E 電路並通過 KZG 驗證。
+    圖 5：系統 pipeline。綠色方框為本論文範圍（Horner Kernel + ExplicitRC），灰色虛框為 function-specific 的未來工作。
   </figcaption>
 </figure>
 
 <p>
-  本論文核心方法為<b>綠色方框</b>：Horner evaluation kernel + ExplicitRC。
+  本論文聚焦於<b>綠色方框</b>：Horner evaluation kernel + ExplicitRC。
   Range reduction（將任意輸入映射到多項式區間內）和 reconstruction（將結果組合回去）
-  是 function-specific 的應用層電路。<b>EXP07 實驗已為全部 13 個函數實作完整的 E2E 電路</b>，
-  包含 7 種可重用 gadget（IntDiv, LeadBit, QuadrantMod, Comparison, SignExtend, FieldDiv, IntSqrt），
-  並通過 KZG 真實證明驗證。
+  是<b>function-specific 的應用層電路</b>，不屬於本論文的通用方法論。
 </p>
 <p>
   ExplicitRC（gap decomposition）使得 kernel 本身是自洽的：合法輸入得到正確輸出，非法輸入被確定性地拒絕。
@@ -1136,7 +1151,7 @@
 
 <table>
   <tr><th>限制</th><th>影響</th><th>說明</th></tr>
-  <tr><td>ULP claims scope to Horner kernel</td><td>低</td><td>E2E 電路已實測：14 個 kernel 均 ≤4 ULP，E2E 全 13 函數 ≤3 ULP（exp 在 k=16 時因 LN2_S 量化放大為 98K ULP，但 kernel 本身僅 1 ULP）</td></tr>
+  <tr><td>ULP claims scope to Horner kernel</td><td>中</td><td>End-to-end 精度取決於 range reduction 實作</td></tr>
   <tr><td>GELU 只覆蓋 [0,1]</td><td>低</td><td>x &gt; 1 需要 piecewise extension</td></tr>
   <tr><td>Batch scaling: G 輸給 B</td><td>中</td><td>N=1000 時 G 需 k=14 (1,011ms) vs B k=11 (135ms)。k 為電路容量參數（2<sup>k</sup> rows）</td></tr>
   <tr><td>線性深度</td><td>低</td><td>Horner 是天然 sequential；常見 d=3~9 足夠短</td></tr>
@@ -1157,10 +1172,10 @@
 <h2>三個預期學術貢獻</h2>
 <ol style="margin:12px 0 12px 24px; line-height:2.2;">
   <li><b>Minimax 係數選擇</b>：據我們的文獻回顧，目前還沒有在 ZK Horner 電路中系統性地使用 Remez 最優多項式的工作。
-    d* 比較顯示：52 組 (函數 &times; pp) 配置中 33 組 Taylor 在 d&le;9 內無法達到 ULP&le;1 而 Minimax 可以；
-    8/13 函數 Taylor 在所有精度等級下均無法達標。5 個兩者達標的函數中 Minimax 平均節省 2.8 次（見 &sect;3.2 表格）</li>
-  <li><b>Deferred Truncation</b>：利用 BN254 的 254-bit 大域容量（中間值僅需 96 bits），將 Horner chain 內 d 次截斷合併為 1 次，lookup 數量節省約 40%，精度改善 2x。據我們的文獻回顧，22 個 ZK 系統中無人在 Horner chain 內做延遲截斷</li>
-  <li><b>(pp, d) 通用設計空間</b>：同一電路結構、同一張 256-entry ByteTable，服務 13 個超越函數。切換函數只需改 5 個多項式係數。精度 pp 和多項式次數 d 均為可配置參數，共 546 個可行配置點（442 窮舉 + 104 取樣）</li>
+    d* 比較顯示：52 組 (函數 &times; pp) 配置中 32 組 Taylor 無法在 d&le;9 內達到 ULP&le;1 而 Minimax 可以；
+    6/13 函數 Taylor 在所有精度等級下均無法達標。7 個兩者達標的函數中 Minimax 平均節省 3.0 次（見 &sect;3.2 表格）</li>
+  <li><b>Deferred Truncation</b>：利用 BN254 的 254-bit 大域容量（中間值僅需 96 bits），將 Horner chain 內 d 次截斷合併為 1 次，lookup 數量節省約 40%，精度改善 2&times;&ndash;7&times;（13 函數範圍）。據我們的文獻回顧，30 個 ZK 系統中無人在 Horner chain 內做延遲截斷</li>
+  <li><b>(pp, d) 通用設計空間</b>：同一電路結構、同一張 256-entry ByteTable，服務 13 個超越函數。切換函數只需改 5 個多項式係數。精度 pp 和多項式次數 d 均為可配置參數，共 546 個可行配置點</li>
 </ol>
 
 <h2>(pp, d) 設計空間</h2>
@@ -1189,33 +1204,6 @@
   <li>Python 和 Rust 獨立實作<b>交叉驗證</b></li>
   <li>完整的 ablation study 隔離每個貢獻的獨立效果</li>
 </ul>
-
-<h2>E2E 電路實測結果（EXP07）</h2>
-<p>
-  以下為全部 13 個函數的 End-to-End 電路 KZG benchmark 結果（pp=16, d=5, BN254 + SHPLONK, release mode, median of 5 runs）。
-  所有函數共用 256-entry ByteTable，切換函數僅需改 5 個多項式係數。
-</p>
-<table>
-  <tr><th>函數</th><th>Gates</th><th>Lookups</th><th>Proof (B)</th><th>Prove (ms)</th><th>Verify (ms)</th><th>Pipeline</th></tr>
-  <tr><td>exp(x)−1</td><td class="num">8</td><td class="num">17</td><td class="num">7,456</td><td class="num">274</td><td class="num">3.9</td><td>IntDiv+Pow2</td></tr>
-  <tr><td>ln(1+x)</td><td class="num">8</td><td class="num">17</td><td class="num">7,392</td><td class="num">373</td><td class="num">4.0</td><td>LeadBit+MulAdd</td></tr>
-  <tr><td>sin(x)</td><td class="num">17</td><td class="num">32</td><td class="num">9,504</td><td class="num">494</td><td class="num">4.7</td><td>Quad+Half+Dual</td></tr>
-  <tr><td>1−cos(x)</td><td class="num">17</td><td class="num">32</td><td class="num">9,504</td><td class="num">454</td><td class="num">4.7</td><td>Quad+Half+Dual</td></tr>
-  <tr><td>tan(x)</td><td class="num">8</td><td class="num">12</td><td class="num">5,568</td><td class="num">195</td><td class="num">3.6</td><td>Sign</td></tr>
-  <tr><td>arctan(x)</td><td class="num">11</td><td class="num">18</td><td class="num">8,416</td><td class="num">292</td><td class="num">4.3</td><td>Sign+Cmp+FDiv</td></tr>
-  <tr><td>arcsin(x)</td><td class="num">11</td><td class="num">19</td><td class="num">8,736</td><td class="num">295</td><td class="num">4.3</td><td>Sign+Cmp+Sqrt</td></tr>
-  <tr><td>sinh(x)</td><td class="num">15</td><td class="num">29</td><td class="num">8,352</td><td class="num">384</td><td class="num">4.3</td><td>Sign+Div+Dual+Hyp</td></tr>
-  <tr><td>erf(x)</td><td class="num">8</td><td class="num">12</td><td class="num">5,568</td><td class="num">198</td><td class="num">3.6</td><td>Sign</td></tr>
-  <tr><td>sigmoid(x)</td><td class="num">8</td><td class="num">12</td><td class="num">5,568</td><td class="num">199</td><td class="num">3.7</td><td>Sign+Symm</td></tr>
-  <tr><td>GELU(x)</td><td class="num">6</td><td class="num">12</td><td class="num">4,992</td><td class="num">180</td><td class="num">3.2</td><td>Kernel-only</td></tr>
-  <tr><td>1−exp(−x)</td><td class="num">6</td><td class="num">12</td><td class="num">4,992</td><td class="num">179</td><td class="num">3.4</td><td>Kernel-only</td></tr>
-  <tr><td>1−exp(−x²)</td><td class="num">7</td><td class="num">12</td><td class="num">5,440</td><td class="num">194</td><td class="num">3.4</td><td>Sign(abs)</td></tr>
-</table>
-<p style="font-size:14px; color:#718096;">
-  Kernel-only 函數（GELU, 1−exp）最輕量：6 gates, 12 lookups, 4,992B proof, ~180ms prove, ~3.3ms verify。
-  Dual kernel 函數（sin, 1−cos）最重：17 gates, 32 lookups, 9,504B proof, ~474ms prove, ~4.7ms verify。
-  所有函數 verify &lt; 5ms。
-</p>
 
 <h2>預期的論文結構</h2>
 <table>
