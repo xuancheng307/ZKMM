@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ch 13: 多項式逼近理論 — ZK 手冊</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>ZK 手冊</h1>
+      <div class="subtitle">零知識證明系統</div>
+    </div>
+    <nav>
+      <div class="section-label">總覽</div>
+      <a href="index.html"><span class="page-num">0.</span> 首頁</a>
+      <div class="section-label">基礎</div>
+      <a href="foundations.html"><span class="page-num">1.</span> 數學基礎</a>
+      <a href="zkp-basics.html"><span class="page-num">2.</span> ZKP：基本概念與性質</a>
+      <div class="section-label">構建模組</div>
+      <a href="polynomial-commitments.html"><span class="page-num">3.</span> 多項式承諾</a>
+      <a href="arithmetization.html"><span class="page-num">4.</span> 算術化</a>
+      <a href="fft-domains.html"><span class="page-num">5.</span> FFT 與求值域</a>
+      <div class="section-label">證明系統</div>
+      <a href="groth16.html"><span class="page-num">6.</span> Groth16</a>
+      <a href="plonk.html"><span class="page-num">7.</span> PLONK</a>
+      <a href="halo2.html"><span class="page-num">8.</span> Halo2</a>
+      <div class="section-label">進階主題</div>
+      <a href="lookup-arguments.html"><span class="page-num">9.</span> Lookup Arguments</a>
+      <a href="polynomial-method.html"><span class="page-num">10.</span> 多項式方法</a>
+      <a href="security-proofs.html"><span class="page-num">11.</span> 安全性證明</a>
+      <div class="section-label">論文方法論</div>
+      <a href="fixed-point.html"><span class="page-num">12.</span> 有限域定點運算</a>
+      <a href="approximation-theory.html" class="active"><span class="page-num">13.</span> 多項式逼近理論</a>
+      <a href="horner-evaluation.html"><span class="page-num">14.</span> Horner 求值</a>
+    </nav>
+  </aside>
+  <main class="main-content">
+
+    <!-- ============================================================
+         PAGE HEADER
+         ============================================================ -->
+    <div class="page-header">
+      <h1>13. 多項式逼近理論</h1>
+      <p class="page-subtitle">用多項式近似超越函數。Taylor 在一個點最準，Minimax 在整個區間最準——ZK 電路需要 Minimax。</p>
+    </div>
+
+    <!-- ============================================================
+         DEFINITIONS SECTION
+         ============================================================ -->
+    <div class="definitions-section">
+      <h2>關鍵定義</h2>
+
+      <!-- 1. Polynomial Approximation -->
+      <div class="def-item">
+        <div class="def-term">Polynomial Approximation <span class="zh">多項式逼近</span></div>
+        <div class="def-body">
+          用一個多項式 $p(x) = c_0 + c_1 x + c_2 x^2 + \cdots + c_d x^d$ 來近似一個目標函數
+          $f(x)$（通常是超越函數，如 $e^x$、$\ln x$、$\sin x$）。在 ZK 電路中，
+          所有運算都是有限域上的加法和乘法，因此多項式是表達非線性函數的唯一自然選擇。
+          逼近的品質由<strong>誤差度量</strong>衡量——不同的度量導向不同的最優多項式。
+        </div>
+      </div>
+
+      <!-- 2. Taylor Series -->
+      <div class="def-item">
+        <div class="def-term">Taylor Series <span class="zh">Taylor 級數</span></div>
+        <div class="def-body">
+          在展開點 $a$ 處截取至次數 $d$ 的 Taylor 多項式：
+          $$T_d(x) = \sum_{k=0}^{d} \frac{f^{(k)}(a)}{k!} \cdot (x - a)^k$$
+          Taylor 多項式在 $x = a$ 處與 $f(x)$ 的前 $d$ 階導數完全一致——
+          即在<em>一個點</em>上最準。但離展開點越遠，誤差通常急劇增長。
+          Taylor 多項式最小化的是<strong>局部</strong>誤差，而非全局誤差。
+        </div>
+      </div>
+
+      <!-- 3. Minimax Polynomial -->
+      <div class="def-item">
+        <div class="def-term">Minimax Polynomial <span class="zh">Minimax 多項式</span></div>
+        <div class="def-body">
+          次數 $\leq d$ 的所有多項式中，使區間 $[a,b]$ 上最大誤差最小的那一個：
+          $$p^* = \arg\min_{p \in \mathcal{P}_d} \max_{x \in [a,b]} |f(x) - p(x)|$$
+          其中 $\mathcal{P}_d$ 是次數 $\leq d$ 的多項式集合。Minimax 多項式把誤差「均勻分佈」在整個區間上——
+          每個地方都差不多準。根據 Chebyshev 等振盪定理，$p^*$ 是<strong>唯一的</strong>最優解。
+        </div>
+      </div>
+
+      <!-- 4. L∞ Norm -->
+      <div class="def-item">
+        <div class="def-term">$L_\infty$ Norm <span class="zh">$L_\infty$ 範數</span></div>
+        <div class="def-body">
+          函數在區間 $[a,b]$ 上的最大絕對值：
+          $$\|g\|_\infty = \max_{x \in [a,b]} |g(x)|$$
+          應用到逼近誤差 $e(x) = f(x) - p(x)$ 時，$\|e\|_\infty$ 就是整個區間上的最壞情況誤差。
+          Minimax 多項式的定義等價於：$p^* = \arg\min_{p \in \mathcal{P}_d} \|f - p\|_\infty$。
+          在定點量化中，$\text{ULP}_{\max} \propto \|f - p\|_\infty$，
+          因此最小化 $L_\infty$ 範數<strong>直接</strong>最小化最大 ULP 誤差。
+        </div>
+      </div>
+
+      <!-- 5. Equioscillation Theorem -->
+      <div class="def-item">
+        <div class="def-term">Equioscillation Theorem <span class="zh">等振盪定理</span></div>
+        <div class="def-body">
+          <strong>Chebyshev 等振盪定理</strong>：次數 $\leq d$ 的多項式 $p^*$ 是 $f$ 在 $[a,b]$ 上的
+          Minimax 逼近，當且僅當誤差函數 $e(x) = f(x) - p^*(x)$ 至少有 $d+2$ 個<strong>等振盪點</strong>
+          $a \leq x_0 < x_1 < \cdots < x_{d+1} \leq b$，使得
+          $$e(x_i) = (-1)^i \cdot \varepsilon^*, \quad \varepsilon^* = \|f - p^*\|_\infty$$
+          這些點交替取到最大正誤差和最大負誤差。等振盪點的存在既是 Minimax 最優性的充分條件，也是必要條件。
+        </div>
+      </div>
+
+      <!-- 6. Remez Algorithm -->
+      <div class="def-item">
+        <div class="def-term">Remez Algorithm <span class="zh">Remez 演算法</span></div>
+        <div class="def-body">
+          計算 Minimax 多項式的標準迭代演算法（由 Evgeny Remez 於 1934 年提出）。
+          每次迭代維護 $d+2$ 個參考點，解線性方程組得到等振盪多項式，
+          然後找到全局最大誤差點替換一個參考點。通常在 5&ndash;15 次迭代後收斂。
+          本論文使用 Python <code>mpmath</code> 庫的 Remez 實現，以 50 位十進位精度計算係數。
+        </div>
+      </div>
+
+      <!-- 7. Range Reduction -->
+      <div class="def-item">
+        <div class="def-term">Range Reduction <span class="zh">範圍縮減</span></div>
+        <div class="def-body">
+          利用數學恆等式（如 $e^x = 2^k \cdot e^r$）將任意大的輸入映射到
+          一個窄區間上，使多項式逼近可以在最有利的範圍內運作。例如：
+          $\exp(x)$ 映射到 $[0, \ln 2)$；$\ln(x)$ 映射到 $[1, 2)$；$\sin(x)$ 映射到 $[0, \pi/4]$。
+          區間越窄，同樣次數的多項式能達到越高的精度——這是因為 Taylor 餘項
+          $R_d \propto (b-a)^{d+1}$，區間縮短使餘項指數級縮小。
+        </div>
+      </div>
+
+      <!-- 8. Chebyshev Nodes -->
+      <div class="def-item">
+        <div class="def-term">Chebyshev Nodes <span class="zh">Chebyshev 節點</span></div>
+        <div class="def-body">
+          第一類 Chebyshev 多項式 $T_n(x)$ 的零點：
+          $$x_k = \cos\!\left(\frac{2k-1}{2n}\pi\right), \quad k = 1, 2, \ldots, n$$
+          在 Chebyshev 節點上做 Lagrange 插值會得到<strong>近似最優</strong>的逼近（誤差在
+          Minimax 最優值的 $O(\log d)$ 倍以內）。但 Chebyshev 插值<strong>不等於</strong> Minimax——
+          它是一個快速的近似替代，而非真正的 $L_\infty$ 最優解。
+        </div>
+      </div>
+
+      <!-- 9. Quantization Saturation Boundary -->
+      <div class="def-item">
+        <div class="def-term">Quantization Saturation Boundary <span class="zh">量化飽和邊界</span></div>
+        <div class="def-body">
+          本論文的一個關鍵發現：存在一個臨界次數 $d^*$，超過 $d^*$ 之後，
+          繼續增加多項式次數反而會<strong>降低</strong>定點量化後的精度。
+          原因是高次項的係數 $D_i = \text{round}(c_i \cdot S^{d+1-i})$ 中，
+          縮放因子 $S^{d+1-i}$ 放大了四捨五入誤差。在 $d > d^*$ 時，量化誤差的增長速度
+          超過逼近誤差的減少速度，導致 $\text{ULP}_{\max}$ 反而升高。
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ============================================================
+         13.1 WHY POLYNOMIALS?
+         ============================================================ -->
+    <h2>13.1 為什麼是多項式？</h2>
+
+    <p>
+      ZK 電路（無論是 Groth16、PLONK 或 Halo2）的底層運算模型是
+      <strong>有限域上的算術電路</strong>：每個閘執行的要麼是加法 $a + b \bmod p$，
+      要麼是乘法 $a \times b \bmod p$。沒有比較運算、沒有條件分支、
+      沒有浮點運算、沒有超越函數——只有加法和乘法。
+    </p>
+
+    <p>
+      在這個限制下，要計算 $e^x$、$\ln x$、$\sin x$ 等超越函數，
+      唯一的「原生」方法就是將它們表達為<strong>加法和乘法的組合</strong>——
+      也就是多項式：
+    </p>
+
+    $$p(x) = c_0 + c_1 x + c_2 x^2 + \cdots + c_d x^d$$
+
+    <p>
+      一個次數 $d$ 的多項式可以用 $d$ 次乘法和 $d$ 次加法來求值
+      （使用 Horner 法，見第 14 章），完美適配算術電路的能力。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">多項式是算術電路的「母語」</div>
+      <p>
+        其他逼近方法（有理函數 Pad&eacute;、分段線性、神經網路）在算術電路中不是不可能，
+        而是<strong>成本更高</strong>。Pad&eacute; 逼近需要除法——在有限域中是一次乘法逆元運算
+        （約 $O(\log p)$ 次乘法）。分段線性需要比較和分支——在 ZK 中需要分解為位元，
+        成本巨大。多項式是唯一「零成本結構開銷」的選擇。
+      </p>
+    </div>
+
+    <p>
+      問題因此簡化為：<strong>給定超越函數 $f(x)$ 和區間 $[a,b]$，如何找到一個次數 $d$ 的多項式
+      $p(x)$，使它最好地逼近 $f(x)$？</strong>「最好」的定義取決於誤差度量的選擇——
+      這正是 Taylor 和 Minimax 之間的核心差異。
+    </p>
+
+
+    <!-- ============================================================
+         13.2 TAYLOR SERIES
+         ============================================================ -->
+    <h2>13.2 Taylor 級數</h2>
+
+    <h3>定義與公式</h3>
+
+    <p>
+      Taylor 多項式是逼近理論中最為人熟知的工具。給定函數 $f(x)$ 在展開點 $a$ 處的資訊，
+      次數 $d$ 的 Taylor 多項式為：
+    </p>
+
+    $$T_d(x) = \sum_{k=0}^{d} \frac{f^{(k)}(a)}{k!} \cdot (x - a)^k$$
+
+    <p>
+      Taylor 多項式的特殊之處在於：它與 $f(x)$ 在 $x = a$ 處共享前 $d$ 階導數。
+      這意味著在 $x = a$ 的極小鄰域內，$T_d(x)$ 是<strong>最佳逼近</strong>——
+      誤差以 $O((x-a)^{d+1})$ 的速率衰減。
+    </p>
+
+    <h3>範例：$\exp(x)$ 在 $a = 0$ 的 Taylor degree-5</h3>
+
+    <p>
+      $\exp(x)$ 在 $a = 0$ 的各階導數都是 $\exp(0) = 1$，因此：
+    </p>
+
+    $$T_5(x) = 1 + x + \frac{x^2}{2} + \frac{x^3}{6} + \frac{x^4}{24} + \frac{x^5}{120}$$
+
+    <p>
+      Taylor 餘項公式給出誤差上界：
+    </p>
+
+    $$|e^x - T_5(x)| \leq \frac{e^b}{6!} \cdot |x|^6, \quad x \in [0, b]$$
+
+    <p>
+      在 $x = 0$ 時，誤差精確為零。但在區間的另一端 $x = \ln 2 \approx 0.693$ 時：
+    </p>
+
+    $$|e^{\ln 2} - T_5(\ln 2)| \approx 1.53 \times 10^{-5}$$
+
+    <p>
+      這看起來很小，但在定點量化（$\text{pp} = 16$）下，這對應約 <strong>12 ULP</strong> 的誤差——
+      遠超我們的目標（$\text{ULP}_{\max} \leq 1$）。
+    </p>
+
+    <h3>問題：誤差在區間邊緣暴增</h3>
+
+    <p>
+      Taylor 多項式的根本問題是<strong>誤差分佈極不均勻</strong>。
+      在展開點附近幾乎為零，在區間邊緣卻可能很大。用 ASCII 圖表來視覺化：
+    </p>
+
+    <pre>
+Taylor 誤差圖：e(x) = exp(x) - T₅(x) on [0, ln2)
+
+ 誤差
+   |
+   |                                         ╱
+   |                                       ╱
+   |                                     ╱
+   |                                  ╱
+   |                               ╱
+   |                           ╱╱
+   |                       ╱╱
+   |                  ╱╱╱
+   |          ╱╱╱╱╱╱
+   0 ─────────────────────────────────────── x
+   ↑                                        ↑
+  a=0                                    ln(2)
+
+特徵：誤差從 0 單調增長至最大值，集中在區間末端
+    </pre>
+
+    <p>
+      這種「一端為零、另一端暴增」的誤差分佈意味著：
+      Taylor 多項式在展開點附近「浪費」了大量精度（誤差遠小於需要），
+      而在區間邊緣卻嚴重不足。從 $L_\infty$ 的角度看，這是對「精度預算」的極度浪費。
+    </p>
+
+
+    <!-- ============================================================
+         13.3 MINIMAX POLYNOMIAL
+         ============================================================ -->
+    <h2>13.3 Minimax 多項式</h2>
+
+    <h3>定義</h3>
+
+    <p>
+      Minimax 多項式 $p^*$ 是次數 $\leq d$ 的所有多項式中，使區間 $[a,b]$ 上
+      <strong>最大絕對誤差</strong>最小的那一個：
+    </p>
+
+    $$p^* = \arg\min_{p \in \mathcal{P}_d} \;\max_{x \in [a,b]} |f(x) - p(x)|$$
+
+    <p>
+      令 $\varepsilon^* = \|f - p^*\|_\infty$。那麼 $\varepsilon^*$ 是不可改善的——
+      任何其他次數 $\leq d$ 的多項式的最大誤差都 $\geq \varepsilon^*$。
+    </p>
+
+    <h3>等振盪定理（Chebyshev Equioscillation）</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 13.1 — Chebyshev 等振盪定理</div>
+      <p>
+        設 $f \in C[a,b]$（連續函數），$d \geq 0$。多項式 $p^* \in \mathcal{P}_d$ 是 $f$ 在 $[a,b]$
+        上的最佳 $L_\infty$ 逼近，<strong>當且僅當</strong>存在 $d + 2$ 個點
+        $a \leq x_0 < x_1 < \cdots < x_{d+1} \leq b$，使得：
+      </p>
+      $$f(x_i) - p^*(x_i) = (-1)^i \cdot \sigma \cdot \varepsilon^*, \quad i = 0, 1, \ldots, d+1$$
+      <p>
+        其中 $\sigma \in \{+1, -1\}$，$\varepsilon^* = \|f - p^*\|_\infty$。
+        這 $d+2$ 個點稱為<strong>等振盪點</strong>（equioscillation points）。
+        等振盪定理同時保證了 $p^*$ 的<strong>唯一性</strong>。
+      </p>
+    </div>
+
+    <p>
+      直覺上，等振盪意味著誤差在整個區間上「來回擺動」，交替觸及正負極值。
+      如果誤差在某個區域沒有觸及極值，我們就能「重新分配」精度到那個區域，進一步降低最大誤差——
+      這與 $p^*$ 的最優性矛盾。因此，最優逼近<em>必須</em>讓誤差在所有地方都「用盡」。
+    </p>
+
+    <h3>Minimax 誤差圖</h3>
+
+    <pre>
+Minimax 誤差圖：e(x) = exp(x) - p*(x) on [0, ln2), degree-5
+
+ +ε* ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+         ╱╲          ╱╲          ╱╲
+        ╱  ╲        ╱  ╲        ╱  ╲        ╱
+       ╱    ╲      ╱    ╲      ╱    ╲      ╱
+  0 ──╱──────╲────╱──────╲────╱──────╲────╱────
+              ╲  ╱        ╲  ╱        ╲  ╱
+               ╲╱          ╲╱          ╲╱
+ -ε* ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+
+特徵：d+2 = 7 個等振盪點，誤差交替達到 +ε* 和 -ε*
+      整個區間上的最大誤差 = ε*（已是理論最小值）
+    </pre>
+
+    <p>
+      對比 Taylor 和 Minimax 的誤差圖，差異一目了然：
+    </p>
+
+    <pre>
+Taylor vs Minimax 誤差比較：
+
+Taylor:                          Minimax:
+   |                  ╱             |
+   |                ╱          +ε*  | ╱╲    ╱╲    ╱╲
+   |             ╱╱                 |╱  ╲  ╱  ╲  ╱  ╲
+   |          ╱╱              0 ────────╲╱────╲╱────╲╱──
+   |     ╱╱╱                  -ε*  |
+   0 ────────────── x               ──────────────── x
+
+max 誤差 = 12 ULP              max 誤差 = 1 ULP
+（集中在右端）                  （均勻分佈）
+    </pre>
+
+    <h3>直覺比喻：鋪鐵軌</h3>
+
+    <div class="callout example">
+      <div class="callout-title">比喻 — 在彎路上鋪直鐵軌</div>
+      <p>
+        想像你要在一條彎曲的公路上鋪一段直鐵軌（=多項式）來近似公路（=超越函數）：
+      </p>
+      <ul>
+        <li><strong>Taylor 做法</strong>：在起點完美對齊——角度、曲率、曲率的變化率全部匹配。
+        但越往前走，鐵軌和公路的偏差越大，到終點可能偏出好幾公尺。</li>
+        <li><strong>Minimax 做法</strong>：在整條路上「平均」對齊。起點可能不完美，
+        但沿途任何地方偏差都不超過一個固定值 $\varepsilon^*$。</li>
+      </ul>
+      <p>
+        如果我們的需求是「鐵軌和公路的最大偏差不能超過 1 公分」，那麼 Minimax 是唯一合理的選擇。
+        Taylor 可能在起點偏差只有 0.001 公分，但在終點偏差 12 公分——不合格。
+      </p>
+    </div>
+
+
+    <!-- ============================================================
+         13.4 REMEZ ALGORITHM
+         ============================================================ -->
+    <h2>13.4 Remez 演算法</h2>
+
+    <p>
+      等振盪定理告訴我們 Minimax 多項式的<em>存在性</em>和<em>特徵</em>，
+      但沒有直接給出計算方法。<strong>Remez 演算法</strong>（1934）是計算 Minimax 多項式的標準方法。
+    </p>
+
+    <div class="callout definition">
+      <div class="callout-title">Remez 演算法 — 輸入與輸出</div>
+      <p>
+        <strong>輸入</strong>：目標函數 $f$，區間 $[a,b]$，多項式次數 $d$<br>
+        <strong>輸出</strong>：Minimax 多項式的係數 $c_0, c_1, \ldots, c_d$ 及最優誤差 $\varepsilon^*$
+      </p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <strong>步驟 1：初始化參考點。</strong>
+        選 $d + 2$ 個初始參考點 $\{x_0, x_1, \ldots, x_{d+1}\} \subset [a,b]$。
+        常見的初始化策略是使用 Chebyshev 節點（映射到 $[a,b]$），因為它們已經接近等振盪點。
+      </div>
+      <div class="step">
+        <strong>步驟 2：解線性方程組。</strong>
+        在當前的 $d+2$ 個參考點上，求解以下 $(d+2) \times (d+2)$ 線性方程組：
+        $$\sum_{j=0}^{d} c_j \cdot x_i^j + (-1)^i \cdot E = f(x_i), \quad i = 0, 1, \ldots, d+1$$
+        未知數是 $c_0, c_1, \ldots, c_d$（多項式係數）和 $E$（等振盪誤差值）。
+        這個方程組有唯一解，因為 Vandermonde 矩陣是非奇異的。
+      </div>
+      <div class="step">
+        <strong>步驟 3：找全局最大誤差點。</strong>
+        用步驟 2 得到的多項式 $p(x)$，在整個區間 $[a,b]$ 上計算誤差 $e(x) = f(x) - p(x)$，
+        找到 $|e(x)|$ 的全局最大值點 $x^*$。這通常透過密集取樣加 Newton-Raphson 精煉完成。
+      </div>
+      <div class="step">
+        <strong>步驟 4：更新參考點。</strong>
+        用 $x^*$ 替換一個舊的參考點，保持交替符號的性質。
+        具體規則：找到使 $e(x_i)$ 和 $e(x^*)$ 同號的最近參考點，替換之。
+      </div>
+      <div class="step">
+        <strong>步驟 5：收斂判定。</strong>
+        如果 $|E_{\text{new}} - E_{\text{old}}| < \delta$（收斂閾值），則停止；
+        否則回到步驟 2。
+      </div>
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">收斂速度</div>
+      <p>
+        Remez 演算法在實務中收斂非常快——通常 <strong>5&ndash;15 次迭代</strong>即可。
+        理論上，收斂速度是超線性的（類似 Newton 法）。我們在論文中使用 Python
+        <code>mpmath</code> 庫的 <code>remez</code> 函數，以 50 位十進位精度（遠超 16-bit 定點的需求）
+        計算 Minimax 係數，確保量化前的係數誤差可忽略。
+      </p>
+    </div>
+
+    <div class="callout example">
+      <div class="callout-title">範例 — Remez 計算 $\exp(x)$ degree-5 on $[0, \ln 2)$</div>
+      <p>
+        呼叫 <code>mpmath.remez(lambda x: mp.exp(x), 5, [0, mp.log(2)])</code>，
+        約 8 次迭代後收斂，得到六個係數（50 位精度）：
+      </p>
+      <table>
+        <thead><tr><th>$j$</th><th>$c_j$（Minimax）</th><th>$c_j$（Taylor）</th></tr></thead>
+        <tbody>
+          <tr><td>0</td><td>1.000000894...</td><td>1.000000000</td></tr>
+          <tr><td>1</td><td>0.999999098...</td><td>1.000000000</td></tr>
+          <tr><td>2</td><td>0.500006921...</td><td>0.500000000</td></tr>
+          <tr><td>3</td><td>0.166641524...</td><td>0.166666667</td></tr>
+          <tr><td>4</td><td>0.041854923...</td><td>0.041666667</td></tr>
+          <tr><td>5</td><td>0.008341622...</td><td>0.008333333</td></tr>
+        </tbody>
+      </table>
+      <p>
+        Taylor 係數是「漂亮的」$1/k!$；Minimax 係數看起來不規則，但它們使最大誤差從
+        $1.53 \times 10^{-5}$（Taylor）降至 $1.27 \times 10^{-6}$（Minimax）——
+        <strong>12 倍改善</strong>。
+      </p>
+    </div>
+
+
+    <!-- ============================================================
+         13.5 TAYLOR vs MINIMAX: QUANTITATIVE COMPARISON
+         ============================================================ -->
+    <h2>13.5 Taylor vs Minimax：量化比較</h2>
+
+    <p>
+      理論分析告訴我們 Minimax 一定更好，但「好多少」取決於具體函數和設定。
+      以下是論文中最核心的實驗數據。
+    </p>
+
+    <h3>$\exp(x)$ degree-5 on $[0, \ln 2)$，$\text{pp} = 16$</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>指標</th>
+          <th>Taylor</th>
+          <th>Minimax</th>
+          <th>差距</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>$\|f - p\|_\infty$（連續誤差）</td>
+          <td>$1.53 \times 10^{-5}$</td>
+          <td>$1.27 \times 10^{-6}$</td>
+          <td>$12\times$</td>
+        </tr>
+        <tr>
+          <td>$\text{ULP}_{\max}$（定點量化後）</td>
+          <td>12</td>
+          <td>1</td>
+          <td>$12\times$</td>
+        </tr>
+        <tr>
+          <td>$\text{ULP}_{\text{avg}}$</td>
+          <td>3.2</td>
+          <td>0.4</td>
+          <td>$8\times$</td>
+        </tr>
+        <tr>
+          <td>等振盪點數</td>
+          <td>2（端點）</td>
+          <td>7（$d+2$）</td>
+          <td>&mdash;</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout warning">
+      <div class="callout-title">警告 — 12 倍差距的實際意義</div>
+      <p>
+        在 $\text{ULP}_{\max} = 1$ 的精度邊界上，Taylor 的 12 ULP 誤差意味著
+        <strong>數千個輸入值的計算結果都是錯的</strong>（偏離超過 1 ULP）。
+        這不是可以容忍的「小誤差」——它足以決定一個 ZK 電路的精度測試是 pass 還是 fail。
+        在所有 52 組 $(\text{pp}, d)$ 配置中，Minimax 的 $\text{ULP}_{\max}$ 始終
+        $\leq$ Taylor 的 $\text{ULP}_{\max}$，且在多數配置中差距為 $3\times$ 至 $15\times$。
+      </p>
+    </div>
+
+    <h3>多函數、多次數比較</h3>
+
+    <p>
+      以下表格涵蓋論文中測試的部分函數，固定 $\text{pp} = 16$，展示 Taylor vs Minimax
+      在不同次數下的 $\text{ULP}_{\max}$ 比較：
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>函數</th>
+          <th>縮減區間</th>
+          <th>$d$</th>
+          <th>Taylor $\text{ULP}_{\max}$</th>
+          <th>Minimax $\text{ULP}_{\max}$</th>
+          <th>比率</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>$e^x - 1$</td>
+          <td>$[0, \ln 2)$</td>
+          <td>5</td>
+          <td>12</td>
+          <td>1</td>
+          <td>$12\times$</td>
+        </tr>
+        <tr>
+          <td>$\ln(1+x)$</td>
+          <td>$[0, 1)$</td>
+          <td>7</td>
+          <td>9</td>
+          <td>1</td>
+          <td>$9\times$</td>
+        </tr>
+        <tr>
+          <td>$\sin(x)$</td>
+          <td>$[0, \pi/4]$</td>
+          <td>5</td>
+          <td>4</td>
+          <td>1</td>
+          <td>$4\times$</td>
+        </tr>
+        <tr>
+          <td>$\tanh(x)$</td>
+          <td>$[0, 1)$</td>
+          <td>7</td>
+          <td>15</td>
+          <td>2</td>
+          <td>$7.5\times$</td>
+        </tr>
+        <tr>
+          <td>$\text{sigmoid}(x) - 0.5$</td>
+          <td>$[0, 5)$</td>
+          <td>9</td>
+          <td>25</td>
+          <td>3</td>
+          <td>$8.3\times$</td>
+        </tr>
+        <tr>
+          <td>$\text{erf}(x)$</td>
+          <td>$[0, 2)$</td>
+          <td>9</td>
+          <td>18</td>
+          <td>2</td>
+          <td>$9\times$</td>
+        </tr>
+        <tr>
+          <td>$\text{GELU}(x)$</td>
+          <td>$[-3, 3)$</td>
+          <td>9</td>
+          <td>31</td>
+          <td>4</td>
+          <td>$7.8\times$</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      規律非常清楚：<strong>Minimax 在所有函數上都明顯優於 Taylor</strong>。
+      差距通常在 $4\times$ 到 $15\times$ 之間，且隨著區間長度增加（或函數非線性程度增加）而擴大。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">為什麼差距不是常數？</div>
+      <p>
+        差距取決於兩個因素：(1) Taylor 餘項的增長速率——對 $\exp$ 類快速增長的函數差距更大；
+        (2) 區間長度——長區間放大了 Taylor 的偏心效應。
+        對於區間很短的函數（如 $\sin(x)$ on $[0, \pi/4]$），Taylor 已經不錯，
+        Minimax 的改善較小但仍然顯著。
+      </p>
+    </div>
+
+
+    <!-- ============================================================
+         13.6 RANGE REDUCTION
+         ============================================================ -->
+    <h2>13.6 範圍縮減</h2>
+
+    <p>
+      多項式逼近在<strong>窄區間</strong>上效果最好。要處理任意大的輸入範圍，
+      我們利用數學恆等式將輸入「折」進一個小區間。這個過程稱為<strong>範圍縮減</strong>
+      （range reduction）。
+    </p>
+
+    <h3>主要函數的範圍縮減策略</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>函數</th>
+          <th>數學恆等式</th>
+          <th>縮減後區間</th>
+          <th>縮減計算</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>$\exp(x)$</td>
+          <td>$e^x = 2^k \cdot e^r$，其中 $k = \lfloor x / \ln 2 \rfloor$，$r = x - k \ln 2$</td>
+          <td>$[0,\; \ln 2) \approx [0,\; 0.693)$</td>
+          <td>整數除法 + 減法</td>
+        </tr>
+        <tr>
+          <td>$\ln(x)$</td>
+          <td>$\ln(x) = k \ln 2 + \ln(r)$，其中 $x = r \cdot 2^k$，$r \in [1, 2)$</td>
+          <td>$[1,\; 2)$</td>
+          <td>找最高有效位 + 移位</td>
+        </tr>
+        <tr>
+          <td>$\sin(x)$</td>
+          <td>象限分解：$\sin(x) = \pm\sin(r)$ 或 $\pm\cos(r)$</td>
+          <td>$[0,\; \pi/4] \approx [0,\; 0.785]$</td>
+          <td>模運算 + 象限判定</td>
+        </tr>
+        <tr>
+          <td>$\cos(x)$</td>
+          <td>$\cos(x) = \pm\sin(r)$ 或 $\pm\cos(r)$（象限移位）</td>
+          <td>$[0,\; \pi/4]$</td>
+          <td>同 $\sin$</td>
+        </tr>
+        <tr>
+          <td>$\text{sigmoid}(x)$</td>
+          <td>$\sigma(x) = 1 / (1 + e^{-x})$，負輸入用 $\sigma(-x) = 1 - \sigma(x)$</td>
+          <td>$[0,\; 5)$（超過 5 飽和）</td>
+          <td>取絕對值 + 符號恢復</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>為什麼窄區間改善逼近品質？</h3>
+
+    <p>
+      多項式逼近的誤差與區間長度的 $(d+1)$ 次方成正比。直覺上，
+      對於次數 $d$ 的逼近，Taylor 餘項的上界為：
+    </p>
+
+    $$|R_d(x)| \leq \frac{M_{d+1}}{(d+1)!} \cdot (b - a)^{d+1}$$
+
+    <p>
+      其中 $M_{d+1} = \max |f^{(d+1)}(x)|$。如果我們將區間長度減半
+      （例如從 $[0, 2\ln 2)$ 到 $[0, \ln 2)$），誤差上界降低 $2^{d+1}$ 倍。
+      對 $d = 5$，這是 $2^6 = 64$ 倍——巨大的改善。
+    </p>
+
+    <div class="callout example">
+      <div class="callout-title">範例 — 範圍縮減的效果</div>
+      <p>
+        $\exp(x)$ degree-5 逼近：
+      </p>
+      <ul>
+        <li>區間 $[0, 1]$：Minimax $\|e\|_\infty \approx 5.4 \times 10^{-5}$ → $\text{ULP}_{\max} \approx 4$</li>
+        <li>區間 $[0, \ln 2) \approx [0, 0.693)$：Minimax $\|e\|_\infty \approx 1.3 \times 10^{-6}$ → $\text{ULP}_{\max} = 1$</li>
+      </ul>
+      <p>
+        區間長度從 1 縮減到 0.693（$0.69\times$），誤差降低約 $40\times$。
+        這就是範圍縮減的威力——它讓低次多項式也能達到高精度。
+      </p>
+    </div>
+
+    <h3>ZK 電路中範圍縮減的成本</h3>
+
+    <p>
+      範圍縮減在 ZK 電路中不是免費的——它需要額外的約束（閘）來實現：
+    </p>
+
+    <ul>
+      <li><strong>整數除法</strong>（$k = \lfloor x / \ln 2 \rfloor$）：需要範圍檢查和商-餘關係約束，
+      約 $O(\text{bits})$ 個額外閘</li>
+      <li><strong>條件分支</strong>（象限判定）：需要位元分解，約 $O(\text{bits})$ 個閘</li>
+      <li><strong>$2^k$ 乘法</strong>（結果恢復）：在定點運算中是移位操作，需要查找或位元操作</li>
+    </ul>
+
+    <p>
+      論文 ch4 將範圍縮減視為可選的擴展功能（end-to-end evaluation），
+      核心四步方法論中的 Step 2 假設輸入已在正確的區間內。
+    </p>
+
+
+    <!-- ============================================================
+         13.7 CHEBYSHEV INTERPOLATION vs MINIMAX
+         ============================================================ -->
+    <h2>13.7 Chebyshev 插值 vs Minimax</h2>
+
+    <p>
+      一個常見的混淆：<strong>在 Chebyshev 節點上做 Lagrange 插值</strong>和
+      <strong>Minimax 逼近</strong>是兩個不同的概念。
+    </p>
+
+    <h3>Chebyshev 插值</h3>
+
+    <p>
+      在 $[-1, 1]$ 上取 $n+1$ 個 Chebyshev 節點：
+    </p>
+
+    $$x_k = \cos\!\left(\frac{2k+1}{2(n+1)}\pi\right), \quad k = 0, 1, \ldots, n$$
+
+    <p>
+      然後做 Lagrange 插值得到多項式 $I_n(x)$。Chebyshev 插值的誤差滿足：
+    </p>
+
+    $$\|f - I_n\|_\infty \leq \left(1 + \frac{2}{\pi} \ln(n+1)\right) \cdot \|f - p^*_n\|_\infty$$
+
+    <p>
+      其中 $p^*_n$ 是 Minimax 多項式。這告訴我們 Chebyshev 插值的誤差最多比 Minimax 差
+      $O(\log n)$ 倍——<strong>近似最優</strong>，但<strong>不是</strong>最優。
+    </p>
+
+    <h3>差異的實際影響</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>特性</th>
+          <th>Chebyshev 插值</th>
+          <th>Minimax（Remez）</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>$L_\infty$ 誤差</td>
+          <td>近似最優（差 $O(\log d)$ 倍）</td>
+          <td>全局最優</td>
+        </tr>
+        <tr>
+          <td>計算方法</td>
+          <td>直接公式（快，閉式解）</td>
+          <td>迭代演算法（Remez，需 5-15 次迭代）</td>
+        </tr>
+        <tr>
+          <td>等振盪？</td>
+          <td>不保證</td>
+          <td>保證 $d+2$ 個等振盪點</td>
+        </tr>
+        <tr>
+          <td>在 ULP 邊界上</td>
+          <td>可能多 1&ndash;2 ULP</td>
+          <td>$\text{ULP}_{\max}$ 最小化</td>
+        </tr>
+        <tr>
+          <td>使用場景</td>
+          <td>快速近似、原型測試</td>
+          <td>生產部署、精度至關重要</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout warning">
+      <div class="callout-title">警告 — 為什麼論文不用 Chebyshev 插值</div>
+      <p>
+        在 $\text{ULP}_{\max} = 1$ 的精度邊界上，「差 $O(\log d)$ 倍」可能意味著
+        $\text{ULP}_{\max}$ 從 1 變成 2 或 3——通過測試和不通過測試的差別。
+        Remez 演算法的實現難度並不高（<code>mpmath.remez</code> 一行程式碼），
+        而且只需離線計算一次。<strong>沒有理由放棄全局最優解</strong>。
+      </p>
+    </div>
+
+
+    <!-- ============================================================
+         13.8 QUANTIZATION SATURATION BOUNDARY
+         ============================================================ -->
+    <h2>13.8 量化飽和邊界</h2>
+
+    <p>
+      在實數逼近理論中，一個不言自明的規律是：<strong>次數越高，逼近越準</strong>——
+      更多的自由度讓多項式能更好地擬合目標函數。但在<strong>定點量化</strong>的世界中，
+      這個規律有一個出人意料的界限。
+    </p>
+
+    <h3>問題根源：高次項的量化誤差放大</h3>
+
+    <p>
+      回顧定點表示（第 12 章）：多項式係數 $c_j$ 必須量化為定點整數：
+    </p>
+
+    $$D_j = \text{round}(c_j \cdot S^{d+1-j})$$
+
+    <p>
+      其中 $S = 2^{\text{pp}}$ 是縮放因子。問題出在 $S^{d+1-j}$ 這個乘數上：
+    </p>
+
+    <ul>
+      <li>高次項（$j$ 大，即 $x^d, x^{d-1}, \ldots$）的原始係數 $c_j$ 通常很小
+      （因為 $1/j!$ 的衰減），而 $S^{d+1-j}$ 的指數也相對較小——量化誤差適中</li>
+      <li>低次項（$j$ 小，即 $x^0, x^1, \ldots$）的原始係數 $c_j$ 較大，
+      乘以 $S^{d+1-j}$（指數很大）後，四捨五入的相對誤差被指數級放大</li>
+    </ul>
+
+    <p>
+      當多項式次數 $d$ 增加時，$S^{d+1-j}$ 中的 $d+1$ 增大，
+      所有項的量化誤差都被推高。如果 $d$ 超過某個臨界值 $d^*$，
+      量化誤差的增長速度就超過逼近誤差的減少速度——
+      導致 $\text{ULP}_{\max}$ 反而<strong>升高</strong>。
+    </p>
+
+    <h3>量化飽和的數學直覺</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定義 13.2 — 量化飽和邊界 $d^*$</div>
+      <p>
+        給定函數 $f$、區間 $[a,b]$ 和精度參數 $\text{pp}$，<strong>量化飽和邊界</strong> $d^*$ 定義為
+        使 $\text{ULP}_{\max}$ 最小的多項式次數：
+      </p>
+      $$d^* = \arg\min_{d} \;\text{ULP}_{\max}(f, [a,b], d, \text{pp})$$
+      <p>
+        對於 $d < d^*$，逼近誤差主導——增加次數改善精度。<br>
+        對於 $d > d^*$，量化誤差主導——增加次數反而損失精度。
+      </p>
+    </div>
+
+    <p>
+      兩種誤差的競爭可以視覺化：
+    </p>
+
+    <pre>
+ULP_max vs 多項式次數 d
+
+ULP_max
+  |  ╲
+  |   ╲                                    ╱ ╱
+  |    ╲                              ╱ ╱
+  |     ╲                         ╱ ╱
+  |      ╲    逼近誤差主導    ╱ ╱   量化誤差主導
+  |       ╲              ╱ ╱
+  |        ╲         ╱ ╱
+  |         ╲    ╱ ╱
+  |          ╲╱ ╱
+  |           ●  ← d* (最佳次數)
+  |
+  └────────────────────────────────────── d
+              d*
+    </pre>
+
+    <div class="callout warning">
+      <div class="callout-title">警告 — 反直覺的結果</div>
+      <p>
+        <strong>「次數越高越好」在有限精度下是錯的。</strong>這是論文的一個重要發現。
+        例如，$\exp(x) - 1$ on $[0, \ln 2)$ 在 $\text{pp} = 16$ 下，
+        $d = 5$ 達到 $\text{ULP}_{\max} = 1$，但 $d = 7$ 反而 $\text{ULP}_{\max} = 3$——
+        多出的兩個自由度不但沒有幫助，反而因為量化誤差的放大而造成淨損失。
+        這意味著：在設計 ZK 電路時，盲目提高多項式次數是一個<strong>陷阱</strong>。
+        必須針對每個 $(\text{pp}, f, [a,b])$ 組合找到最佳 $d^*$。
+      </p>
+    </div>
+
+    <h3>尋找 $d^*$ 的方法</h3>
+
+    <p>
+      由於 $d^*$ 取決於 $f$、$[a,b]$ 和 $\text{pp}$ 的具體值，沒有通用的閉式公式。
+      論文採用的方法是<strong>暴力搜索</strong>：
+    </p>
+
+    <ol>
+      <li>對 $d = 1, 2, \ldots, d_{\max}$，用 Remez 計算 Minimax 係數</li>
+      <li>將係數量化為定點整數</li>
+      <li>在所有合法輸入上評估 $\text{ULP}_{\max}$</li>
+      <li>找到 $\text{ULP}_{\max}$ 最小的 $d$</li>
+    </ol>
+
+    <p>
+      這個搜索只需離線做一次（每個函數），且 $d_{\max}$ 通常不超過 15，
+      所以計算成本可忽略。論文 ch4 對 13 個函數 $\times$ 4 個 pp 值 = 52 組配置
+      都進行了此搜索。
+    </p>
+
+
+    <!-- ============================================================
+         13.9 FULL PIPELINE SUMMARY
+         ============================================================ -->
+    <h2>13.9 完整流程概覽</h2>
+
+    <p>
+      將本章的所有概念串聯起來，從超越函數到 ZK 電路可用的定點多項式的完整流程是：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <strong>選擇目標函數和區間。</strong>
+        確定要逼近的函數 $f(x)$ 和範圍縮減後的區間 $[a,b]$。
+        盡量選擇使 $f(a) = 0$ 的區間（如 $\exp(x)-1$ 在 $x=0$），
+        這樣常數項 $c_0 = 0$，可以啟用 Horner 零常數項優化（第 14 章）。
+      </div>
+      <div class="step">
+        <strong>搜索最佳次數 $d^*$。</strong>
+        對 $d = 1, 2, \ldots, d_{\max}$，用 Remez 演算法計算 Minimax 係數，
+        量化後評估 $\text{ULP}_{\max}$。選擇使 $\text{ULP}_{\max}$ 最小的 $d^*$。
+      </div>
+      <div class="step">
+        <strong>用 Remez 計算 Minimax 係數。</strong>
+        以 50 位精度計算 $c_0, c_1, \ldots, c_{d^*}$。如果需要 $c_0 = 0$ 約束，
+        在 Remez 搜索空間中限制常數項為零。
+      </div>
+      <div class="step">
+        <strong>量化為定點整數。</strong>
+        $D_j = \text{round}(c_j \cdot S^{d^*+1-j})$，其中 $S = 2^{\text{pp}}$。
+        這些 $D_j$ 就是 Horner 求值（第 14 章）的輸入。
+      </div>
+      <div class="step">
+        <strong>驗證精度。</strong>
+        在所有合法的定點輸入上計算量化後多項式的輸出，
+        與高精度參考值比較，確認 $\text{ULP}_{\max} \leq$ 目標值。
+      </div>
+    </div>
+
+    <div class="callout definition">
+      <div class="callout-title">四步方法論中的位置</div>
+      <p>
+        本章涵蓋的內容對應論文四步方法論（Four-Step Methodology）的 <strong>Step 2</strong>：
+      </p>
+      <ol>
+        <li><strong>Step 1</strong>：定點格式設計（第 12 章）</li>
+        <li><strong>Step 2</strong>：Minimax 多項式係數計算（<strong>本章</strong>）</li>
+        <li><strong>Step 3</strong>：Horner 求值電路設計（第 14 章）</li>
+        <li><strong>Step 4</strong>：電路實現與驗證</li>
+      </ol>
+    </div>
+
+
+    <!-- ============================================================
+         SIGNIFICANCE SECTION
+         ============================================================ -->
+    <h2>對本研究的意義</h2>
+
+    <p>
+      多項式逼近理論是本論文方法論的<strong>理論基石</strong>。
+      以下幾個方面說明了為什麼 Minimax 逼近——而非 Taylor 或其他方法——
+      是 ZK 電路中超越函數計算的正確選擇。
+    </p>
+
+    <h3>Minimax 直接最小化 ULP_max</h3>
+
+    <p>
+      論文的精度度量是 $\text{ULP}_{\max}$——所有輸入中最壞情況的 ULP 誤差。
+      而 $\text{ULP}_{\max}$ 與 $L_\infty$ 範數成正比：
+    </p>
+
+    $$\text{ULP}_{\max} \propto \|f - p\|_\infty$$
+
+    <p>
+      Minimax 多項式的定義就是最小化 $\|f - p\|_\infty$。
+      因此，<strong>選擇 Minimax 等於直接最小化論文的核心精度指標</strong>。
+      這不是巧合，而是方法論設計時的有意選擇——精度度量和逼近方法完美對齊。
+    </p>
+
+    <h3>量化飽和邊界改變了「次數越高越好」的直覺</h3>
+
+    <p>
+      在純數學的逼近理論中，次數越高、逼近越好是基本事實（Weierstrass 逼近定理的推論）。
+      但本論文的實驗發現，在定點量化的約束下，存在一個<strong>最佳次數 $d^*$</strong>，
+      超過它反而更差。這個發現直接影響了電路設計：
+    </p>
+
+    <ul>
+      <li>電路中的閘數（成本）與多項式次數 $d$ 成正比</li>
+      <li>$d > d^*$ 時，多付出的閘不但沒有回報，反而降低精度</li>
+      <li>因此，$d^*$ 是成本和精度的<strong>最優平衡點</strong></li>
+    </ul>
+
+    <h3>$c_0 = 0$ 約束與 Horner 優化的關聯</h3>
+
+    <p>
+      如果我們選擇使 $f(a) = 0$ 的區間（如 $\exp(x)-1$ 在 $x=0$），
+      Minimax 多項式的常數項 $c_0$ 自然為零（或可透過約束 Remez 搜索空間強制為零）。
+      這使得多項式可以寫成 $p(x) = x \cdot q(x)$ 的形式，
+      啟用 Horner 求值中的零常數項優化——省去一個加法閘和一次截斷
+      （詳見第 14 章）。這是逼近理論和電路設計之間的巧妙連結。
+    </p>
+
+    <h3>為何不用其他逼近方法？</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>方法</th>
+          <th>$L_\infty$ 誤差</th>
+          <th>對 ULP 的影響</th>
+          <th>計算難度</th>
+          <th>論文選擇</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Taylor 級數</td>
+          <td>在展開點附近最小，遠處暴增</td>
+          <td>$\text{ULP}_{\max}$ 大幅惡化（$4\times$&ndash;$15\times$）</td>
+          <td>容易（閉式公式）</td>
+          <td>&cross;</td>
+        </tr>
+        <tr>
+          <td>Chebyshev 插值</td>
+          <td>近似最優（差 $O(\log d)$ 倍）</td>
+          <td>可能多 1&ndash;2 ULP</td>
+          <td>容易（閉式公式）</td>
+          <td>&cross;</td>
+        </tr>
+        <tr>
+          <td>Minimax（Remez）</td>
+          <td>全局最優</td>
+          <td>$\text{ULP}_{\max}$ 最小化</td>
+          <td>中等（迭代演算法）</td>
+          <td>&check;</td>
+        </tr>
+        <tr>
+          <td>Pad&eacute; 逼近</td>
+          <td>某些函數更優</td>
+          <td>需要除法 &rarr; 電路成本高</td>
+          <td>中等</td>
+          <td>&cross;</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      選擇的邏輯非常清楚：
+    </p>
+
+    <ul>
+      <li><strong>Taylor</strong>：精度差太多，淘汰</li>
+      <li><strong>Chebyshev 插值</strong>：接近最優但非最優；在 ULP 邊界上可能差 1&ndash;2 ULP，
+      而 Remez 並不比它更難實現——一行 <code>mpmath.remez()</code> 就解決了。淘汰</li>
+      <li><strong>Pad&eacute;</strong>：需要有理函數（分子除以分母），在 ZK 電路中除法極為昂貴
+      （需要乘法逆元約束）。即使逼近精度更高，電路成本的增加遠超收益。淘汰</li>
+      <li><strong>Minimax</strong>：全局最優 $L_\infty$ 誤差 &rarr; 直接最小化 ULP_max；
+      純多項式 &rarr; 電路成本最低；Remez 離線計算 &rarr; 不增加電路複雜度。
+      <strong>唯一合理的選擇</strong></li>
+    </ul>
+
+    <div class="callout definition">
+      <div class="callout-title">一句話總結</div>
+      <p>
+        Minimax 多項式是 ZK 電路中逼近超越函數的<strong>理論最優選擇</strong>——
+        它最小化的正是我們關心的度量（$L_\infty \propto \text{ULP}_{\max}$），
+        它的形式（純多項式）完美適配算術電路的能力，
+        而量化飽和邊界的發現則告訴我們何時停止增加次數。
+      </p>
+    </div>
+
+
+    <!-- ============================================================
+         FURTHER READING
+         ============================================================ -->
+    <h2>延伸閱讀</h2>
+
+    <ul>
+      <li>
+        Trefethen, <em>Approximation Theory and Approximation Practice</em> (2013)
+        &mdash; 逼近理論的最佳入門書，包含 Chebyshev 多項式、Remez 演算法和等振盪定理的直覺解釋
+      </li>
+      <li>
+        Cheney &amp; Light, <em>A Course in Approximation Theory</em>
+        &mdash; 嚴謹的研究生教材，涵蓋 Minimax 逼近的完整理論
+      </li>
+      <li>
+        <code>mpmath</code> 文件 &mdash; <code>remez</code> 函數
+        &mdash; 論文中使用的 Minimax 多項式計算工具
+      </li>
+      <li>
+        Muller, <em>Elementary Functions: Algorithms and Implementation</em> (3rd ed., 2016)
+        &mdash; 初等函數在定點/浮點硬體中的逼近與實現，包含範圍縮減的完整討論
+      </li>
+    </ul>
+
+
+    <!-- ============================================================
+         PAGE NAVIGATION
+         ============================================================ -->
+    <div class="page-nav">
+      <a href="fixed-point.html">
+        <span class="nav-label">上一章</span>
+        <span class="nav-title">&larr; 12. 有限域定點運算</span>
+      </a>
+      <a href="horner-evaluation.html">
+        <span class="nav-label">下一章</span>
+        <span class="nav-title">14. Horner 求值 &rarr;</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

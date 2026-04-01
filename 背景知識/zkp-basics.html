@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ch.2 ZKP：基礎與性質 — ZK Handbook</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>ZK Handbook</h1>
+      <div class="subtitle">Zero-Knowledge Proof Systems</div>
+    </div>
+    <nav>
+      <div class="section-label">總覽</div>
+      <a href="index.html"><span class="page-num">0.</span> 首頁</a>
+      <div class="section-label">基礎</div>
+      <a href="foundations.html"><span class="page-num">1.</span> 數學基礎</a>
+      <a href="zkp-basics.html" class="active"><span class="page-num">2.</span> ZKP：基礎與性質</a>
+      <div class="section-label">構建模組</div>
+      <a href="polynomial-commitments.html"><span class="page-num">3.</span> 多項式承諾</a>
+      <a href="arithmetization.html"><span class="page-num">4.</span> 算術化</a>
+      <a href="fft-domains.html"><span class="page-num">5.</span> FFT 與求值域</a>
+      <div class="section-label">證明系統</div>
+      <a href="groth16.html"><span class="page-num">6.</span> Groth16</a>
+      <a href="plonk.html"><span class="page-num">7.</span> PLONK</a>
+      <a href="halo2.html"><span class="page-num">8.</span> Halo2</a>
+      <div class="section-label">進階主題</div>
+      <a href="lookup-arguments.html"><span class="page-num">9.</span> 查找論證</a>
+      <a href="polynomial-method.html"><span class="page-num">10.</span> 多項式方法</a>
+      <a href="security-proofs.html"><span class="page-num">11.</span> 安全性證明</a>
+
+      <div class="section-label">論文方法論</div>
+      <a href="fixed-point.html"><span class="page-num">12.</span> 有限域定點運算</a>
+      <a href="approximation-theory.html"><span class="page-num">13.</span> 多項式逼近理論</a>
+      <a href="horner-evaluation.html"><span class="page-num">14.</span> Horner 求值</a>
+    </nav>
+  </aside>
+  <main class="main-content">
+
+    <!-- Page Header -->
+    <div class="page-header">
+      <h1>第二章：ZKP &mdash; 基礎與性質</h1>
+      <p class="page-subtitle">
+        互動式證明系統的形式化定義、三大核心安全性質
+        （完備性、可靠性、零知識性）、Sigma 協議、Fiat-Shamir 轉換，
+        以及現代零知識系統的分類體系。
+      </p>
+    </div>
+
+    <!-- ================================================ -->
+    <!-- DEFINITIONS SECTION                              -->
+    <!-- ================================================ -->
+    <div class="definitions-section">
+      <h2>關鍵定義</h2>
+
+      <div class="def-item">
+        <div class="def-term">Interactive Proof System <span class="zh">互動式證明系統</span></div>
+        <div class="def-body">
+          兩方 $(P, V)$ 之間進行多輪訊息交換的協議。
+          <strong>證明者</strong> $P$ 可擁有無界計算能力；<strong>驗證者</strong> $V$
+          被限制為概率多項式時間（PPT）。互動結束後，$V$ 輸出
+          $\mathsf{accept}$（1）或 $\mathsf{reject}$（0）。形式上，對於語言 $L$ 及安全參數 $\lambda$，
+          系統由聯合執行 $\langle P(w), V(r) \rangle(x)$ 定義，其中 $x$ 為公開輸入，
+          $w$ 為見證，$r$ 為 $V$ 的隨機性。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Completeness <span class="zh">完備性</span></div>
+        <div class="def-body">
+          若陳述為真（$x \in L$）且雙方皆誠實地遵循協議，
+          驗證者將以壓倒性機率接受：
+          $$\Pr\!\bigl[\langle P(w), V \rangle(x) = 1\bigr] \;\geq\; 1 - \mathrm{negl}(\lambda)$$
+          其中 $w$ 是 $x$ 的有效見證。當此機率恰好等於 1 時，我們稱系統具有
+          <em>完美完備性</em>。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Soundness <span class="zh">可靠性</span></div>
+        <div class="def-body">
+          若陳述為假（$x \notin L$），則任何作弊的證明者 $P^*$（即使計算能力無界）
+          都無法使誠實的驗證者接受，除非以可忽略的機率：
+          $$\Pr\!\bigl[\langle P^*, V \rangle(x) = 1\bigr] \;\leq\; \mathrm{negl}(\lambda)$$
+          這是<em>資訊理論</em>（統計）可靠性。若可靠性僅對
+          PPT 對手成立，則該系統稱為<em>論證</em>而非<em>證明</em>。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Knowledge Soundness <span class="zh">知識可靠性</span></div>
+        <div class="def-body">
+          更強的概念：若證明者 $P^*$ 能使驗證者接受，則存在
+          一個 PPT <strong>提取器</strong> $\mathcal{E}$，給定對 $P^*$ 的預言機（回溯）存取權限，
+          能提取有效見證 $w$ 使得 $(x, w) \in R_L$。形式上：
+          $$\Pr\!\bigl[\langle P^*, V \rangle(x) = 1\bigr] - \Pr\!\bigl[\mathcal{E}^{P^*}(x) \to w : (x,w) \in R_L\bigr] \;\leq\; \mathrm{negl}(\lambda)$$
+          這是<em>知識論證</em>（SNARK 中「K」）所要求的性質。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Zero-Knowledge <span class="zh">零知識性</span></div>
+        <div class="def-body">
+          存在一個 PPT <strong>模擬器</strong> $\mathcal{S}$，僅給定公開輸入 $x$
+          （且<em>沒有</em>見證 $w$），能產生與真實互動不可區分的轉錄：
+          $$\mathcal{S}(x) \;\approx\; \mathrm{View}_V\!\bigl[\langle P(w), V \rangle(x)\bigr]$$
+          不可區分性的類型（$\equiv$、$\approx_s$ 或 $\approx_c$）決定了
+          是完美、統計還是計算零知識。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Perfect / Statistical / Computational ZK <span class="zh">完美/統計/計算零知識</span></div>
+        <div class="def-body">
+          <strong>完美零知識</strong>：模擬轉錄與真實轉錄的分佈<em>完全相同</em>
+          （$\Delta = 0$）。<br>
+          <strong>統計零知識</strong>：分佈<em>統計接近</em>
+          （統計距離 $\Delta \leq \mathrm{negl}(\lambda)$）。<br>
+          <strong>計算零知識</strong>：沒有 PPT 區分器能區分兩者
+          （計算不可區分性）。大多數實用系統達到計算零知識。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Honest-Verifier Zero-Knowledge (HVZK) <span class="zh">誠實驗證者零知識</span></div>
+        <div class="def-body">
+          零知識的較弱形式：模擬器 $\mathcal{S}$ 只需產生與<em>誠實</em>驗證者 $V$
+          互動不可區分的轉錄（即 $V$ 遵循協議，均勻隨機地選擇挑戰值）。
+          HVZK <em>不</em>保證對偏離協議的惡意驗證者的隱私。
+          然而，當協議透過 Fiat-Shamir 編譯時，HVZK 已足夠，
+          因為「驗證者」已被雜湊函數取代。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Argument vs Proof <span class="zh">論證 vs 證明</span></div>
+        <div class="def-body">
+          <strong>證明</strong>：可靠性對<em>計算能力無界</em>的對手成立
+          （資訊理論安全）。例如：原始的 Schnorr 互動式證明。<br>
+          <strong>論證</strong>：可靠性僅對<em>計算受限</em>（PPT）的對手成立。
+          破壞可靠性需要解決困難問題（如離散對數、因式分解）。
+          所有 SNARK 都是論證而非證明 &mdash; 計算能力無界的對手可以
+          破壞底層的困難性假設並偽造證明。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Non-Interactive Proof (NIZK) <span class="zh">非互動式零知識證明</span></div>
+        <div class="def-body">
+          證明者僅向驗證者發送<em>單一</em>訊息 $\pi$ 的證明系統，無需
+          進一步互動。驗證者僅根據
+          $(x, \pi)$ 及可能的共同參考字串 $\sigma$ 決定 $\mathsf{accept}$ 或 $\mathsf{reject}$。
+          NIZK 對區塊鏈應用至關重要，因為「驗證者」是智能合約，
+          無法進行互動式通訊。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Fiat-Shamir Heuristic <span class="zh">Fiat-Shamir 啟發法</span></div>
+        <div class="def-body">
+          一種通用轉換，將任何公開硬幣互動式協議轉換為非互動式協議，
+          方法是以密碼雜湊函數應用於當前轉錄的輸出取代驗證者的隨機挑戰：
+          $$c = H(\text{statement} \,\|\, \text{prior messages})$$
+          安全性在 <strong>Random Oracle Model</strong>（ROM）中得到證明。實務上，$H$ 以
+          SHA-256、BLAKE2 或 Poseidon 實現。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Random Oracle Model (ROM) <span class="zh">隨機預言機模型</span></div>
+        <div class="def-body">
+          一種安全模型，其中雜湊函數 $H$ 被建模為真正的隨機函數：
+          對每個新查詢 $x$，$H(x)$ 是獨立於所有其他查詢的均勻隨機值。
+          所有各方（證明者、驗證者、對手）均可查詢該預言機，但無人能在
+          未實際查詢 $x$ 的情況下預測 $H(x)$。ROM 證明是啟發式的 &mdash; 真實的雜湊函數
+          是確定性的 &mdash; 但 ROM 安全性在實務上被廣泛接受。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Common Reference String (CRS) <span class="zh">共同參考字串</span></div>
+        <div class="def-body">
+          證明者和驗證者共享的字串 $\sigma$，由受信任的設定儀式
+          或透明程序生成。CRS 是大多數 NIZK 系統所必需的 &mdash;
+          在標準假設下（不使用 ROM），NP 的 NIZK 不可能沒有 CRS。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Structured Reference String (SRS) <span class="zh">結構化參考字串</span></div>
+        <div class="def-body">
+          具有代數結構的 CRS，通常由編碼秘密活門 $\tau$ 之冪次的橢圓曲線點組成：
+          $$\mathsf{SRS} = \bigl([1]_1, [\tau]_1, [\tau^2]_1, \ldots, [\tau^d]_1,\; [1]_2, [\tau]_2\bigr)$$
+          秘密 $\tau$（稱為<em>有毒廢料</em>）在設定後必須銷毀。
+          若 $\tau$ 被對手知曉，可靠性將被完全破壞。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Witness <span class="zh">見證</span></div>
+        <div class="def-body">
+          使陳述為真的秘密輸入 $w$。對於 NP 關係 $R_L$，
+          見證滿足 $(x, w) \in R_L$。例如：「我知道 $w$ 使得 $C(x, w) = 0$」
+          其中 $C$ 是算術電路。證明說服驗證者此 $w$ 存在，
+          但不揭露 $w$ 本身。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Sigma Protocol <span class="zh">&Sigma;-協議</span></div>
+        <div class="def-body">
+          具有以下結構的三輪互動式協議：
+          <strong>承諾</strong>（$a$）&rarr; <strong>挑戰</strong>（$c$）&rarr; <strong>回應</strong>（$z$）。
+          該協議為<em>公開硬幣</em>（驗證者的訊息僅為隨機硬幣），
+          並滿足<em>完備性</em>、<em>特殊可靠性</em>（可從具有相同承諾但不同挑戰的
+          兩個接受轉錄中提取見證）以及 <em>HVZK</em>。
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================ -->
+    <!-- 2.1 THE THREE PROPERTIES                         -->
+    <!-- ================================================ -->
+    <h2>2.1 三大性質 &mdash; 形式化定義</h2>
+
+    <p>
+      每個零知識證明系統都必須滿足三個基本安全性質。
+      這些性質共同保證協議是<em>有用的</em>（完備性）、
+      <em>可信的</em>（可靠性）以及<em>隱私的</em>（零知識性）。
+      我們依次將每一項形式化。
+    </p>
+
+    <h3>完備性</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定義 2.1 &mdash; 完備性</div>
+      <p>
+        對於語言 $L$ 及見證關係 $R_L$，互動式證明系統 $(P, V)$
+        具有<strong>完備性</strong>，若對所有 $x \in L$ 及所有有效見證 $w$ 使得
+        $(x, w) \in R_L$：
+      </p>
+      $$\Pr\!\bigl[\langle P(w), V \rangle(x) = 1\bigr] \;\geq\; 1 - \mathrm{negl}(\lambda)$$
+      <p>
+        機率取決於 $P$ 和 $V$ 雙方的隨機硬幣。
+        若機率恰好為 1，則系統具有<strong>完美完備性</strong>。
+      </p>
+    </div>
+
+    <p>
+      <strong>現實世界類比：</strong>完備性意味著持有有效護照的誠實之人
+      在邊境將總是被放行。若系統偶爾拒絕合法的證明者，
+      它將毫無用處 &mdash; 沒有人會信任或採用它。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">備註</div>
+      <p>
+        大多數實用的零知識系統具有完美完備性：若雙方皆誠實且
+        陳述為真，驗證者總是接受。不完美完備性（以機率
+        $1 - \epsilon$ 接受，其中 $\epsilon$ 很小）主要屬於理論上的考量。
+      </p>
+    </div>
+
+    <h3>可靠性 vs 知識可靠性</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定義 2.2 &mdash; 可靠性</div>
+      <p>
+        對於語言 $L$，互動式證明系統 $(P, V)$ 具有<strong>可靠性</strong>，
+        若對所有 $x \notin L$ 及所有（可能作弊、計算能力無界的）證明者策略 $P^*$：
+      </p>
+      $$\Pr\!\bigl[\langle P^*, V \rangle(x) = 1\bigr] \;\leq\; \mathrm{negl}(\lambda)$$
+      <p>
+        機率取決於 $V$ 的隨機硬幣。上界 $\mathrm{negl}(\lambda)$ 稱為
+        <strong>可靠性誤差</strong>。
+      </p>
+    </div>
+
+    <p>
+      可靠性表示：假陳述不能被「證明」。無論作弊的證明者多麼聰明或強大，
+      驗證者都會識破謊言（除非以可忽略的機率）。
+    </p>
+
+    <p>
+      <strong>現實世界類比：</strong>可靠性意味著持偽造護照的人
+      在邊境將被識破。即使偽造者技藝極為精湛，
+      驗證過程仍會偵測到偽造。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">定義 2.3 &mdash; 知識可靠性（知識論證）</div>
+      <p>
+        對於關係 $R_L$，互動式證明系統 $(P, V)$ 具有<strong>知識可靠性</strong>，
+        若存在 PPT <strong>提取器</strong> $\mathcal{E}$，使得對每個使 $V$
+        以不可忽略機率接受的 PPT 證明者 $P^*$，$\mathcal{E}$ 可透過回溯 $P^*$ 提取有效見證：
+      </p>
+      $$\Pr\!\bigl[\langle P^*, V \rangle(x) = 1\bigr] - \Pr\!\bigl[\mathcal{E}^{P^*}(x) \to w : (x,w) \in R_L\bigr] \;\leq\; \kappa(\lambda)$$
+      <p>
+        其中 $\kappa(\lambda)$ 是<strong>知識誤差</strong>。提取器對 $P^*$ 具有預言機
+        （黑盒回溯）存取權限：它可以從任意點使用新的隨機性重新執行 $P^*$。
+      </p>
+    </div>
+
+    <p>
+      知識可靠性<em>嚴格強於</em>普通可靠性。普通可靠性表示
+      「你不能證明假陳述」。知識可靠性則表示「若你能證明真陳述，
+      你必須確實<em>知道</em>見證」。
+    </p>
+
+    <div class="callout example">
+      <div class="callout-title">範例 &mdash; 為何此區別很重要</div>
+      <p>
+        考慮陳述「數字 $N$ 是合數」。普通的證明只需說服
+        驗證者 $N$ 是合數。但<em>知識證明</em>要求證明者確實
+        知道一個因式分解 &mdash; 僅知道因式分解<em>存在</em>是不夠的。
+      </p>
+      <p>
+        在區塊鏈應用中，知識可靠性至關重要：證明者必須展示其知道
+        有效的交易見證（如私鑰、Merkle 路徑），而不僅僅是
+        該見證存在於某處。
+      </p>
+    </div>
+
+    <h4>提取論證</h4>
+
+    <p>
+      提取器在實務中如何運作？關鍵技術是<strong>回溯</strong>。
+      給定一個三輪 Sigma 協議的轉錄 $(a, c, z)$：
+    </p>
+
+    <ol>
+      <li>執行 $P^*$ 以獲得第一條訊息 $a$。</li>
+      <li>發送隨機挑戰 $c_1$ 並接收回應 $z_1$。記錄轉錄 $(a, c_1, z_1)$。</li>
+      <li><strong>回溯</strong> $P^*$ 到發送 $a$ 之後的狀態。</li>
+      <li>發送<em>不同的</em>隨機挑戰 $c_2 \neq c_1$ 並接收回應 $z_2$。記錄 $(a, c_2, z_2)$。</li>
+      <li>從兩個接受轉錄 $(a, c_1, z_1)$ 和 $(a, c_2, z_2)$ 中，以代數方法提取見證 $w$。</li>
+    </ol>
+
+    <p>
+      此技術稱為<strong>特殊可靠性</strong>：從具有相同第一條訊息 $a$ 但不同挑戰
+      $c_1 \neq c_2$ 的任意兩個接受轉錄中，可以有效地計算見證。
+      我們將在第 2.2 節中透過 Schnorr 協議具體展示這一點。
+    </p>
+
+    <h3>零知識性 &mdash; 模擬範式</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定義 2.4 &mdash; 零知識性</div>
+      <p>
+        對於 $L$，互動式證明系統 $(P, V)$ 具有<strong>零知識性</strong>，
+        若對每個 PPT 驗證者 $V^*$，存在 PPT <strong>模擬器</strong> $\mathcal{S}$，
+        使得對所有 $x \in L$ 及見證 $w$：
+      </p>
+      $$\bigl\{\mathcal{S}(x)\bigr\}_{x \in L} \;\approx\; \bigl\{\mathrm{View}_{V^*}\!\bigl[\langle P(w), V^* \rangle(x)\bigr]\bigr\}_{x \in L}$$
+      <p>
+        其中 $\mathrm{View}_{V^*}$ 包含驗證者的隨機硬幣及所有收到的訊息。
+        $\approx$ 的類型決定了零知識的種類：
+      </p>
+      <ul>
+        <li>$\equiv$（分佈完全相同）&rArr; <strong>完美零知識</strong></li>
+        <li>$\approx_s$（統計接近）&rArr; <strong>統計零知識</strong></li>
+        <li>$\approx_c$（計算不可區分）&rArr; <strong>計算零知識</strong></li>
+      </ul>
+    </div>
+
+    <p>
+      <strong>現實世界類比：</strong>想像向一位色盲朋友證明兩顆球顏色不同，
+      卻不告訴他們哪顆是哪種顏色。關鍵洞察：若某人（模擬器）
+      <em>完全未見過那些球</em>就能產生完整的互動轉錄，
+      那麼該互動就沒有揭露任何關於顏色的資訊 &mdash; 它是零知識的。
+    </p>
+
+    <p>
+      模擬範式是零知識密碼學中<em>最</em>核心的概念。它提供了一種嚴格的方法
+      來證明「沒有任何資訊被洩露」：若模擬轉錄與真實轉錄不可區分，
+      則觀察者除了陳述的真偽之外，不會獲得任何額外資訊。
+      我們將在第 2.6 節中詳細探討此範式。
+    </p>
+
+    <div class="callout warning">
+      <div class="callout-title">警告 &mdash; 零知識不等於「隱藏輸入」</div>
+      <p>
+        零知識不意味著<em>陳述</em>被隱藏 &mdash; 雙方都知道
+        陳述 $x$。它意味著<em>見證</em> $w$（以及從中可推導的一切）被隱藏。
+        驗證者得知 $x \in L$（給予足夠時間他們本可自行驗證），但
+        對<em>為何</em> $x \in L$（見證）一無所知。
+      </p>
+    </div>
+
+
+    <!-- ================================================ -->
+    <!-- 2.2 SIGMA PROTOCOLS                              -->
+    <!-- ================================================ -->
+    <h2>2.2 互動式證明：Sigma 協議</h2>
+
+    <p>
+      Sigma 協議（$\Sigma$-協議）是最簡單且最重要的互動式證明系統類別。
+      它們恰好有 <strong>3 輪</strong>，且具有簡潔的代數結構，
+      使其易於分析、組合和轉換為非互動式證明。
+    </p>
+
+    <h3>承諾-挑戰-回應結構</h3>
+
+    <div class="diagram">
+<pre>
+    證明者 P(x, w)                          驗證者 V(x)
+    ═══════════════                         ═════════════
+
+    選擇隨機 r
+    計算承諾 a
+                           ─── a ──────▶
+                                            選擇隨機 c ∈ {0,1}^λ
+                           ◀── c ──────
+    計算回應 z
+    使用 (r, c, w)
+                           ─── z ──────▶
+                                            檢驗驗證方程式
+                                            輸出 accept/reject
+</pre>
+    </div>
+
+    <p>Sigma 協議必須滿足三個性質：</p>
+    <ol>
+      <li><strong>完備性：</strong>若雙方皆誠實，驗證者總是接受。</li>
+      <li><strong>特殊可靠性：</strong>給定兩個接受轉錄 $(a, c_1, z_1)$ 和 $(a, c_2, z_2)$，
+        其承諾 $a$ 相同但 $c_1 \neq c_2$，可以有效地計算見證 $w$。</li>
+      <li><strong>HVZK：</strong>存在一個模擬器，不知道
+        $w$ 即可產生與真實轉錄（當 $V$ 誠實時）分佈相同的轉錄。</li>
+    </ol>
+
+    <h3>範例：Schnorr 離散對數知識協議</h3>
+
+    <p>
+      最重要的 Sigma 協議是 <strong>Schnorr 協議</strong>，用於證明離散對數的知識。
+      設定如下：令 $\mathbb{G}$ 為素數階 $q$ 的循環群，
+      生成元為 $g$。證明者知道秘密 $x \in \mathbb{Z}_q$，公開值為 $h = g^x$。
+      證明者想說服驗證者：「我知道 $x$ 使得 $h = g^x$。」
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <h4>承諾</h4>
+        <p>
+          證明者選擇隨機 $r \xleftarrow{\$} \mathbb{Z}_q$ 並計算承諾
+          $a = g^r$。將 $a$ 發送給驗證者。
+        </p>
+      </div>
+      <div class="step">
+        <h4>挑戰</h4>
+        <p>
+          驗證者選擇隨機挑戰 $c \xleftarrow{\$} \mathbb{Z}_q$ 並將 $c$ 發送給證明者。
+        </p>
+      </div>
+      <div class="step">
+        <h4>回應</h4>
+        <p>
+          證明者計算 $z = r + c \cdot x \pmod{q}$ 並將 $z$ 發送給驗證者。
+        </p>
+      </div>
+    </div>
+
+    <div class="callout definition">
+      <div class="callout-title">Schnorr 驗證方程式</div>
+      <p>驗證者接受若且唯若：</p>
+      $$g^z \;=\; a \cdot h^c$$
+      <p>
+        正確性在於 $g^z = g^{r + cx} = g^r \cdot g^{cx} = g^r \cdot (g^x)^c = a \cdot h^c$。
+      </p>
+    </div>
+
+    <h4>證明 Schnorr 的完備性</h4>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 2.1 &mdash; Schnorr 協議的完備性</div>
+      <p>若證明者知道 $x$ 使得 $h = g^x$，且雙方遵循協議，驗證者總是接受。</p>
+      <p><strong>證明。</strong>證明者發送 $a = g^r$，接收 $c$，並發送 $z = r + cx \pmod{q}$。
+        驗證者檢驗：</p>
+      $$g^z = g^{r + cx} = g^r \cdot (g^x)^c = a \cdot h^c \;\;\checkmark$$
+      <p>
+        驗證方程式以機率 1 成立。因此 Schnorr 協議具有
+        <strong>完美完備性</strong>。$\square$
+      </p>
+    </div>
+
+    <h4>證明 Schnorr 的特殊可靠性</h4>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 2.2 &mdash; Schnorr 協議的特殊可靠性</div>
+      <p>
+        給定兩個接受轉錄 $(a, c_1, z_1)$ 和 $(a, c_2, z_2)$ 且 $c_1 \neq c_2$，
+        可以提取離散對數 $x$。
+      </p>
+      <p><strong>證明。</strong>從兩個接受轉錄：</p>
+      $$g^{z_1} = a \cdot h^{c_1} \quad \text{and} \quad g^{z_2} = a \cdot h^{c_2}$$
+      <p>將第一個方程式除以第二個：</p>
+      $$g^{z_1 - z_2} = h^{c_1 - c_2} = g^{x(c_1 - c_2)}$$
+      <p>因此：</p>
+      $$z_1 - z_2 = x(c_1 - c_2) \pmod{q}$$
+      <p>由於 $c_1 \neq c_2$ 且 $q$ 為素數，$(c_1 - c_2)$ 在模 $q$ 下可逆，故可提取：</p>
+      $$x = \frac{z_1 - z_2}{c_1 - c_2} \pmod{q} \;\;\square$$
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">備註 &mdash; 回溯論證</div>
+      <p>
+        特殊可靠性透過第 2.1 節所述的回溯技術蘊含知識可靠性。
+        提取器執行證明者以取得 $(a, c_1, z_1)$，回溯至 $a$ 之後的狀態，並發送
+        新的 $c_2 \neq c_1$。若證明者再次成功，提取器便擁有兩個接受轉錄
+        並可計算 $x$。預期回溯次數為 $1/\epsilon$ 的多項式，其中 $\epsilon$
+        是證明者的成功機率。
+      </p>
+    </div>
+
+    <h4>證明 Schnorr 的 HVZK</h4>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 2.3 &mdash; Schnorr 的 HVZK</div>
+      <p>
+        Schnorr 協議具有<strong>完美 HVZK</strong>。
+      </p>
+      <p><strong>證明。</strong>我們構造模擬器 $\mathcal{S}(h)$，不知道 $x$ 即可產生
+        與真實轉錄分佈完全相同的轉錄：</p>
+      <ol>
+        <li>均勻隨機選擇 $z \xleftarrow{\$} \mathbb{Z}_q$ 和 $c \xleftarrow{\$} \mathbb{Z}_q$。</li>
+        <li>計算 $a = g^z \cdot h^{-c}$。</li>
+        <li>輸出轉錄 $(a, c, z)$。</li>
+      </ol>
+      <p><strong>驗證：</strong>模擬轉錄滿足 $g^z = a \cdot h^c$（因為 $a = g^z h^{-c}$，由構造可得）。
+        我們需要證明 $(a, c, z)$ 與真實轉錄具有相同的分佈。</p>
+      <p>
+        在真實轉錄中：$c$ 和 $r$ 均勻分佈在 $\mathbb{Z}_q$ 上，故 $z = r + cx$ 亦為均勻
+        （因為 $r$ 均勻且獨立於 $c$）。因此 $(c, z)$ 均勻分佈在
+        $\mathbb{Z}_q \times \mathbb{Z}_q$ 上，而 $a$ 由 $a = g^z h^{-c}$ 確定。
+      </p>
+      <p>
+        在模擬中：$c$ 和 $z$ 被均勻選取，$a$ 由 $a = g^z h^{-c}$ 確定。
+        兩個分佈<strong>完全相同</strong>。$\square$
+      </p>
+    </div>
+
+    <p>
+      關鍵技巧：模擬器<strong>先選擇 $z$ 和 $c$</strong>，再反向計算 $a$。
+      在真實協議中，證明者先選擇 $r$（確定 $a = g^r$），然後接收 $c$，再計算
+      $z$。但<em>分佈</em>是相同的，因為所有值都均勻分佈在 $\mathbb{Z}_q$ 上。
+      這種「逆序」模擬是模擬範式的標誌性特徵。
+    </p>
+
+    <h3>具體數字的計算範例</h3>
+
+    <div class="callout example">
+      <div class="callout-title">範例 &mdash; $\mathbb{Z}_{23}^*$ 中的 Schnorr 協議</div>
+      <p>
+        令 $p = 23$，$q = 11$（因為 $23 = 2 \cdot 11 + 1$）。令 $g = 4$（$\mathbb{Z}_{23}^*$ 中
+        階為 11 的子群的生成元）。可驗證：$4^{11} \equiv 1 \pmod{23}$。
+      </p>
+      <p>
+        <strong>設定：</strong>證明者的秘密為 $x = 7$。公鑰為：
+      </p>
+      $$h = g^x = 4^7 \bmod 23$$
+      <p>計算：$4^1 = 4$，$4^2 = 16$，$4^4 = 16^2 = 256 \equiv 3 \pmod{23}$，
+        $4^7 = 4^4 \cdot 4^2 \cdot 4^1 = 3 \cdot 16 \cdot 4 = 192 \equiv 8 \pmod{23}$。
+        故 $h = 8$。
+      </p>
+      <p><strong>第一步（承諾）：</strong>證明者選擇 $r = 3$ 並發送：</p>
+      $$a = g^r = 4^3 = 64 \equiv 18 \pmod{23}$$
+      <p><strong>第二步（挑戰）：</strong>驗證者發送 $c = 5$。</p>
+      <p><strong>第三步（回應）：</strong>證明者計算：</p>
+      $$z = r + c \cdot x = 3 + 5 \cdot 7 = 38 \equiv 5 \pmod{11}$$
+      <p><strong>驗證：</strong>驗證者檢驗 $g^z \stackrel{?}{=} a \cdot h^c$：</p>
+      $$g^z = 4^5 = 1024 \equiv 1024 - 44 \cdot 23 = 1024 - 1012 = 12 \pmod{23}$$
+      $$a \cdot h^c = 18 \cdot 8^5 \pmod{23}$$
+      <p>計算 $8^5$：$8^2 = 64 \equiv 18$，$8^4 = 18^2 = 324 \equiv 324 - 14 \cdot 23 = 2$，
+        $8^5 = 8^4 \cdot 8 = 2 \cdot 8 = 16$。</p>
+      $$a \cdot h^c = 18 \cdot 16 = 288 \equiv 288 - 12 \cdot 23 = 288 - 276 = 12 \pmod{23}$$
+      <p>兩邊皆等於 <strong>12</strong>。驗證者接受。&#10003;</p>
+    </div>
+
+    <div class="callout example">
+      <div class="callout-title">範例 &mdash; 模擬轉錄（同一群）</div>
+      <p>
+        模擬器（不知道 $x = 7$）產生一個偽造轉錄：
+      </p>
+      <ol>
+        <li>選擇 $z = 9$ 和 $c = 3$（皆均勻分佈在 $\mathbb{Z}_{11}$ 上）。</li>
+        <li>計算 $a = g^z \cdot h^{-c} = 4^9 \cdot 8^{-3} \pmod{23}$。</li>
+      </ol>
+      <p>計算 $4^9$：$4^8 = (4^4)^2 = 3^2 = 9$，$4^9 = 9 \cdot 4 = 36 \equiv 13$。</p>
+      <p>計算 $8^{-3}$：首先 $8^3 = 8 \cdot 18 = 144 \equiv 144 - 6 \cdot 23 = 6$。
+        然後 $6^{-1} \pmod{23}$：$6 \cdot 4 = 24 \equiv 1$，故 $8^{-3} \equiv 4$。</p>
+      <p>$a = 13 \cdot 4 = 52 \equiv 6 \pmod{23}$。</p>
+      <p>
+        模擬轉錄為 $(a, c, z) = (6, 3, 9)$。驗證：
+        $g^z = 4^9 = 13$，$a \cdot h^c = 6 \cdot 8^3 = 6 \cdot 6 = 36 \equiv 13$。&#10003;
+      </p>
+      <p>
+        此轉錄與真實轉錄<em>不可區分</em> &mdash; 它通過驗證方程式，
+        且其分佈與真實轉錄的分佈完全相同。
+      </p>
+    </div>
+
+
+    <!-- ================================================ -->
+    <!-- 2.3 FIAT-SHAMIR                                  -->
+    <!-- ================================================ -->
+    <h2>2.3 從互動到非互動：Fiat-Shamir 轉換</h2>
+
+    <p>
+      互動式協議在理論上很優雅，但在區塊鏈和其他證明者與驗證者
+      無法即時通訊的場景中不切實際。
+      <strong>Fiat-Shamir 轉換</strong>（1986）透過使協議非互動來解決此問題。
+    </p>
+
+    <h3>轉換方法</h3>
+
+    <p>
+      核心想法看似簡單：以雜湊函數應用於證明者的承諾（及陳述）之輸出
+      取代驗證者的隨機挑戰 $c$：
+    </p>
+
+    $$c = H(\text{statement} \;\|\; a)$$
+
+    <p>
+      由於 $H$ 是確定性的，證明者可以自行計算挑戰 &mdash; 無需驗證者。
+      產生的非互動式證明僅為配對 $(a, z)$（或等價地 $(c, z)$，因為
+      $a$ 有時可被重建）。
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <h4>證明者計算承諾</h4>
+        <p>如前：選擇 $r$，計算 $a = g^r$。</p>
+      </div>
+      <div class="step">
+        <h4>證明者透過雜湊計算挑戰</h4>
+        <p>$c = H(g \;\|\; h \;\|\; a)$ &mdash; 所有公開參數加上承諾的雜湊。</p>
+      </div>
+      <div class="step">
+        <h4>證明者計算回應</h4>
+        <p>$z = r + cx \pmod{q}$。</p>
+      </div>
+      <div class="step">
+        <h4>證明輸出</h4>
+        <p>非互動式證明為 $\pi = (a, z)$。發送給驗證者。</p>
+      </div>
+    </div>
+
+    <div class="callout definition">
+      <div class="callout-title">Fiat-Shamir 驗證</div>
+      <p>驗證者收到 $(g, h, \pi = (a, z))$ 後，檢驗：</p>
+      <ol>
+        <li>重新計算 $c = H(g \;\|\; h \;\|\; a)$。</li>
+        <li>檢驗 $g^z \stackrel{?}{=} a \cdot h^c$。</li>
+      </ol>
+      <p>無需互動 &mdash; 證明者向驗證者發送單一訊息即可。</p>
+    </div>
+
+    <h3>Random Oracle Model 中的安全性</h3>
+
+    <p>
+      為何以 $H(\cdot)$ 取代隨機的 $c$ 能保持可靠性？在 <strong>Random Oracle
+      Model</strong> 中，$H$ 表現為真正的隨機函數。證明者在承諾 $a$ 之前
+      無法預測 $H(g \| h \| a)$，因此從證明者的角度來看 $c$ 實際上是隨機的 &mdash;
+      就像真實的驗證者選擇的一樣。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 2.4 &mdash; Fiat-Shamir 可靠性（ROM）</div>
+      <p>
+        若 Sigma 協議具有 $(2, n)$-特殊可靠性（可從具有相同承諾的 2 個接受
+        轉錄中提取見證），則對其施加 Fiat-Shamir 轉換後，可在 Random Oracle Model 中
+        得到非互動式知識論證。
+      </p>
+      <p>
+        <strong>證明概要：</strong>提取器對隨機預言機進行程式化。當 $P^*$ 查詢
+        $H(g \| h \| a)$ 時，提取器記錄查詢。然後它可以「回溯」$P^*$，並以
+        不同的隨機值回答相同查詢，從而獲得具有相同 $a$ 但不同 $c$ 值的
+        兩個接受轉錄。特殊可靠性隨即產生見證。
+      </p>
+    </div>
+
+    <h3>弱 Fiat-Shamir：一個關鍵陷阱</h3>
+
+    <div class="callout warning">
+      <div class="callout-title">警告 &mdash; 弱 Fiat-Shamir 攻擊</div>
+      <p>
+        常見的實作錯誤是僅對承諾進行雜湊：
+      </p>
+      $$c = H(a) \quad \text{（錯誤 — 缺少陳述）}$$
+      <p>
+        這被稱為<strong>弱 Fiat-Shamir</strong>，可能完全破壞可靠性。
+        攻擊方式：惡意的證明者為陳述 $x_1$ 計算一個證明，然後將
+        <em>同一個證明</em>重播用於不同的陳述 $x_2$（因為雜湊未綁定陳述）。
+      </p>
+      <p><strong>正確用法：</strong>始終在雜湊中包含所有公開輸入：</p>
+      $$c = H(\text{all public parameters} \;\|\; \text{statement } x \;\|\; \text{commitment } a)$$
+      <p>
+        現實中的 CVE 漏洞即源於此錯誤。Frozen Heart 漏洞（2021）影響了
+        多個省略公開輸入的零知識程式庫。
+      </p>
+    </div>
+
+    <h3>為何區塊鏈需要非互動式證明</h3>
+
+    <p>
+      在區塊鏈上，「驗證者」是智能合約。智能合約是被動的：它們接收
+      包含證明的交易，並必須在單一執行步驟中決定接受或拒絕。
+      它們無法向證明者回傳挑戰。因此，所有部署於區塊鏈的零知識系統
+      （Groth16、PLONK 等）都是非互動式的 &mdash; 透過 Fiat-Shamir 或基於 CRS 的構造實現。
+    </p>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>互動式協議</h4>
+        <ul>
+          <li>多輪通訊</li>
+          <li>驗證者生成新鮮隨機性</li>
+          <li>對無界對手可靠</li>
+          <li>適用於直接雙方場景</li>
+          <li>不適用於區塊鏈</li>
+        </ul>
+      </div>
+      <div class="comparison-card">
+        <h4>非互動式（Fiat-Shamir）</h4>
+        <ul>
+          <li>證明者發送單一訊息</li>
+          <li>挑戰由雜湊導出</li>
+          <li>在 ROM 中可靠（啟發式）</li>
+          <li>證明可由任何人在任何時候驗證</li>
+          <li>區塊鏈必需</li>
+        </ul>
+      </div>
+    </div>
+
+
+    <!-- ================================================ -->
+    <!-- 2.4 PROOF VS ARGUMENT: SETUP                     -->
+    <!-- ================================================ -->
+    <h2>2.4 證明 vs 論證：設定假設</h2>
+
+    <p>
+      「證明」與「論證」之間的區別是零知識密碼學中最重要的概念之一。
+      它決定了信任模型：系統安全需要哪些假設？
+    </p>
+
+    <h3>資訊理論可靠性（證明）</h3>
+
+    <div class="callout definition">
+      <div class="callout-title">互動式證明</div>
+      <p>
+        互動式證明具有<strong>資訊理論可靠性</strong>：無論計算能力如何，
+        任何對手都無法使驗證者接受假陳述。
+        這是最強的可靠性保證。唯一的限制是概率驗證
+        固有的可忽略可靠性誤差。
+      </p>
+    </div>
+
+    <p>
+      例如：IP = PSPACE 協議、sumcheck 協議以及互動式 Schnorr（Fiat-Shamir 之前）。
+      這些系統的可靠性不依賴任何計算困難性假設。
+    </p>
+
+    <h3>計算可靠性（論證）</h3>
+
+    <div class="callout definition">
+      <div class="callout-title">互動式論證</div>
+      <p>
+        互動式論證具有<strong>計算可靠性</strong>：可靠性僅對
+        PPT 對手成立。計算能力無界的對手<em>可以</em>透過解決
+        底層困難問題（如計算離散對數、破壞指數知識假設
+        或找到雜湊碰撞）來破壞可靠性。
+      </p>
+    </div>
+
+    <p>
+      所有 SNARK（Groth16、PLONK、Marlin 等）都是<em>論證</em>而非證明。為何接受
+      這個較弱的保證？因為論證可以是<strong>簡潔的</strong> &mdash; 證明大小為
+      $O(1)$ 或 $O(\log n)$ &mdash; 而資訊理論證明通常需要
+      證明大小 $\Omega(n)$。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">備註 &mdash; STARK 也是論證</div>
+      <p>
+        儘管名稱為「STARK」（Scalable <em>Transparent</em> ARgument of Knowledge），STARK 是
+        論證：其可靠性依賴雜湊函數的抗碰撞性。
+        能找到雜湊碰撞的計算能力無界對手可以破壞 STARK 的可靠性。
+        然而，STARK 實現了<strong>後量子安全性</strong>，因為目前沒有已知的量子演算法
+        能有效破壞抗碰撞性。
+      </p>
+    </div>
+
+    <h3>受信任設定儀式</h3>
+
+    <p>
+      許多 SNARK 系統需要<strong>結構化參考字串（SRS）</strong> &mdash; 一組
+      編碼秘密活門 $\tau$ 的公開參數。若任何人得知 $\tau$，便可偽造
+      假陳述的證明。生成 SRS 同時確保 $\tau$ 被銷毀的過程
+      稱為<strong>受信任設定儀式</strong>。
+    </p>
+
+    <h4>有毒廢料</h4>
+
+    <div class="callout warning">
+      <div class="callout-title">警告 &mdash; 有毒廢料</div>
+      <p>
+        設定過程中使用的秘密 $\tau$ 稱為<strong>有毒廢料</strong>。若儀式結束後
+        任何一方知道 $\tau$，該方可以：
+      </p>
+      <ul>
+        <li>為任何假陳述偽造證明</li>
+        <li>在加密貨幣應用中憑空鑄造代幣</li>
+        <li>完全破壞系統的可靠性</li>
+      </ul>
+      <p>
+        有毒廢料必須被<strong>不可恢復地銷毀</strong>。這就是為何受信任設定儀式
+        被設計為多方計算：每位參與者貢獻隨機性，
+        只要<em>至少一位參與者</em>誠實地銷毀其份額，
+        最終的 $\tau$ 就是安全的。
+      </p>
+    </div>
+
+    <h4>Powers-of-Tau 儀式</h4>
+
+    <p>
+      <strong>Powers-of-Tau</strong> 儀式是生成通用 SRS 的標準方法。
+      它產生：
+    </p>
+
+    $$\mathsf{SRS} = \bigl\{[1]_1, [\tau]_1, [\tau^2]_1, \ldots, [\tau^d]_1, \;[1]_2, [\tau]_2, \ldots, [\tau^d]_2\bigr\}$$
+
+    <p>儀式透過依序貢獻來運作：</p>
+
+    <div class="steps">
+      <div class="step">
+        <h4>參與者 1</h4>
+        <p>生成隨機 $\tau_1$，計算 $[\tau_1^i]_1$ 和 $[\tau_1^i]_2$（$i = 0, \ldots, d$）。
+          發佈結果並銷毀 $\tau_1$。</p>
+      </div>
+      <div class="step">
+        <h4>參與者 2</h4>
+        <p>取得前一輪的輸出，生成隨機 $\tau_2$，並「更新」每個元素：
+          $[\tau_1^i]_1 \mapsto [\tau_1^i \cdot \tau_2^i]_1 = [(\tau_1 \tau_2)^i]_1$。銷毀 $\tau_2$。</p>
+      </div>
+      <div class="step">
+        <h4>參與者 $k$（最後一位）</h4>
+        <p>$k$ 位參與者之後，有效秘密為 $\tau = \tau_1 \cdot \tau_2 \cdots \tau_k$。
+          沒有單一參與者知道 $\tau$。只要<em>任何一位</em>參與者誠實地銷毀了
+          其份額，$\tau$ 便對所有人未知。</p>
+      </div>
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">備註 &mdash; 現實世界的儀式</div>
+      <p>
+        Zcash Sapling 儀式（2018）有 90 位參與者。Ethereum 為 EIP-4844 舉辦的
+        KZG 儀式（2023）有超過 140,000 位貢獻者 &mdash; 這是史上最大的受信任設定。
+        「$N$ 人中有 1 人誠實」的安全假設在 $N$ 很大時變得極為強健。
+      </p>
+    </div>
+
+    <h3>設定類型：比較</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>系統</th>
+          <th>設定類型</th>
+          <th>信任假設</th>
+          <th>可更新？</th>
+          <th>後量子？</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Groth16</strong></td>
+          <td>電路專屬受信任設定</td>
+          <td>儀式中 $N$ 人有 1 人誠實</td>
+          <td>否（新電路 = 新設定）</td>
+          <td>否</td>
+        </tr>
+        <tr>
+          <td><strong>PLONK</strong></td>
+          <td>通用受信任設定（SRS）</td>
+          <td>儀式中 $N$ 人有 1 人誠實</td>
+          <td>是（適用任何 $\leq d$ 的電路）</td>
+          <td>否</td>
+        </tr>
+        <tr>
+          <td><strong>Marlin</strong></td>
+          <td>通用受信任設定（SRS）</td>
+          <td>儀式中 $N$ 人有 1 人誠實</td>
+          <td>是</td>
+          <td>否</td>
+        </tr>
+        <tr>
+          <td><strong>Halo2</strong></td>
+          <td>透明（無需設定）</td>
+          <td>離散對數困難性</td>
+          <td>不適用（無需設定）</td>
+          <td>否</td>
+        </tr>
+        <tr>
+          <td><strong>STARK</strong></td>
+          <td>透明（無需設定）</td>
+          <td>抗碰撞雜湊</td>
+          <td>不適用（無需設定）</td>
+          <td>是</td>
+        </tr>
+        <tr>
+          <td><strong>Bulletproofs</strong></td>
+          <td>透明（無需設定）</td>
+          <td>離散對數困難性</td>
+          <td>不適用（無需設定）</td>
+          <td>否</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">備註 &mdash; 電路專屬 vs 通用設定</div>
+      <p>
+        <strong>電路專屬</strong>（Groth16）：SRS 綁定於一個特定電路。
+        更改電路需要全新的儀式。<br>
+        <strong>通用</strong>（PLONK、Marlin）：SRS 適用於大小不超過 $d$ 的任何電路。
+        一次儀式服務所有應用。這是重大的實務優勢。
+      </p>
+    </div>
+
+
+    <!-- ================================================ -->
+    <!-- 2.5 TAXONOMY                                     -->
+    <!-- ================================================ -->
+    <h2>2.5 零知識系統的分類</h2>
+
+    <p>
+      零知識證明系統的種類繁多，可能令人目不暇給。本節提供多維度的
+      分類以協助讀者理解整體格局。
+    </p>
+
+    <h3>依互動模型分類</h3>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>互動式</h4>
+        <p>
+          多輪通訊。驗證者發送隨機挑戰。
+          理論基礎：IP = PSPACE（Shamir, 1992）。
+          應用於：sumcheck、GKR 協議、Sigma 協議。
+        </p>
+      </div>
+      <div class="comparison-card">
+        <h4>非互動式</h4>
+        <p>
+          證明者向驗證者發送單一訊息。透過 Fiat-Shamir（ROM）或 CRS 模型實現。
+          區塊鏈應用所必需。
+          應用於：Groth16、PLONK、STARK、Bulletproofs。
+        </p>
+      </div>
+    </div>
+
+    <h3>依可靠性類型分類</h3>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>證明（資訊理論）</h4>
+        <p>
+          可靠性對無界對手成立。保證更強但通常
+          產生較大的證明。例如：基於 PCP 的構造、sumcheck。
+        </p>
+      </div>
+      <div class="comparison-card">
+        <h4>論證（計算）</h4>
+        <p>
+          可靠性僅對 PPT 對手成立。依賴困難性假設。
+          實現簡潔證明。例如：所有 SNARK、STARK。
+        </p>
+      </div>
+    </div>
+
+    <h3>依設定類型分類</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>設定類型</th>
+          <th>描述</th>
+          <th>信任要求</th>
+          <th>範例</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>受信任（電路專屬）</strong></td>
+          <td>透過 MPC 儀式為每個電路生成 SRS</td>
+          <td>$N$ 人中有 1 人誠實</td>
+          <td>Groth16</td>
+        </tr>
+        <tr>
+          <td><strong>通用（可更新）</strong></td>
+          <td>SRS 適用於大小上限內的任何電路</td>
+          <td>$N$ 人中有 1 人誠實</td>
+          <td>PLONK、Marlin</td>
+        </tr>
+        <tr>
+          <td><strong>透明</strong></td>
+          <td>無需受信任設定；僅使用公開隨機性</td>
+          <td>無（雜湊函數安全性）</td>
+          <td>STARK、Bulletproofs、Halo2</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>依零知識類型分類</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>類型</th>
+          <th>不可區分性</th>
+          <th>強度</th>
+          <th>實務影響</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>完美零知識</strong></td>
+          <td>$\Delta(\mathcal{S}, \mathrm{Real}) = 0$</td>
+          <td>最強</td>
+          <td>即使無界區分器也無法獲得資訊</td>
+        </tr>
+        <tr>
+          <td><strong>統計零知識</strong></td>
+          <td>$\Delta(\mathcal{S}, \mathrm{Real}) \leq \mathrm{negl}(\lambda)$</td>
+          <td>強</td>
+          <td>指數級微小的洩露</td>
+        </tr>
+        <tr>
+          <td><strong>計算零知識</strong></td>
+          <td>無 PPT 區分器</td>
+          <td>標準</td>
+          <td>足以應付所有實務應用</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>依算術化方式分類</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>算術化方式</th>
+          <th>約束類型</th>
+          <th>使用者</th>
+          <th>關鍵特點</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>R1CS</strong></td>
+          <td>$A \vec{w} \circ B \vec{w} = C \vec{w}$</td>
+          <td>Groth16、Spartan</td>
+          <td>每個約束一次乘法</td>
+        </tr>
+        <tr>
+          <td><strong>PLONKish</strong></td>
+          <td>自訂閘 + 複製約束</td>
+          <td>PLONK、Halo2</td>
+          <td>靈活的自訂閘，支援查找</td>
+        </tr>
+        <tr>
+          <td><strong>AIR</strong></td>
+          <td>執行軌跡上的轉移約束</td>
+          <td>STARK</td>
+          <td>自然適用於虛擬機執行軌跡</td>
+        </tr>
+        <tr>
+          <td><strong>CCS</strong></td>
+          <td>廣義約束系統</td>
+          <td>HyperNova</td>
+          <td>涵蓋 R1CS 和 PLONKish</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>依多項式承諾方案分類</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>PCS</th>
+          <th>假設</th>
+          <th>證明大小</th>
+          <th>驗證成本</th>
+          <th>設定</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>KZG</strong></td>
+          <td>配對 + $q$-SDH</td>
+          <td>$O(1)$ &mdash; 1 個群元素</td>
+          <td>$O(1)$ &mdash; 2 次配對</td>
+          <td>受信任（SRS）</td>
+        </tr>
+        <tr>
+          <td><strong>IPA (Bulletproofs)</strong></td>
+          <td>離散對數</td>
+          <td>$O(\log n)$ 個群元素</td>
+          <td>$O(n)$（無高效批次處理）</td>
+          <td>透明</td>
+        </tr>
+        <tr>
+          <td><strong>FRI</strong></td>
+          <td>CRHF（僅雜湊）</td>
+          <td>$O(\log^2 n)$ 個雜湊摘要</td>
+          <td>$O(\log^2 n)$</td>
+          <td>透明</td>
+        </tr>
+        <tr>
+          <td><strong>DARK</strong></td>
+          <td>隱藏階群</td>
+          <td>$O(\log n)$</td>
+          <td>$O(\log n)$</td>
+          <td>透明（類群）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>綜合比較表</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>系統</th>
+          <th>設定</th>
+          <th>算術化方式</th>
+          <th>PCS</th>
+          <th>證明大小</th>
+          <th>後量子</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Groth16</strong></td>
+          <td>電路受信任</td>
+          <td>R1CS / QAP</td>
+          <td>KZG（配對）</td>
+          <td>$O(1)$</td>
+          <td>否</td>
+        </tr>
+        <tr>
+          <td><strong>PLONK</strong></td>
+          <td>通用受信任</td>
+          <td>PLONKish</td>
+          <td>KZG（配對）</td>
+          <td>$O(1)$</td>
+          <td>否</td>
+        </tr>
+        <tr>
+          <td><strong>Halo2</strong></td>
+          <td>透明</td>
+          <td>PLONKish</td>
+          <td>IPA</td>
+          <td>$O(\log n)$</td>
+          <td>否</td>
+        </tr>
+        <tr>
+          <td><strong>STARK</strong></td>
+          <td>透明</td>
+          <td>AIR</td>
+          <td>FRI</td>
+          <td>$O(\text{polylog } n)$</td>
+          <td>是</td>
+        </tr>
+        <tr>
+          <td><strong>Bulletproofs</strong></td>
+          <td>透明</td>
+          <td>R1CS</td>
+          <td>IPA</td>
+          <td>$O(\log n)$</td>
+          <td>否</td>
+        </tr>
+        <tr>
+          <td><strong>Spartan</strong></td>
+          <td>透明</td>
+          <td>R1CS</td>
+          <td>IPA / KZG</td>
+          <td>$O(\sqrt{n})$</td>
+          <td>取決於 PCS</td>
+        </tr>
+        <tr>
+          <td><strong>Nova</strong></td>
+          <td>透明</td>
+          <td>R1CS (IVC)</td>
+          <td>IPA / KZG</td>
+          <td>每步 $O(1)$</td>
+          <td>取決於 PCS</td>
+        </tr>
+      </tbody>
+    </table>
+
+
+    <!-- ================================================ -->
+    <!-- 2.6 SIMULATION PARADIGM IN DETAIL                -->
+    <!-- ================================================ -->
+    <h2>2.6 模擬範式詳解</h2>
+
+    <p>
+      模擬範式是零知識密碼學的<em>核心概念</em>。它提供了形式化機制，
+      用以證明一個協議除了陳述的真偽之外不會洩露任何資訊。
+      本節深入探討此範式。
+    </p>
+
+    <h3>何謂模擬器？</h3>
+
+    <p>
+      <strong>模擬器</strong> $\mathcal{S}$ 是一個 PPT 演算法，僅給定公開
+      輸入 $x$（關鍵在於<em>沒有見證</em> $w$），便能產生與真實協議執行
+      不可區分的「偽造」轉錄。此類模擬器的存在即為零知識性的<em>定義</em>。
+    </p>
+
+    <p>邏輯如下：</p>
+    <ol>
+      <li>若模擬器能產生與真實互動相同的輸出（不需要見證）...</li>
+      <li>...那麼真實互動就不可能包含關於見證的任何資訊...</li>
+      <li>...因為若包含，模擬器（沒有見證）就無法重現。</li>
+    </ol>
+
+    <div class="callout definition">
+      <div class="callout-title">模擬論證</div>
+      <p>
+        假設對手 $\mathcal{A}$ 聲稱能從證明轉錄 $T$ 中得知見證 $w$ 的某些資訊。
+        我們證明這是不可能的：
+      </p>
+      <ol>
+        <li>將模擬轉錄 $T' = \mathcal{S}(x)$ 餵給 $\mathcal{A}$，而非真實轉錄。</li>
+        <li>由於 $T \approx T'$（不可區分），$\mathcal{A}$ 的行為相同。</li>
+        <li>但 $T'$ 是<em>不使用 $w$</em> 產生的，因此 $\mathcal{A}$ 不可能從
+          $T'$ 中提取關於 $w$ 的資訊。</li>
+        <li>因此 $\mathcal{A}$ 也不可能從 $T$ 中提取關於 $w$ 的資訊。矛盾。</li>
+      </ol>
+    </div>
+
+    <h3>Schnorr 模擬器詳解</h3>
+
+    <p>
+      讓我們重新審視 Schnorr 協議的模擬器，<em>精確地</em>理解它為何有效。
+    </p>
+
+    <h4>真實轉錄的生成</h4>
+
+    <p>在使用秘密 $x$（其中 $h = g^x$）的真實執行中：</p>
+
+    <div class="diagram">
+<pre>
+真實執行：                                  分佈分析：
+─────────────                           ────────────────────
+1. r ← Z_q  （均勻隨機）                  r：均勻分佈在 Z_q 上
+2. a = g^r                              a：均勻分佈在 G 上（因 g 為生成元）
+3. c ← Z_q  （驗證者的隨機值）             c：均勻分佈在 Z_q 上，獨立於 r
+4. z = r + cx (mod q)                   z：均勻分佈在 Z_q 上（因 r 為均勻）
+
+(a, c, z) 的聯合分佈：                     a 由 (c, z, x) 確定：
+                                            a = g^z · h^{-c}
+故 (c, z) 均勻分佈在 Z_q × Z_q 上         a 是 (c, z) 的確定性函數
+</pre>
+    </div>
+
+    <h4>模擬轉錄的生成</h4>
+
+    <div class="diagram">
+<pre>
+模擬（不知道 x）：                          分佈分析：
+───────────────────────────────         ────────────────────
+1. z ← Z_q  （均勻隨機）                  z：均勻分佈在 Z_q 上
+2. c ← Z_q  （均勻隨機）                  c：均勻分佈在 Z_q 上，獨立於 z
+3. a = g^z · h^{-c}                     a：(c, z) 的確定性函數
+
+(a, c, z) 的聯合分佈：
+(c, z) 均勻分佈在 Z_q × Z_q 上
+a 與真實情形中是相同的確定性函數
+</pre>
+    </div>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 2.5 &mdash; 分佈等價</div>
+      <p>
+        真實與模擬的轉錄分佈<strong>完全相同</strong>
+        （不僅是計算不可區分 &mdash; 是完美相同）。
+      </p>
+      <p><strong>證明。</strong>在兩種情況下：</p>
+      <ul>
+        <li>$(c, z)$ 均勻分佈在 $\mathbb{Z}_q \times \mathbb{Z}_q$ 上。</li>
+        <li>$a$ 是滿足 $g^z = a \cdot h^c$（即 $a = g^z h^{-c}$）的唯一群元素。</li>
+      </ul>
+      <p>
+        由於 $(c, z)$ 在兩種情況下具有相同的分佈，且 $a$ 在兩種情況下
+        是 $(c, z)$ 的相同確定性函數，因此聯合分佈 $(a, c, z)$ 完全相同。$\square$
+      </p>
+    </div>
+
+    <p>
+      關鍵洞察：在真實協議中，$a$ <em>先</em>被計算（為 $g^r$），然後
+      $z$ <em>最後</em>被計算（為 $r + cx$）。在模擬中，$z$ <em>先</em>被選取，
+      $a$ <em>最後</em>被計算（為 $g^z h^{-c}$）。<strong>計算順序被反轉</strong>，
+      但<strong>聯合分佈不變</strong>。這就是基於模擬的證明之本質。
+    </p>
+
+    <h3>完美零知識 vs 計算零知識：範例</h3>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>完美零知識（Schnorr）</h4>
+        <p>
+          模擬與真實的分佈<em>完全相同</em>（統計距離 = 0）。
+          即使計算能力無界的區分器也無法區分兩者。
+          這是可能的，因為模擬器可以產生具有<em>完全</em>正確分佈的轉錄。
+        </p>
+        <p>
+          <strong>為何有效：</strong>Schnorr 協議的代數結構允許完美模擬。
+          「逆序技巧」產生完全相同的分佈。
+        </p>
+      </div>
+      <div class="comparison-card">
+        <h4>計算零知識（多數 SNARK）</h4>
+        <p>
+          模擬器使用 CRS 活門（有毒廢料 $\tau$）來產生偽造證明。
+          這些證明與真實證明在計算上不可區分，但擁有
+          $\tau$ 存取權限的區分器可以區分兩者。
+        </p>
+        <p>
+          <strong>為何僅計算：</strong>模擬器需要活門來「作弊」，
+          且產生的證明具有略微不同的代數結構 &mdash;
+          僅在困難性假設下不可區分。
+        </p>
+      </div>
+    </div>
+
+    <h3>HVZK vs 完全零知識</h3>
+
+    <div class="callout note">
+      <div class="callout-title">備註 &mdash; HVZK vs 完全零知識</div>
+      <p>
+        <strong>HVZK</strong>：模擬器只需產生與誠實驗證者（遵循協議並均勻選擇
+        挑戰的驗證者）互動不可區分的轉錄。這較易實現。
+      </p>
+      <p>
+        <strong>完全零知識</strong>：模擬器必須產生與<em>任何</em>（可能惡意的）
+        驗證者 $V^*$（可能對抗性地選擇挑戰）互動不可區分的轉錄。
+        這更強且更難證明。
+      </p>
+      <p>
+        <strong>為何 HVZK 在實務上已足夠：</strong>當 Sigma 協議透過
+        Fiat-Shamir 編譯時，「驗證者」被替換為行為誠實的雜湊函數
+        （確定性的）。因此，HVZK 對非互動式證明已足夠。
+        在互動式設定中，HVZK 可使用如
+        Damg&aring;rd 轉換（在揭露承諾之前先承諾挑戰）等技術升級為完全零知識。
+      </p>
+    </div>
+
+    <h3>與現實世界隱私的關聯</h3>
+
+    <p>
+      模擬範式為「證明揭露了什麼？」這個問題提供了精確的答案。
+    </p>
+
+    <div class="callout definition">
+      <div class="callout-title">零知識保證</div>
+      <p>
+        零知識證明恰好揭露<strong>一個位元</strong>的資訊：陳述是真還是假。
+        僅此而已。這由模擬論證形式化：
+      </p>
+      <ul>
+        <li>證明轉錄 $T$ 可以在不使用見證的情況下被模擬。</li>
+        <li>因此 $T$ 不包含關於見證的任何資訊。</li>
+        <li>驗證者獲得的唯一資訊是單一位元：「陳述為真」。</li>
+      </ul>
+      <p>
+        這就是為何零知識證明對隱私具有變革性意義：你可以證明合規性（例如，「我的
+        交易有效」、「我年滿 18 歲」、「此計算被正確執行」），而無需
+        揭露底層資料（交易細節、確切年齡、計算輸入）。
+      </p>
+    </div>
+
+    <h3>Schnorr 之外的模擬器策略</h3>
+
+    <p>
+      不同的零知識系統使用不同的模擬策略：
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>策略</th>
+          <th>機制</th>
+          <th>零知識類型</th>
+          <th>使用者</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>逆序</strong></td>
+          <td>先選擇回應，再計算承諾</td>
+          <td>完美零知識</td>
+          <td>Schnorr、Sigma 協議</td>
+        </tr>
+        <tr>
+          <td><strong>基於活門</strong></td>
+          <td>使用 CRS 活門產生有效證明</td>
+          <td>計算零知識</td>
+          <td>Groth16、PLONK</td>
+        </tr>
+        <tr>
+          <td><strong>ROM 程式化</strong></td>
+          <td>模擬器控制隨機預言機</td>
+          <td>計算零知識</td>
+          <td>基於 Fiat-Shamir 的系統</td>
+        </tr>
+        <tr>
+          <td><strong>回溯</strong></td>
+          <td>執行驗證者，必要時回溯</td>
+          <td>統計零知識</td>
+          <td>圖同構零知識</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout example">
+      <div class="callout-title">範例 &mdash; 活門模擬（Groth16 風格）</div>
+      <p>
+        在 Groth16 中，CRS 包含秘密 $\tau$ 的編碼冪次。模擬器
+        知道 $\tau$，可以直接為<em>任何</em>陳述 $x$ 計算有效證明 $\pi = (A, B, C)$
+        &mdash; 包括假陳述。這正是有毒廢料必須銷毀的原因：
+        若任何人知道 $\tau$，他們就成為能偽造證明的「通用模擬器」。
+      </p>
+      <p>
+        模擬器產生的證明與真實證明在計算上不可區分
+        （在 $q$-type 配對假設下）。區分器需要解決困難的
+        數學問題才能區分兩者。
+      </p>
+    </div>
+
+    <div class="callout example">
+      <div class="callout-title">範例 &mdash; ROM 程式化模擬</div>
+      <p>
+        在 Fiat-Shamir 協議中，模擬器控制隨機預言機 $H$。模擬時：
+      </p>
+      <ol>
+        <li>先選擇 $z$ 和 $c$（回應和挑戰）。</li>
+        <li>計算 $a = g^z h^{-c}$（承諾）。</li>
+        <li><strong>程式化預言機：</strong>設定 $H(g \| h \| a) := c$。</li>
+      </ol>
+      <p>
+        現在轉錄 $(a, c, z)$ 與 Fiat-Shamir 雜湊一致：$c = H(g \| h \| a)$
+        由構造成立。在現實世界中，$H$ 是固定的雜湊函數，因此模擬器
+        不能「程式化」它 &mdash; 但在 ROM 安全性證明中，模擬器<em>就是</em>預言機，
+        所以它可以任意回答查詢。
+      </p>
+    </div>
+
+    <h3>常見誤解</h3>
+
+    <div class="callout warning">
+      <div class="callout-title">警告 &mdash; 零知識不意味著什麼</div>
+      <ul>
+        <li>
+          <strong>「沒有人能驗證證明」</strong> &mdash; 錯誤。任何人都能驗證零知識證明。
+          零知識意味著證明不揭露關於見證的資訊，而非不可驗證。
+        </li>
+        <li>
+          <strong>「陳述是秘密的」</strong> &mdash; 錯誤。證明者和驗證者都知道
+          陳述 $x$。只有見證 $w$ 是隱私的。
+        </li>
+        <li>
+          <strong>「零知識證明因隱私而計算昂貴」</strong> &mdash; 具有誤導性。
+          隱私性質（零知識）本質上是免費的 &mdash; 昂貴的部分是簡潔性
+          （使證明小且驗證快）。非簡潔的零知識證明可以非常高效。
+        </li>
+        <li>
+          <strong>「模擬器能在實務中偽造證明」</strong> &mdash; 錯誤。模擬器
+          是安全性證明中使用的理論構造。在現實世界中，沒有人能執行
+          模擬器（它需要回溯對手或控制隨機預言機 &mdash;
+          這些能力在證明之外不存在）。
+        </li>
+      </ul>
+    </div>
+
+
+    <h2>對本研究的意義</h2>
+    <div class="callout theorem">
+      <div class="callout-title">本章技術如何支撐論文</div>
+      <p>
+        我們的多項式方法電路必須作為一個合格的 ZK 證明系統，同時滿足三大性質：
+      </p>
+      <ul>
+        <li><strong>完備性</strong>：若 Prover 使用正確的 Minimax 係數和 Horner 求值，驗證者一定接受。這在第 11 章中形式化證明。</li>
+        <li><strong>健全性</strong>：惡意 Prover 不能偽造函數求值結果。排列論證確保接線正確，byte decomposition 的 range check 確保截斷結果合法。</li>
+        <li><strong>零知識性</strong>：驗證者不會得知超越函數的輸入值 $R$。Halo2 通過盲化行（blinding rows）和隨機多項式實現此性質。</li>
+      </ul>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>概念</th><th>在論文中的應用</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Fiat-Shamir 轉換</td><td>使證明非互動式——鏈上驗證的必要條件。Halo2 的 <code>Transcript</code> API 實現此轉換</td></tr>
+        <tr><td>模擬範式</td><td>用於證明我們的電路不洩露輸入 $R$（模擬器可以在不知道 $R$ 的情況下生成不可區分的轉錄）</td></tr>
+        <tr><td>知識可靠性</td><td>比一般健全性更強——保證存在提取器可從證明中取出見證值</td></tr>
+        <tr><td>Argument vs Proof</td><td>Halo2 是一個 argument system（計算健全性），假設 DLog 困難</td></tr>
+        <tr><td>CRS vs SRS</td><td>Halo2 (IPA) 使用通用公開參數，不需要結構化參考字串</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ================================================ -->
+    <!-- PAGE NAVIGATION                                  -->
+    <!-- ================================================ -->
+    <div class="page-nav">
+      <a href="foundations.html"><span class="nav-label">上一章</span><span class="nav-title">&larr; 1. 數學基礎</span></a>
+      <a href="polynomial-commitments.html"><span class="nav-label">下一章</span><span class="nav-title">3. 多項式承諾 &rarr;</span></a>
+    </div>
+  </main>
+</body>
+</html>

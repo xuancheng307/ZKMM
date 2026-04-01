@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ch 14: Horner 求值與延遲截斷 — ZK 手冊</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>ZK 手冊</h1>
+      <div class="subtitle">零知識證明系統</div>
+    </div>
+    <nav>
+      <div class="section-label">總覽</div>
+      <a href="index.html"><span class="page-num">0.</span> 首頁</a>
+      <div class="section-label">基礎</div>
+      <a href="foundations.html"><span class="page-num">1.</span> 數學基礎</a>
+      <a href="zkp-basics.html"><span class="page-num">2.</span> ZKP：基本概念與性質</a>
+      <div class="section-label">構建模組</div>
+      <a href="polynomial-commitments.html"><span class="page-num">3.</span> 多項式承諾</a>
+      <a href="arithmetization.html"><span class="page-num">4.</span> 算術化</a>
+      <a href="fft-domains.html"><span class="page-num">5.</span> FFT 與求值域</a>
+      <div class="section-label">證明系統</div>
+      <a href="groth16.html"><span class="page-num">6.</span> Groth16</a>
+      <a href="plonk.html"><span class="page-num">7.</span> PLONK</a>
+      <a href="halo2.html"><span class="page-num">8.</span> Halo2</a>
+      <div class="section-label">進階主題</div>
+      <a href="lookup-arguments.html"><span class="page-num">9.</span> Lookup Arguments</a>
+      <a href="polynomial-method.html"><span class="page-num">10.</span> 多項式方法</a>
+      <a href="security-proofs.html"><span class="page-num">11.</span> 安全性證明</a>
+      <div class="section-label">論文方法論</div>
+      <a href="fixed-point.html"><span class="page-num">12.</span> 有限域定點運算</a>
+      <a href="approximation-theory.html"><span class="page-num">13.</span> 多項式逼近理論</a>
+      <a href="horner-evaluation.html" class="active"><span class="page-num">14.</span> Horner 求值</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+      <h1>14. Horner 求值與延遲截斷</h1>
+      <p class="page-subtitle">Horner 把 degree-$d$ 多項式用 $d$ 次乘法算完。延遲截斷把截斷成本從 $O(d)$ 降至 $O(1)$。</p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DEFINITIONS SECTION                                           -->
+    <!-- ============================================================ -->
+    <div class="definitions-section">
+      <h2>關鍵定義</h2>
+
+      <!-- 1. Horner's Method -->
+      <div class="def-item">
+        <div class="def-term">Horner's Method <span class="zh">Horner 求值法</span></div>
+        <div class="def-body">
+          將多項式 $P(x) = a_d x^d + a_{d-1} x^{d-1} + \cdots + a_1 x + a_0$ 改寫為<strong>巢狀形式</strong>（nested form）進行求值：
+          $$P(x) = (\cdots((a_d \cdot x + a_{d-1}) \cdot x + a_{d-2}) \cdots) \cdot x + a_0$$
+          只需 $d$ 次乘法和 $d$ 次加法，是一般多項式求值所需的最少乘法次數。在 ZK 電路中，每一次乘法對應一個乘法閘，因此 Horner 法是最優的求值策略。
+        </div>
+      </div>
+
+      <!-- 2. Horner Chain -->
+      <div class="def-item">
+        <div class="def-term">Horner Chain <span class="zh">Horner 鏈</span></div>
+        <div class="def-body">
+          <strong>Horner 鏈</strong>是 Horner 求值法中的逐步計算序列。定義：
+          $H_d = a_d$，
+          $H_i = a_i + x \cdot H_{i+1}$（$i = d-1, d-2, \ldots, 0$），
+          最終 $P(x) = H_0$。每一步 $H_i$ 稱為 Horner 鏈的一個<em>環節</em>，對應電路中的一個乘法閘加一個加法閘。
+        </div>
+      </div>
+
+      <!-- 3. Zero-Constant-Term Optimization -->
+      <div class="def-item">
+        <div class="def-term">Zero-Constant-Term Optimization <span class="zh">零常數項優化</span></div>
+        <div class="def-body">
+          透過選擇逼近區間使得 $f(a) = 0$（例如 $\exp(x)-1$ 在 $x=0$，$\ln(1+x)$ 在 $x=0$），可確保逼近多項式的常數項 $a_0 = 0$。
+          這使得 $P(R) = R \cdot Q(R)$，其中 $Q$ 是去掉常數項後的多項式。好處在於：最外層的乘以 $R$ 可自然地與延遲截斷的最終除法合併，無需額外閘。
+        </div>
+      </div>
+
+      <!-- 4. Naive Truncation -->
+      <div class="def-item">
+        <div class="def-term">Naive Truncation <span class="zh">逐步截斷</span></div>
+        <div class="def-body">
+          在 Horner 鏈的<strong>每一步</strong>乘法後進行截斷（除以 scale factor $S$），以維持正確的定點表示。
+          對於 degree-$d$ 多項式，需要 $d$ 次截斷。每次截斷在電路中約需 3 rows 和 6 次 lookup，因此總截斷成本為 $O(d)$。
+          此外，每次截斷引入 $\leq 1$ ULP 的捨入誤差，$d$ 步後累積誤差可達 $d$ ULP。
+        </div>
+      </div>
+
+      <!-- 5. Deferred Truncation -->
+      <div class="def-item">
+        <div class="def-term">Deferred Truncation <span class="zh">延遲截斷</span></div>
+        <div class="def-body">
+          <strong>延遲截斷</strong>的核心思想是：不在 Horner 鏈的每一步截斷，而是讓中間值「帶著過大的 scale」一路計算下去，在整條鏈完成後只做<strong>一次</strong>截斷。
+          為此，需要對係數進行<em>預縮放</em>（pre-scaling），使得每一步的 scale 自然匹配。最終的截斷成本從 $O(d)$ 降至 $O(1)$，同時消除了累積捨入誤差。
+        </div>
+      </div>
+
+      <!-- 6. Coefficient Pre-scaling -->
+      <div class="def-item">
+        <div class="def-term">Coefficient Pre-scaling <span class="zh">係數預縮放</span></div>
+        <div class="def-body">
+          在延遲截斷方案中，多項式係數 $c_i$ 不再以標準 scale $S$ 表示，而是以遞增的 scale 表示：
+          $$D_i = \operatorname{round}(c_i \cdot S^{d+1-i})$$
+          其中 $c_i$ 是 Remez 演算法輸出的實數係數，$S = 2^{pp}$ 是定點 scale factor，$d$ 是多項式次數。
+          這種預縮放使得 Horner 鏈每一步的 scale 自動正確，無需中間截斷。
+        </div>
+      </div>
+
+      <!-- 7. Overflow Bound -->
+      <div class="def-item">
+        <div class="def-term">Overflow Bound <span class="zh">溢位上界</span></div>
+        <div class="def-body">
+          延遲截斷的中間值 $w_\text{pre}$ 的位元數上界為 $(d+1) \cdot pp$，其中 $pp$ 是定點精度位元數。為避免在有限域中發生環繞（wraparound），必須滿足：
+          $$(d+1) \cdot pp < \text{field\_bits}$$
+          對於 BN254/Pallas 曲線，field_bits $= 254$。若此條件不滿足，中間值可能溢位域大小，導致計算結果錯誤。
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 14.1 HORNER EVALUATION                                        -->
+    <!-- ============================================================ -->
+    <h2 id="horner-evaluation">14.1 Horner 求值法</h2>
+
+    <h3>展開形式 vs. 巢狀形式</h3>
+    <p>
+      考慮一個 degree-$d$ 多項式的求值。最直觀的方法是按展開形式逐項計算：
+    </p>
+    $$P(x) = a_d x^d + a_{d-1} x^{d-1} + \cdots + a_1 x + a_0$$
+    <p>
+      這需要先計算 $x$ 的各次冪 $x^2, x^3, \ldots, x^d$（共 $d-1$ 次乘法），再將每個冪次乘以對應係數（共 $d$ 次乘法），最後加總。<strong>總共需要 $2d - 1$ 次乘法</strong>。
+    </p>
+    <p>
+      Horner 法將同一多項式改寫為巢狀形式：
+    </p>
+    $$P(x) = (\cdots((a_d \cdot x + a_{d-1}) \cdot x + a_{d-2}) \cdots) \cdot x + a_0$$
+
+    <p>以 $d = 5$ 為例，展開如下：</p>
+    $$P(x) = ((((a_5 \cdot x + a_4) \cdot x + a_3) \cdot x + a_2) \cdot x + a_1) \cdot x + a_0$$
+
+    <p>
+      每一步只需一次乘法和一次加法，共 $d$ 步。<strong>總共只需 $d$ 次乘法</strong>，相較展開形式節省了將近一半。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">Horner 法的最優性</div>
+      <p>
+        1954 年，A. M. Ostrowski 證明了：對於一般的 degree-$d$ 多項式（無特殊結構），$d$ 次乘法是求值所需的<em>最少</em>次數。因此 Horner 法在乘法次數上是<strong>最優的</strong>。
+      </p>
+      <p>
+        在 ZK 電路中，每一次域乘法對應一個乘法閘（multiplication gate），而加法閘的成本可忽略不計。因此，Horner 法使得 degree-$d$ 多項式的電路求值只需 $d$ 個乘法閘 &mdash; 這是理論下界。
+      </p>
+    </div>
+
+    <h3>乘法次數比較</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>方法</th>
+          <th>乘法次數</th>
+          <th>加法次數</th>
+          <th>$d=5$ 時的乘法</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>展開形式（逐項計算）</td>
+          <td>$2d - 1$</td>
+          <td>$d$</td>
+          <td>9</td>
+        </tr>
+        <tr>
+          <td>展開形式（預計算冪次）</td>
+          <td>$2d - 1$</td>
+          <td>$d$</td>
+          <td>9</td>
+        </tr>
+        <tr>
+          <td><strong>Horner 法</strong></td>
+          <td><strong>$d$</strong></td>
+          <td><strong>$d$</strong></td>
+          <td><strong>5</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Horner 鏈的逐步展開</h3>
+    <p>
+      為明確起見，定義 Horner 鏈的每一步。令 $d = 5$：
+    </p>
+    <div class="steps">
+      <div class="step">
+        <strong>初始化：</strong>$H_5 = a_5$
+      </div>
+      <div class="step">
+        <strong>第一步：</strong>$H_4 = a_4 + x \cdot H_5 = a_4 + a_5 x$
+      </div>
+      <div class="step">
+        <strong>第二步：</strong>$H_3 = a_3 + x \cdot H_4 = a_3 + a_4 x + a_5 x^2$
+      </div>
+      <div class="step">
+        <strong>第三步：</strong>$H_2 = a_2 + x \cdot H_3 = a_2 + a_3 x + a_4 x^2 + a_5 x^3$
+      </div>
+      <div class="step">
+        <strong>第四步：</strong>$H_1 = a_1 + x \cdot H_2 = a_1 + a_2 x + a_3 x^2 + a_4 x^3 + a_5 x^4$
+      </div>
+      <div class="step">
+        <strong>第五步：</strong>$H_0 = a_0 + x \cdot H_1 = a_0 + a_1 x + a_2 x^2 + a_3 x^3 + a_4 x^4 + a_5 x^5 = P(x)$
+      </div>
+    </div>
+
+    <p>
+      每一步只涉及一次乘法（$x \cdot H_{i+1}$）和一次加法（$+ a_i$），完全符合算術電路中的一個 custom gate。
+    </p>
+
+    <!-- ============================================================ -->
+    <!-- 14.2 ZERO-CONSTANT-TERM OPTIMIZATION                         -->
+    <!-- ============================================================ -->
+    <h2 id="zero-constant-term">14.2 零常數項優化</h2>
+
+    <h3>動機</h3>
+    <p>
+      在論文的方法論中，逼近的目標函數 $f(x)$ 和逼近區間 $[a, b]$ 的選擇保證了 $f(a) = 0$。例如：
+    </p>
+    <ul>
+      <li>$\exp(x) - 1$ 在 $x = 0$ 處為零</li>
+      <li>$\ln(1 + x)$ 在 $x = 0$ 處為零</li>
+      <li>$\sin(x)$ 在 $x = 0$ 處為零</li>
+    </ul>
+    <p>
+      由於 $f(a) = 0$ 且逼近多項式 $P(x)$ 在 $x = a$ 處也須為零，因此多項式的常數項 $a_0 = P(a) = 0$。
+    </p>
+
+    <h3>數學簡化</h3>
+    <p>
+      常數項為零時，多項式可提取公因子 $x$：
+    </p>
+    $$P(x) = a_d x^d + a_{d-1} x^{d-1} + \cdots + a_1 x = x \cdot (a_d x^{d-1} + \cdots + a_1)$$
+    <p>
+      在定點表示中，$x$ 的編碼為 $R \in \mathbb{F}_p$（scale 為 $S$），因此：
+    </p>
+    $$P(R) = R \cdot Q(R)$$
+    <p>
+      其中 $Q(R)$ 是 degree-$(d-1)$ 的多項式在 $R$ 處的 Horner 求值結果。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">為什麼要特別處理常數項？</div>
+      <p>
+        在延遲截斷方案中，Horner 鏈最終輸出的 scale 為 $S^{d+1}$。如果 $a_0 \neq 0$，它在 Horner 鏈末端的 scale 也必須是 $S^{d+1}$，但 $a_0$ 代表的是一個 $O(1)$ 的常數 &mdash; 將它放大到 $S^{d+1}$ 倍會引入巨大的量化誤差。$f(a) = 0$ 確保 $a_0 = 0$，完美迴避了這個問題。
+      </p>
+    </div>
+
+    <h3>在 Horner 鏈中的表現</h3>
+    <p>
+      以 $d = 5$、$a_0 = 0$ 為例，Horner 鏈變為：
+    </p>
+    $$P(R) = R \cdot (((( D_5 \cdot R + D_4) \cdot R + D_3) \cdot R + D_2) \cdot R + D_1)$$
+    <p>
+      括號內部是一條 degree-4 的 Horner 鏈（需要 4 個乘法閘），加上最外層的 $R \cdot (\cdots)$（第 5 個乘法閘）。
+      最外層的乘以 $R$ 在延遲截斷方案中自然地與最終截斷合併 &mdash; 它把 scale 從 $S^d$ 推到 $S^{d+1}$，正好是截斷前的目標 scale。
+    </p>
+
+    <!-- ============================================================ -->
+    <!-- 14.3 NAIVE TRUNCATION PROBLEM                                 -->
+    <!-- ============================================================ -->
+    <h2 id="naive-truncation">14.3 逐步截斷的問題</h2>
+
+    <h3>為什麼需要截斷？</h3>
+    <p>
+      回顧定點算術（Ch 12）：兩個 scale 為 $S$ 的定點數相乘，結果的 scale 為 $S^2$。若不截斷（除以 $S$），scale 會隨著連鎖乘法以指數方式增長。Horner 鏈的每一步都包含一次乘法，因此若不做任何處理，第 $k$ 步的 scale 為 $S^{k+1}$ &mdash; 很快就會超過域的大小。
+    </p>
+
+    <h3>Naive 做法</h3>
+    <p>
+      最直觀的解決方案是：在每一步乘法後立即截斷，把 scale 壓回 $S$。以 $d = 5$ 為例：
+    </p>
+    <pre><code>Naive Horner（逐步截斷）：
+  H₅ = D₅                                     // scale: S
+  H₄ = trunc(D₄ + R * H₅)                     // 截斷 #1：S² → S
+  H₃ = trunc(D₃ + R * H₄)                     // 截斷 #2：S² → S
+  H₂ = trunc(D₂ + R * H₃)                     // 截斷 #3：S² → S
+  H₁ = trunc(D₁ + R * H₂)                     // 截斷 #4：S² → S
+  w  = trunc(R * H₁)                           // 截斷 #5：S² → S</code></pre>
+
+    <h3>截斷的電路成本</h3>
+    <p>
+      每次截斷操作 $\text{trunc}(v) = \lfloor v / S \rfloor$ 在電路中<strong>不是免費的</strong>。它需要：
+    </p>
+    <ul>
+      <li>Prover 提供商 $q$ 和餘數 $r$，使得 $v = q \cdot S + r$</li>
+      <li>一個 custom gate 驗證 $q \cdot S + r = v$</li>
+      <li>Range check：$0 \leq r < S$（byte decomposition，$pp/8$ 個 bytes）</li>
+      <li>Range check：$0 \leq q < S$（byte decomposition，$pp/8$ 個 bytes）</li>
+    </ul>
+    <p>
+      每次截斷約需 <strong>3 rows</strong>（商、餘數、驗證）和 <strong>$2 \cdot pp/8$ 次 lookup</strong>（byte decomposition）。
+    </p>
+
+    <h3>Degree-5 的成本災難</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Naive Horner ($d = 5$)</th>
+          <th>數量</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>截斷次數</td>
+          <td>5</td>
+        </tr>
+        <tr>
+          <td>截斷用 rows</td>
+          <td>$\sim$15</td>
+        </tr>
+        <tr>
+          <td>截斷用 lookups（$pp = 16$）</td>
+          <td>$\sim$20</td>
+        </tr>
+        <tr>
+          <td>Horner 乘法 rows</td>
+          <td>5</td>
+        </tr>
+        <tr>
+          <td><strong>總計</strong></td>
+          <td><strong>$\sim$20 rows + $\sim$20 lookups</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      截斷的開銷<em>遠超</em>乘法本身。對於每一次函數求值，截斷佔了總成本的 75% 以上。
+    </p>
+
+    <h3>累積誤差問題</h3>
+    <p>
+      除了電路成本外，逐步截斷還引入了<strong>累積捨入誤差</strong>。每次截斷操作 $\lfloor v / S \rfloor$ 會丟失最多 $1$ ULP（unit in the last place）的精度。經過 $d$ 次截斷後，最壞情況的累積誤差為：
+    </p>
+    $$\text{error}_{\max} \leq d \;\text{ULP}$$
+    <p>
+      對於 $d = 5$，最壞情況下會有 5 ULP 的誤差 &mdash; 這可能超出某些應用的精度要求。
+    </p>
+
+    <div class="callout warning">
+      <div class="callout-title">逐步截斷的雙重代價</div>
+      <p>
+        逐步截斷同時帶來兩個問題：(1) 電路成本線性增長，$O(d)$ 次截斷使得高次多項式不經濟；(2) 累積誤差與次數成正比，精度隨 $d$ 下降。延遲截斷同時解決了這兩個問題。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 14.4 DEFERRED TRUNCATION                                      -->
+    <!-- ============================================================ -->
+    <h2 id="deferred-truncation">14.4 延遲截斷</h2>
+
+    <h3>核心思想</h3>
+    <p>
+      延遲截斷的關鍵洞察是：<strong>不需要在每一步截斷</strong>。只要中間值不超過域大小，我們可以讓 scale 自然增長，最後統一截斷。問題是：如何讓 Horner 鏈在不同 scale 的數值之間正確地執行加法？
+    </p>
+    <p>
+      答案是<strong>係數預縮放</strong>：讓每個係數 $D_i$ 的 scale 恰好匹配它在 Horner 鏈中被使用時的 scale，使得加法可以直接進行。
+    </p>
+
+    <h3>係數預縮放方案</h3>
+    <p>
+      在標準 Horner 鏈中，第 $i$ 步（從頂部數起）的中間結果 $H_i$ 的 scale 為 $S^{d+1-i}$（因為從 $H_d$ 開始，每乘一次 $R$，scale 增加一個 $S$）。為了讓加法 $D_i + R \cdot H_{i+1}$ 中兩個運算元的 scale 匹配，我們將 $D_i$ 的 scale 也設定為 $S^{d+1-i}$：
+    </p>
+    $$D_i = \operatorname{round}(c_i \cdot S^{d+1-i})$$
+
+    <p>以 $d = 5$、$S = 2^{16}$ 為例：</p>
+    <table>
+      <thead>
+        <tr>
+          <th>係數</th>
+          <th>Scale</th>
+          <th>數值（$S = 2^{16}$）</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>$D_5$</td>
+          <td>$S^1 = S$</td>
+          <td>$2^{16}$</td>
+        </tr>
+        <tr>
+          <td>$D_4$</td>
+          <td>$S^2$</td>
+          <td>$2^{32}$</td>
+        </tr>
+        <tr>
+          <td>$D_3$</td>
+          <td>$S^3$</td>
+          <td>$2^{48}$</td>
+        </tr>
+        <tr>
+          <td>$D_2$</td>
+          <td>$S^4$</td>
+          <td>$2^{64}$</td>
+        </tr>
+        <tr>
+          <td>$D_1$</td>
+          <td>$S^5$</td>
+          <td>$2^{80}$</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Horner 鏈的 Scale 追蹤</h3>
+    <p>
+      現在逐步追蹤每一步的 scale，驗證所有加法都在匹配的 scale 之間進行：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <strong>$H_5 = D_5$</strong><br>
+        Scale: $S^1$。初始化，無計算。
+      </div>
+      <div class="step">
+        <strong>$H_4 = D_4 + R \cdot H_5$</strong><br>
+        $R$ 的 scale 是 $S^1$，$H_5$ 的 scale 是 $S^1$，因此 $R \cdot H_5$ 的 scale 是 $S^2$。<br>
+        $D_4$ 的 scale 也是 $S^2$，加法匹配。結果 $H_4$ 的 scale 為 $S^2$。
+      </div>
+      <div class="step">
+        <strong>$H_3 = D_3 + R \cdot H_4$</strong><br>
+        $R \cdot H_4$ 的 scale 是 $S^1 \cdot S^2 = S^3$。$D_3$ 的 scale 也是 $S^3$。結果 $H_3$ 的 scale 為 $S^3$。
+      </div>
+      <div class="step">
+        <strong>$H_2 = D_2 + R \cdot H_3$</strong><br>
+        $R \cdot H_3$ 的 scale 是 $S^4$。$D_2$ 的 scale 也是 $S^4$。結果 $H_2$ 的 scale 為 $S^4$。
+      </div>
+      <div class="step">
+        <strong>$H_1 = D_1 + R \cdot H_2$</strong><br>
+        $R \cdot H_2$ 的 scale 是 $S^5$。$D_1$ 的 scale 也是 $S^5$。結果 $H_1$ 的 scale 為 $S^5$。
+      </div>
+      <div class="step">
+        <strong>$w_\text{pre} = R \cdot H_1$</strong><br>
+        $R \cdot H_1$ 的 scale 是 $S^6 = S^{d+1}$。這是最終的未截斷結果。
+      </div>
+    </div>
+
+    <h3>最終截斷</h3>
+    <p>
+      $w_\text{pre}$ 的 scale 為 $S^{d+1}$，而我們期望的輸出 scale 為 $S$。因此只需一次截斷：
+    </p>
+    $$w = \left\lfloor \frac{w_\text{pre}}{S^d} \right\rfloor$$
+    <p>
+      結果 $w$ 的 scale 為 $S^{d+1} / S^d = S$，正是標準的定點表示。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">延遲截斷的不變量</div>
+      <p>
+        在 Horner 鏈的第 $k$ 步（$k = d, d-1, \ldots, 1$），中間結果 $H_k$ 的 scale 始終為 $S^{d+1-k}$。這個不變量由係數預縮放保證：$D_k$ 的 scale 為 $S^{d+1-k}$，且 $R \cdot H_{k+1}$ 的 scale 為 $S \cdot S^{d-k} = S^{d+1-k}$，因此加法 $D_k + R \cdot H_{k+1}$ 始終在相同 scale 上進行。
+      </p>
+    </div>
+
+    <h3>一般公式</h3>
+    <p>
+      對於 degree-$d$ 多項式，零常數項（$a_0 = 0$），延遲截斷的完整計算為：
+    </p>
+    $$\boxed{w = \left\lfloor \frac{R \cdot \bigl(D_1 + R \cdot (D_2 + R \cdot (\cdots + R \cdot D_d))\bigr)}{S^d} \right\rfloor}$$
+    <p>其中 $D_i = \operatorname{round}(c_i \cdot S^{d+1-i})$，$R$ 是輸入的定點表示（scale 為 $S$）。</p>
+
+    <!-- ============================================================ -->
+    <!-- 14.5 COST COMPARISON                                          -->
+    <!-- ============================================================ -->
+    <h2 id="cost-comparison">14.5 成本比較</h2>
+
+    <p>
+      以下將 Naive Horner（逐步截斷）與延遲截斷進行系統比較：
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>指標</th>
+          <th>Naive Horner</th>
+          <th>延遲截斷</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>截斷次數</td>
+          <td>$d$</td>
+          <td>$1$</td>
+        </tr>
+        <tr>
+          <td>截斷用 rows（$d = 5$）</td>
+          <td>$\sim$15</td>
+          <td>$\sim$3</td>
+        </tr>
+        <tr>
+          <td>截斷用 lookups（$d = 5, pp = 16$）</td>
+          <td>$\sim$20</td>
+          <td>$\sim$6</td>
+        </tr>
+        <tr>
+          <td>累積捨入誤差</td>
+          <td>$\leq d$ ULP</td>
+          <td>$\leq 1$ ULP</td>
+        </tr>
+        <tr>
+          <td>精度上限</td>
+          <td>$\text{ULP}_{\max}$ 可能 $> 1$</td>
+          <td>$\text{ULP}_{\max} = 1$（最優）</td>
+        </tr>
+        <tr>
+          <td>中間值 bit 數</td>
+          <td>$\leq 2 \cdot pp$（每步截斷後）</td>
+          <td>$\leq (d+1) \cdot pp$</td>
+        </tr>
+        <tr>
+          <td>需要 overflow 檢查？</td>
+          <td>否（每步截斷控制大小）</td>
+          <td>是（$(d+1) \cdot pp < 254$）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout example">
+      <div class="callout-title">節省量的具體計算（$d = 5, pp = 16$）</div>
+      <p><strong>Naive Horner：</strong></p>
+      <ul>
+        <li>Horner 乘法：5 rows</li>
+        <li>截斷：5 次 $\times$ 3 rows = 15 rows</li>
+        <li>Lookups：5 次 $\times$ ($2 \times 16/8$) = 5 $\times$ 4 = 20 lookups</li>
+        <li><strong>合計：20 rows + 20 lookups</strong></li>
+      </ul>
+      <p><strong>延遲截斷：</strong></p>
+      <ul>
+        <li>Horner 乘法：5 rows</li>
+        <li>截斷：1 次 $\times$ 3 rows = 3 rows</li>
+        <li>Lookups：$(d \cdot pp/8 + pp/8)$ = $(5 \times 2 + 2)$ = 12 lookups</li>
+        <li><strong>合計：8 rows + 12 lookups</strong></li>
+      </ul>
+      <p><strong>節省：12 rows + 8 lookups（每次函數求值）</strong></p>
+    </div>
+
+    <p>
+      在一個需要數千次函數求值的電路中，這些節省會被放大。例如，一個包含 10,000 次 $\exp$ 求值的電路，使用延遲截斷可節省約 120,000 rows &mdash; 這可能意味著電路規模縮小 40% 以上。
+    </p>
+
+    <!-- ============================================================ -->
+    <!-- 14.6 OVERFLOW SAFETY                                          -->
+    <!-- ============================================================ -->
+    <h2 id="overflow-safety">14.6 Overflow 安全性分析</h2>
+
+    <h3>問題的本質</h3>
+    <p>
+      延遲截斷的代價是中間值的位元數增長。在 Naive Horner 中，每步截斷後中間值維持在 $\sim 2 \cdot pp$ bits。但在延遲截斷中，到 $w_\text{pre}$ 時，數值的位元數達到了 $(d+1) \cdot pp$ bits。
+    </p>
+    <p>
+      有限域的算術是模 $p$ 的。如果中間值的位元數超過 $\log_2 p$，就會發生<strong>環繞</strong>（wraparound） &mdash; 數值被模 $p$ 約化，導致結果完全錯誤。因此必須確保：
+    </p>
+    $$\boxed{(d+1) \cdot pp < \lfloor \log_2 p \rfloor}$$
+
+    <h3>各配置的安全性分析</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>$d$（次數）</th>
+          <th>$pp$（精度 bits）</th>
+          <th>$w_\text{pre}$ bits</th>
+          <th>Field bits</th>
+          <th>Headroom</th>
+          <th>狀態</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>5</td>
+          <td>16</td>
+          <td>96</td>
+          <td>254</td>
+          <td>158</td>
+          <td>安全</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>24</td>
+          <td>144</td>
+          <td>254</td>
+          <td>110</td>
+          <td>安全</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>32</td>
+          <td>192</td>
+          <td>254</td>
+          <td>62</td>
+          <td>安全</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td>24</td>
+          <td>192</td>
+          <td>254</td>
+          <td>62</td>
+          <td>安全</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td>32</td>
+          <td>256</td>
+          <td>254</td>
+          <td>$-2$</td>
+          <td><strong>溢位</strong></td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td>24</td>
+          <td>240</td>
+          <td>254</td>
+          <td>14</td>
+          <td>勉強安全</td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td>32</td>
+          <td>320</td>
+          <td>254</td>
+          <td>$-66$</td>
+          <td><strong>溢位</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout warning">
+      <div class="callout-title">Overflow 的邊界條件</div>
+      <p>
+        上表的 <code>headroom</code> 是保守估計，假設最壞情況下每個中間值都用滿了其 scale 的位元數。實際上，由於係數 $|c_i| < 1$ 且輸入 $R < S$，真實的位元數通常比上界小。然而，在安全性分析中<strong>必須使用最壞情況</strong>，因為惡意 prover 可能提供任何在 range check 範圍內的數值。
+      </p>
+      <p>
+        特別注意 $d = 7, pp = 32$ 的情況：$(7+1) \times 32 = 256 > 254$，即使只差 2 bits 也<strong>不安全</strong>。若確實需要此配置，必須在 Horner 鏈中間插入一次截斷（partially deferred truncation），將成本從 $O(d)$ 降至 $O(2)$。
+      </p>
+    </div>
+
+    <h3>Headroom 的意義</h3>
+    <p>
+      Headroom（剩餘位元數）不僅需要大於零，還需要足夠大以容納加法中的進位。在 Horner 鏈的每一步，$D_i + R \cdot H_{i+1}$ 的加法可能使結果比兩個運算元都大。保守而言，建議保留至少 $\lceil\log_2(d+1)\rceil$ bits 的額外 headroom 以容納這些加法。
+    </p>
+
+    <div class="callout definition">
+      <div class="callout-title">安全條件（完整版）</div>
+      <p>
+        延遲截斷的完整安全條件為：
+        $$(d+1) \cdot pp + \lceil\log_2(d+1)\rceil < \lfloor\log_2 p\rfloor$$
+        對於 BN254（$\log_2 p = 254$）和典型配置 $d = 5, pp = 16$：
+        $$6 \times 16 + 3 = 99 < 254 \quad \checkmark$$
+        headroom 為 $254 - 99 = 155$ bits，非常充裕。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 14.7 TRUNCATION CIRCUIT                                       -->
+    <!-- ============================================================ -->
+    <h2 id="truncation-circuit">14.7 截斷的電路實現</h2>
+
+    <h3>電路結構</h3>
+    <p>
+      最終截斷 $w = \lfloor w_\text{pre} / S^d \rfloor$ 在電路中的實現方式如下。Prover 提供兩個額外的見證值：
+    </p>
+    <ul>
+      <li><strong>$w$</strong>：商，即最終的定點輸出（scale 為 $S$）</li>
+      <li><strong>$\text{rem}$</strong>：餘數</li>
+    </ul>
+    <p>
+      電路驗證三個條件：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <strong>整除驗證：</strong>$w \cdot S^d + \text{rem} = w_\text{pre}$<br>
+        這是一個 custom gate，確認 $w$ 和 $\text{rem}$ 確實是 $w_\text{pre}$ 除以 $S^d$ 的商和餘數。
+      </div>
+      <div class="step">
+        <strong>餘數範圍檢查：</strong>$0 \leq \text{rem} < S^d$<br>
+        使用 byte decomposition 將 $\text{rem}$ 分解為 $d \cdot pp / 8$ 個 bytes，每個 byte 通過 ByteTable lookup 驗證在 $[0, 255]$ 範圍內。
+      </div>
+      <div class="step">
+        <strong>商範圍檢查：</strong>$0 \leq w < S$<br>
+        使用 byte decomposition 將 $w$ 分解為 $pp / 8$ 個 bytes，同樣通過 ByteTable lookup 驗證。
+      </div>
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">為什麼範圍檢查不可省略？</div>
+      <p>
+        只有整除驗證是不夠的。考慮：若沒有 $0 \leq \text{rem} < S^d$ 的限制，惡意 prover 可以選擇任何 $w'$ 和 $\text{rem}' = w_\text{pre} - w' \cdot S^d$（可能為負數或超大），只要等式成立就行。範圍檢查確保了 $w$ 確實是<strong>唯一正確的</strong>商。
+      </p>
+    </div>
+
+    <h3>電路成本明細</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>組件</th>
+          <th>Rows</th>
+          <th>Lookups</th>
+          <th>說明</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>整除驗證 gate</td>
+          <td>1</td>
+          <td>0</td>
+          <td>$w \cdot S^d + \text{rem} = w_\text{pre}$</td>
+        </tr>
+        <tr>
+          <td>餘數 byte decomposition</td>
+          <td>1</td>
+          <td>$d \cdot pp / 8$</td>
+          <td>$d = 5, pp = 16$: 10 bytes</td>
+        </tr>
+        <tr>
+          <td>商 byte decomposition</td>
+          <td>1</td>
+          <td>$pp / 8$</td>
+          <td>$pp = 16$: 2 bytes</td>
+        </tr>
+        <tr>
+          <td><strong>合計</strong></td>
+          <td><strong>3</strong></td>
+          <td><strong>$(d+1) \cdot pp / 8$</strong></td>
+          <td>$d = 5, pp = 16$: <strong>12 lookups</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Halo2 電路虛擬碼</h3>
+    <p>
+      以下是截斷閘在 Halo2 中的虛擬碼（Rust-like pseudocode）：
+    </p>
+    <pre><code>// === Truncation Gate ===
+// 輸入：w_pre（Horner 鏈的未截斷輸出，scale = S^{d+1}）
+// 輸出：w（截斷後輸出，scale = S）
+
+fn truncation_gate(
+    meta: &amp;mut ConstraintSystem&lt;F&gt;,
+    w_pre: Column&lt;Advice&gt;,
+    w: Column&lt;Advice&gt;,
+    rem: Column&lt;Advice&gt;,
+    s_d: F,  // S^d，常數
+) {
+    meta.create_gate("deferred-truncation", |vc| {
+        let w_pre_val = vc.query_advice(w_pre, Rotation::cur());
+        let w_val     = vc.query_advice(w, Rotation::cur());
+        let rem_val   = vc.query_advice(rem, Rotation::cur());
+
+        // 約束：w * S^d + rem = w_pre
+        vec![
+            w_val.clone() * Expression::Constant(s_d)
+            + rem_val.clone()
+            - w_pre_val
+        ]
+    });
+}
+
+// === Range Check (byte decomposition) ===
+// 將 value 分解為 n_bytes 個 byte，每個 byte lookup ByteTable
+
+fn range_check_bytes(
+    region: &amp;mut Region&lt;F&gt;,
+    value: AssignedCell&lt;F, F&gt;,
+    n_bytes: usize,
+    byte_table: &amp;ByteTable,
+) -&gt; Result&lt;(), Error&gt; {
+    let val = value.value().copied().unwrap();
+    let mut remaining = val;
+
+    for i in 0..n_bytes {
+        let byte_i = remaining % F::from(256);
+        remaining = (remaining - byte_i) / F::from(256);
+
+        // 分配 byte cell 並 lookup ByteTable
+        let byte_cell = region.assign_advice(
+            || format!("byte_{}", i),
+            self.byte_col,
+            offset + i,
+            || Ok(byte_i),
+        )?;
+        byte_table.lookup(byte_cell)?;
+    }
+
+    // 約束 remaining == 0（確保完全分解）
+    region.constrain_constant(remaining_cell, F::zero())?;
+    Ok(())
+}</code></pre>
+
+    <div class="callout note">
+      <div class="callout-title">與 ByteTable Lookup 的關聯</div>
+      <p>
+        Byte decomposition 中使用的 ByteTable 是 Halo2 的 lookup argument（Ch 9）的應用。ByteTable 包含 $\{0, 1, 2, \ldots, 255\}$ 共 256 個條目。每個 byte 的 lookup 證明該值確實在 $[0, 255]$ 範圍內，從而建立起從 byte 到整數的正確分解。這是 ZK 電路中最常用的 range check 技術。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 14.8 WORKED EXAMPLE                                           -->
+    <!-- ============================================================ -->
+    <h2 id="worked-example">14.8 完整工作範例</h2>
+
+    <h3>問題設定</h3>
+    <p>
+      計算 $\exp(x) - 1$ 在 $[0, \ln 2)$ 上的 degree-5 多項式逼近，使用定點算術（$pp = 16$，$S = 2^{16} = 65536$）和延遲截斷。
+    </p>
+
+    <h3>Step 1：多項式係數</h3>
+    <p>
+      假設 Remez 演算法（Ch 13）得到以下實數係數（零常數項）：
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>$i$</th>
+          <th>$c_i$（實數）</th>
+          <th>Scale $S^{d+1-i}$</th>
+          <th>$D_i = \operatorname{round}(c_i \cdot S^{d+1-i})$</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>$1.000000$</td>
+          <td>$S^5 = 2^{80}$</td>
+          <td>$1\,208\,925\,819\,614\,629\,174\,706\,176$</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>$0.500000$</td>
+          <td>$S^4 = 2^{64}$</td>
+          <td>$9\,223\,372\,036\,854\,775\,808$</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>$0.166667$</td>
+          <td>$S^3 = 2^{48}$</td>
+          <td>$46\,912\,496\,118\,443$</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>$0.041667$</td>
+          <td>$S^2 = 2^{32}$</td>
+          <td>$178\,956\,971$</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>$0.008333$</td>
+          <td>$S^1 = 2^{16}$</td>
+          <td>$546$</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">係數的來源</div>
+      <p>
+        上述係數近似於 $\exp(x) - 1$ 的 Taylor 展開係數：$c_1 = 1$, $c_2 = 1/2$, $c_3 = 1/6$, $c_4 = 1/24$, $c_5 = 1/120$。實際的 Remez 係數會與 Taylor 係數略有不同（Remez 最小化最大誤差而非在某一點的誤差），但此範例使用 Taylor 係數以便演示。
+      </p>
+    </div>
+
+    <h3>Step 2：輸入值</h3>
+    <p>
+      假設我們要計算 $\exp(0.5) - 1 \approx 0.648721$。輸入 $x = 0.5$ 的定點表示為：
+    </p>
+    $$R = \operatorname{round}(0.5 \times 2^{16}) = 32768$$
+
+    <h3>Step 3：Horner 鏈計算（不截斷）</h3>
+
+    <div class="steps">
+      <div class="step">
+        <strong>$H_5 = D_5 = 546$</strong><br>
+        Scale: $S^1 = 2^{16}$
+      </div>
+      <div class="step">
+        <strong>$H_4 = D_4 + R \cdot H_5$</strong><br>
+        $= 178\,956\,971 + 32768 \times 546$<br>
+        $= 178\,956\,971 + 17\,891\,328$<br>
+        $= 196\,848\,299$<br>
+        Scale: $S^2 = 2^{32}$
+      </div>
+      <div class="step">
+        <strong>$H_3 = D_3 + R \cdot H_4$</strong><br>
+        $= 46\,912\,496\,118\,443 + 32768 \times 196\,848\,299$<br>
+        $= 46\,912\,496\,118\,443 + 6\,449\,561\,567\,232$<br>
+        $= 53\,362\,057\,685\,675$<br>
+        Scale: $S^3 = 2^{48}$
+      </div>
+      <div class="step">
+        <strong>$H_2 = D_2 + R \cdot H_3$</strong><br>
+        $= 9\,223\,372\,036\,854\,775\,808 + 32768 \times 53\,362\,057\,685\,675$<br>
+        $= 9\,223\,372\,036\,854\,775\,808 + 1\,748\,563\,705\,297\,715\,200$<br>
+        $= 10\,971\,935\,742\,152\,491\,008$<br>
+        Scale: $S^4 = 2^{64}$
+      </div>
+      <div class="step">
+        <strong>$H_1 = D_1 + R \cdot H_2$</strong><br>
+        $= 1\,208\,925\,819\,614\,629\,174\,706\,176 + 32768 \times 10\,971\,935\,742\,152\,491\,008$<br>
+        $= 1\,208\,925\,819\,614\,629\,174\,706\,176 + 359\,464\,337\,558\,521\,225\,166\,848$<br>
+        $= 1\,568\,390\,157\,173\,150\,399\,873\,024$<br>
+        Scale: $S^5 = 2^{80}$
+      </div>
+      <div class="step">
+        <strong>$w_\text{pre} = R \cdot H_1$</strong><br>
+        $= 32768 \times 1\,568\,390\,157\,173\,150\,399\,873\,024$<br>
+        $= 51\,401\,081\,163\,076\,870\,635\,880\,628\,224$<br>
+        Scale: $S^6 = 2^{96}$
+      </div>
+    </div>
+
+    <h3>Step 4：最終截斷</h3>
+    <p>
+      截斷：$w = \lfloor w_\text{pre} / S^5 \rfloor = \lfloor w_\text{pre} / 2^{80} \rfloor$
+    </p>
+    $$w = \left\lfloor \frac{51\,401\,081\,163\,076\,870\,635\,880\,628\,224}{1\,208\,925\,819\,614\,629\,174\,706\,176} \right\rfloor = 42519$$
+    <p>
+      餘數 $\text{rem} = w_\text{pre} - w \cdot S^5$。
+    </p>
+
+    <h3>Step 5：驗證結果</h3>
+    <p>
+      將 $w$ 轉換回實數：
+    </p>
+    $$\frac{w}{S} = \frac{42519}{65536} \approx 0.648788$$
+    <p>
+      精確值為 $\exp(0.5) - 1 = 0.648721...$，因此誤差為 $|0.648788 - 0.648721| \approx 0.000067$，約為 $0.000067 / (1/65536) \approx 4.4$ ULP。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">關於範例的精度</div>
+      <p>
+        此範例使用了近似的 Taylor 係數而非真正的 Remez 最優係數，因此誤差略大於最優情況。使用 Remez 演算法的最優係數，degree-5 逼近配合 $pp = 16$ 的延遲截斷可以達到 $\text{ULP}_{\max} = 1$ 的精度。此處的目的是展示延遲截斷的計算流程，而非精度最優化。
+      </p>
+    </div>
+
+    <h3>電路驗證步驟</h3>
+    <p>
+      在 ZK 電路中，verifier 不重複上述計算（那是 prover 的工作），而是檢查以下約束：
+    </p>
+    <ol>
+      <li>$H_5 = D_5$（常數賦值）</li>
+      <li>$H_4 = D_4 + R \cdot H_5$（乘法閘 #1）</li>
+      <li>$H_3 = D_3 + R \cdot H_4$（乘法閘 #2）</li>
+      <li>$H_2 = D_2 + R \cdot H_3$（乘法閘 #3）</li>
+      <li>$H_1 = D_1 + R \cdot H_2$（乘法閘 #4）</li>
+      <li>$w_\text{pre} = R \cdot H_1$（乘法閘 #5）</li>
+      <li>$w \cdot S^d + \text{rem} = w_\text{pre}$（截斷驗證閘）</li>
+      <li>$0 \leq \text{rem} < S^d$（byte decomposition + lookup）</li>
+      <li>$0 \leq w < S$（byte decomposition + lookup）</li>
+    </ol>
+    <p>
+      以上共 <strong>8 rows + 12 lookups</strong>（5 個乘法 + 3 個截斷相關），即為一次完整函數求值的電路成本。
+    </p>
+
+    <!-- ============================================================ -->
+    <!-- SIGNIFICANCE SECTION                                          -->
+    <!-- ============================================================ -->
+    <h2 id="significance">對本研究的意義</h2>
+
+    <h3>在四步方法中的位置</h3>
+    <p>
+      Horner 求值與延遲截斷對應於論文四步方法的 <strong>Step 3</strong>（Horner 求值設計）和 <strong>Step 4</strong>（電路實現），是整條流程的最後兩個環節：
+    </p>
+    <div class="steps">
+      <div class="step">
+        <strong>Step 1：區間約化</strong> &mdash; 將輸入映射到小區間 $[a, b]$，確保 $f(a) = 0$
+      </div>
+      <div class="step">
+        <strong>Step 2：多項式逼近</strong> &mdash; Remez 演算法求最優多項式（Ch 13）
+      </div>
+      <div class="step">
+        <strong>Step 3：Horner 求值</strong> &mdash; 預縮放係數，Horner 鏈計算（本章 14.1 - 14.4）
+      </div>
+      <div class="step">
+        <strong>Step 4：電路截斷</strong> &mdash; 延遲截斷，一次性完成（本章 14.7）
+      </div>
+    </div>
+
+    <h3>核心優化效果</h3>
+    <p>
+      延遲截斷是論文中<strong>最重要的電路優化</strong>。它的效果是：
+    </p>
+    <ul>
+      <li>將截斷成本從 $O(d)$ 降至 $O(1)$，使得高次多項式在電路中經濟可行</li>
+      <li>消除累積捨入誤差，達到理論最優精度（$\text{ULP}_{\max} = 1$）</li>
+      <li>使得 degree-5 或更高次數的多項式可以在合理的電路成本下使用</li>
+    </ul>
+
+    <h3>完整成本分析</h3>
+    <p>
+      結合 ByteTable 查找（Ch 9, 10），一次完整的函數求值（使用延遲截斷）的電路成本如下：
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>組件</th>
+          <th>閘/行數</th>
+          <th>說明</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Horner 乘法</td>
+          <td>$d$ rows</td>
+          <td>每步一個乘法閘</td>
+        </tr>
+        <tr>
+          <td>最終截斷</td>
+          <td>$\sim$3 rows</td>
+          <td>商 + 餘數驗證</td>
+        </tr>
+        <tr>
+          <td>Byte decomposition</td>
+          <td>$\sim(d \cdot pp/8 + pp/8)$ lookups</td>
+          <td>範圍檢查</td>
+        </tr>
+        <tr>
+          <td><strong>總計（$d=5, pp=16$）</strong></td>
+          <td><strong>$\sim$8 rows + $\sim$12 lookups</strong></td>
+          <td><strong>每次函數求值</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout theorem">
+      <div class="callout-title">成本公式</div>
+      <p>
+        對於 degree-$d$ 多項式，定點精度 $pp$ bits，使用延遲截斷的每次函數求值成本為：
+      </p>
+      $$\text{Rows} = d + 3, \qquad \text{Lookups} = \frac{(d+1) \cdot pp}{8}$$
+      <p>
+        這兩個量都隨 $d$ <em>線性</em>增長（而非 Naive Horner 的 $\sim 4d$ rows + $\sim 4d$ lookups），且常數因子極小。
+      </p>
+    </div>
+
+    <h3>與其他章節的連結</h3>
+    <ul>
+      <li><strong>Ch 12（定點運算）</strong>提供了 scale、truncation、byte decomposition 的基礎概念</li>
+      <li><strong>Ch 13（逼近理論）</strong>提供了多項式係數 $c_i$ &mdash; Horner 鏈的輸入</li>
+      <li><strong>Ch 9（Lookup Arguments）</strong>提供了 ByteTable lookup 的理論支撐</li>
+      <li><strong>Ch 8（Halo2）</strong>提供了 custom gate 和 lookup 的電路框架</li>
+    </ul>
+
+    <div class="callout example">
+      <div class="callout-title">端到端的成本估算</div>
+      <p>
+        假設要在 ZK 電路中計算 10,000 次 $\exp$ 函數（例如 softmax 層的計算）：
+      </p>
+      <ul>
+        <li>每次求值：8 rows + 12 lookups</li>
+        <li>10,000 次：80,000 rows + 120,000 lookups</li>
+        <li>使用 Naive Horner：200,000 rows + 200,000 lookups</li>
+        <li><strong>延遲截斷節省了 60% 的 rows 和 40% 的 lookups</strong></li>
+      </ul>
+      <p>
+        這種節省使得超越函數在 ZK 電路中的使用從「昂貴到不切實際」變為「完全可行」，是論文方法論的核心貢獻之一。
+      </p>
+    </div>
+
+    <!-- PAGE NAV -->
+    <div class="page-nav">
+      <a href="approximation-theory.html">
+        <span class="nav-label">上一章</span>
+        <span class="nav-title">&larr; 13. 多項式逼近理論</span>
+      </a>
+      <a href="index.html">
+        <span class="nav-label">回到首頁</span>
+        <span class="nav-title">手冊首頁 &rarr;</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

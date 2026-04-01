@@ -3,116 +3,469 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZKMM - ZK Transcendental Function Methodology</title>
+  <title>ZKMM — Zero-Knowledge Machine Learning</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface-2: #1a1a26;
+      --border: #2a2a3a;
+      --text: #e4e4ed;
+      --text-dim: #8888a0;
+      --accent: #6366f1;
+      --accent-light: #818cf8;
+      --accent-glow: rgba(99, 102, 241, 0.15);
+      --green: #22c55e;
+      --green-glow: rgba(34, 197, 94, 0.12);
+      --blue: #3b82f6;
+      --blue-glow: rgba(59, 130, 246, 0.12);
+      --font-sans: 'Noto Sans TC', 'Inter', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f8fafc;
-      color: #1a202c;
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
       min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ---- Hero ---- */
+    .hero {
+      text-align: center;
+      padding: 5rem 2rem 3rem;
+      position: relative;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .hero-content { position: relative; z-index: 1; }
+
+    .hero-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent-light);
+      background: var(--accent-glow);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      padding: 0.35rem 1rem;
+      border-radius: 999px;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.25rem);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #fff 0%, #c7d2fe 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      font-size: 1.1rem;
+      color: var(--text-dim);
+      max-width: 600px;
+      margin: 0 auto 0.5rem;
+      line-height: 1.6;
+    }
+
+    .hero-meta {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-top: 1.5rem;
+    }
+
+    .hero-meta span {
+      display: inline-block;
+      margin: 0 0.75rem;
+    }
+
+    .hero-meta .dot {
+      color: var(--accent);
+    }
+
+    /* ---- Container ---- */
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 0 2rem 4rem;
+    }
+
+    /* ---- Section Title ---- */
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-dim);
+      margin-bottom: 1.25rem;
+      padding-left: 0.25rem;
+    }
+
+    /* ---- Cards Grid ---- */
+    .cards {
+      display: grid;
+      gap: 1.25rem;
+      margin-bottom: 3rem;
+    }
+
+    .cards.two-col {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    /* ---- Entry Card (large, clickable) ---- */
+    .entry-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem 2.25rem;
+      text-decoration: none;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .entry-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--accent);
+      box-shadow: 0 8px 32px var(--accent-glow);
+    }
+
+    .entry-card .card-icon {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    .entry-card h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.01em;
+    }
+
+    .entry-card .card-en {
+      font-size: 0.8rem;
+      color: var(--accent-light);
+      font-family: var(--font-mono);
+      margin-bottom: 0.75rem;
+      font-weight: 500;
+    }
+
+    .entry-card .card-desc {
+      font-size: 0.925rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+      flex: 1;
+    }
+
+    .entry-card .card-arrow {
+      margin-top: 1.25rem;
+      font-size: 0.85rem;
+      color: var(--accent-light);
+      font-weight: 600;
       display: flex;
       align-items: center;
-      justify-content: center;
+      gap: 0.4rem;
+      transition: gap 0.2s;
     }
-    .container {
-      max-width: 640px;
-      width: 100%;
-      padding: 2rem;
+
+    .entry-card:hover .card-arrow {
+      gap: 0.75rem;
     }
-    h1 {
-      font-size: 1.75rem;
-      margin-bottom: 0.5rem;
-      color: #2d3748;
+
+    /* Card accent variants */
+    .entry-card.accent-green:hover {
+      border-color: var(--green);
+      box-shadow: 0 8px 32px var(--green-glow);
     }
-    .subtitle {
-      color: #718096;
-      font-size: 0.95rem;
-      margin-bottom: 2rem;
-      line-height: 1.5;
+    .entry-card.accent-green .card-en { color: var(--green); }
+    .entry-card.accent-green .card-arrow { color: var(--green); }
+
+    .entry-card.accent-blue:hover {
+      border-color: var(--blue);
+      box-shadow: 0 8px 32px var(--blue-glow);
     }
-    .card {
-      display: block;
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
+    .entry-card.accent-blue .card-en { color: var(--blue); }
+    .entry-card.accent-blue .card-arrow { color: var(--blue); }
+
+    /* ---- Tag chips ---- */
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 1rem;
+    }
+
+    .tag {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      letter-spacing: 0.02em;
+    }
+
+    /* ---- Report sub-cards ---- */
+    .sub-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 3rem;
+    }
+
+    .sub-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
       padding: 1.25rem 1.5rem;
-      margin-bottom: 1rem;
       text-decoration: none;
-      color: inherit;
-      transition: border-color 0.15s, box-shadow 0.15s;
+      color: var(--text);
+      transition: border-color 0.15s, background 0.15s;
     }
-    .card:hover {
-      border-color: #3182ce;
-      box-shadow: 0 2px 8px rgba(49, 130, 206, 0.1);
+
+    .sub-card:hover {
+      border-color: var(--accent);
+      background: var(--surface-2);
     }
-    .card h2 {
-      font-size: 1.1rem;
-      color: #2b6cb0;
-      margin-bottom: 0.35rem;
+
+    .sub-card h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
     }
-    .card p {
-      font-size: 0.875rem;
-      color: #718096;
-      line-height: 1.4;
-    }
-    .btn-script {
-      display: inline-block;
-      background: #2b6cb0;
-      color: #fff;
-      border-radius: 6px;
-      padding: 0.6rem 1.2rem;
-      text-decoration: none;
-      font-size: 0.875rem;
-      font-weight: 500;
-      margin-bottom: 1rem;
-      transition: background 0.15s;
-    }
-    .btn-script:hover { background: #2c5282; }
-    footer {
-      margin-top: 2rem;
-      text-align: center;
+
+    .sub-card p {
       font-size: 0.8rem;
-      color: #a0aec0;
+      color: var(--text-dim);
+    }
+
+    /* ---- Divider ---- */
+    .divider {
+      border: none;
+      height: 1px;
+      background: var(--border);
+      margin: 2rem 0;
+    }
+
+    /* ---- Footer ---- */
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border);
+    }
+
+    .footer a {
+      color: var(--accent-light);
+      text-decoration: none;
+    }
+
+    .footer a:hover { text-decoration: underline; }
+
+    /* ---- Responsive ---- */
+    @media (max-width: 700px) {
+      .hero { padding: 3rem 1.5rem 2rem; }
+      .container { padding: 0 1.25rem 3rem; }
+      .cards.two-col { grid-template-columns: 1fr; }
+      .entry-card { padding: 1.5rem; }
+      .sub-cards { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="hero-content">
+      <div class="hero-badge">Master's Thesis Project</div>
+      <h1>ZK 電路中超越函數的<br>多項式近似設計方法論</h1>
+      <p class="hero-sub">
+        以 Minimax 多項式逼近與 Horner 求值法，在零知識證明電路中高效計算超越函數
+      </p>
+      <div class="hero-meta">
+        <span>ZKML</span>
+        <span class="dot">/</span>
+        <span>Polynomial Approximation</span>
+        <span class="dot">/</span>
+        <span>Halo2</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
   <div class="container">
-    <h1>ZK Transcendental Function Methodology</h1>
-    <p class="subtitle">
-      Minimax + Deferred Truncation + ExplicitRC: a polynomial-based approach to
-      computing transcendental functions in zero-knowledge proofs.
-    </p>
 
-    <a class="card" href="research-background.html">
-      <h2>Research Background</h2>
-      <p>Why transcendental functions are hard in ZK circuits, and how our approach differs from existing methods.</p>
-    </a>
+    <!-- Primary Entries -->
+    <div class="section-title">核心內容</div>
+    <div class="cards two-col">
 
-    <a class="card" href="contribution-comparison.html">
-      <h2>Contribution Comparison</h2>
-      <p>Systematic comparison with 22 existing systems across CCS, USENIX, CRYPTO, NDSS, ePrint, and arXiv.</p>
-    </a>
+      <!-- Proposal Report -->
+      <a href="提案報告/index.html" class="entry-card accent-blue">
+        <div class="card-icon">&#x1F4D1;</div>
+        <h2>提案報告</h2>
+        <div class="card-en">Thesis Proposal Report</div>
+        <div class="card-desc">
+          碩士論文提案的完整報告，包含問題定義、背景技術、四步設計方法論、實驗結果、範圍界定與結論。
+        </div>
+        <div class="tags">
+          <span class="tag">Minimax</span>
+          <span class="tag">Horner</span>
+          <span class="tag">ExplicitRC</span>
+          <span class="tag">13 Functions</span>
+        </div>
+        <div class="card-arrow">進入報告 &rarr;</div>
+      </a>
 
-    <a class="card" href="proposal.html">
-      <h2>Proposal (Full)</h2>
-      <p>Complete thesis proposal: methodology design, ablation experiments, circuit security analysis, and cost model.</p>
-    </a>
+      <!-- ZK Handbook -->
+      <a href="背景知識/index.html" class="entry-card accent-green">
+        <div class="card-icon">&#x1F4DA;</div>
+        <h2>ZK Proof Systems Handbook</h2>
+        <div class="card-en">Zero-Knowledge 證明系統手冊</div>
+        <div class="card-desc">
+          從有限域到 PLONK、Halo2 的完整參考手冊。涵蓋 14 章、170+ 關鍵定義，每章開頭附中英文定義區塊，結尾附論文意義分析。
+        </div>
+        <div class="tags">
+          <span class="tag">Groth16</span>
+          <span class="tag">PLONK</span>
+          <span class="tag">Halo2</span>
+          <span class="tag">Lookup</span>
+          <span class="tag">Security</span>
+        </div>
+        <div class="card-arrow">進入手冊 &rarr;</div>
+      </a>
 
-    <a class="card" href="what-we-did.html">
-      <h2>Technical Briefing (給密碼學同學)</h2>
-      <p>What exactly we did, explained for cryptography students. Security analysis, circuit-level arguments, honest positioning.</p>
-    </a>
+    </div>
 
-    <a class="btn-script" href="what-we-did-script.html">📋 Presentation Script (~20 min)</a>
+    <!-- Report Sub-pages -->
+    <div class="section-title">提案報告子頁面</div>
+    <div class="sub-cards">
+      <a href="提案報告/index.html" class="sub-card">
+        <h3>總報告</h3>
+        <p>完整提案內容</p>
+      </a>
+      <a href="提案報告/research-background.html" class="sub-card">
+        <h3>研究背景</h3>
+        <p>ZKML 與多項式近似</p>
+      </a>
+      <a href="提案報告/contribution-comparison.html" class="sub-card">
+        <h3>差異比較</h3>
+        <p>Minimax vs Taylor</p>
+      </a>
+      <a href="提案報告/what-we-did.html" class="sub-card">
+        <h3>技術說明</h3>
+        <p>設計方法論詳述</p>
+      </a>
+    </div>
 
-    <a class="card" href="degree_selection_report.html">
-      <h2>Degree Selection Experiment</h2>
-      <p>637-point grid search (546 feasible) over (pp, d) design space: ULP heatmaps, convergence curves, bottleneck analysis, and design guidelines.</p>
-    </a>
+    <hr class="divider">
 
-    <footer>ZKMM Research</footer>
+    <!-- Handbook Chapters -->
+    <div class="section-title">ZK Handbook 章節總覽</div>
+    <div class="sub-cards">
+      <a href="背景知識/foundations.html" class="sub-card">
+        <h3>Ch 1. 數學基礎</h3>
+        <p>有限域、橢圓曲線、配對</p>
+      </a>
+      <a href="背景知識/zkp-basics.html" class="sub-card">
+        <h3>Ch 2. ZKP 基礎</h3>
+        <p>完備性、健全性、零知識</p>
+      </a>
+      <a href="背景知識/polynomial-commitments.html" class="sub-card">
+        <h3>Ch 3. 多項式承諾</h3>
+        <p>KZG、IPA、FRI</p>
+      </a>
+      <a href="背景知識/arithmetization.html" class="sub-card">
+        <h3>Ch 4. 算術化</h3>
+        <p>R1CS、QAP、PLONKish</p>
+      </a>
+      <a href="背景知識/fft-domains.html" class="sub-card">
+        <h3>Ch 5. FFT 與求值域</h3>
+        <p>單位根、NTT、Coset</p>
+      </a>
+      <a href="背景知識/groth16.html" class="sub-card">
+        <h3>Ch 6. Groth16</h3>
+        <p>電路特定可信設置</p>
+      </a>
+      <a href="背景知識/plonk.html" class="sub-card">
+        <h3>Ch 7. PLONK</h3>
+        <p>通用 SRS、置換論證</p>
+      </a>
+      <a href="背景知識/halo2.html" class="sub-card">
+        <h3>Ch 8. Halo2</h3>
+        <p>Pallas/Vesta、IPA</p>
+      </a>
+      <a href="背景知識/lookup-arguments.html" class="sub-card">
+        <h3>Ch 9. Lookup 論證</h3>
+        <p>Plookup、LogUp</p>
+      </a>
+      <a href="背景知識/polynomial-method.html" class="sub-card">
+        <h3>Ch 10. 多項式方法</h3>
+        <p>ByteTable、函數無關電路</p>
+      </a>
+      <a href="背景知識/security-proofs.html" class="sub-card">
+        <h3>Ch 11. 安全性證明</h3>
+        <p>完備性、健全性形式化</p>
+      </a>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Thesis Methodology Chapters -->
+    <div class="section-title">論文方法論</div>
+    <div class="sub-cards">
+      <a href="背景知識/fixed-point.html" class="sub-card">
+        <h3>Ch 12. 有限域定點運算</h3>
+        <p>定點表示、截斷、ULP</p>
+      </a>
+      <a href="背景知識/approximation-theory.html" class="sub-card">
+        <h3>Ch 13. 多項式逼近理論</h3>
+        <p>Minimax、Remez、等振盪</p>
+      </a>
+      <a href="背景知識/horner-evaluation.html" class="sub-card">
+        <h3>Ch 14. Horner 求值</h3>
+        <p>延遲截斷、Overflow 分析</p>
+      </a>
+    </div>
+
   </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>ZKMM &mdash; Zero-Knowledge Machine Learning Research</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="https://github.com/xuancheng307/ZKMM">GitHub</a>
+    </p>
+  </footer>
+
 </body>
 </html>

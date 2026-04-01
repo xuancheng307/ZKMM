@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ch.10 Polynomial Method &mdash; ZK Handbook</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>ZK Handbook</h1>
+      <div class="subtitle">Zero-Knowledge Proof Systems</div>
+    </div>
+    <nav>
+      <div class="section-label">總覽</div>
+      <a href="index.html"><span class="page-num">0.</span> Home</a>
+      <div class="section-label">基礎</div>
+      <a href="foundations.html"><span class="page-num">1.</span> Mathematical Foundations</a>
+      <a href="zkp-basics.html"><span class="page-num">2.</span> ZKP: Basics &amp; Properties</a>
+      <div class="section-label">構建模組</div>
+      <a href="polynomial-commitments.html"><span class="page-num">3.</span> Polynomial Commitments</a>
+      <a href="arithmetization.html"><span class="page-num">4.</span> Arithmetization</a>
+      <a href="fft-domains.html"><span class="page-num">5.</span> FFT &amp; Evaluation Domains</a>
+      <div class="section-label">證明系統</div>
+      <a href="groth16.html"><span class="page-num">6.</span> Groth16</a>
+      <a href="plonk.html"><span class="page-num">7.</span> PLONK</a>
+      <a href="halo2.html"><span class="page-num">8.</span> Halo2</a>
+      <div class="section-label">進階主題</div>
+      <a href="lookup-arguments.html"><span class="page-num">9.</span> Lookup Arguments</a>
+      <a href="polynomial-method.html" class="active"><span class="page-num">10.</span> Polynomial Method</a>
+      <a href="security-proofs.html"><span class="page-num">11.</span> Security Proofs</a>
+
+      <div class="section-label">論文方法論</div>
+      <a href="fixed-point.html"><span class="page-num">12.</span> 有限域定點運算</a>
+      <a href="approximation-theory.html"><span class="page-num">13.</span> 多項式逼近理論</a>
+      <a href="horner-evaluation.html"><span class="page-num">14.</span> Horner 求值</a>
+    </nav>
+  </aside>
+  <main class="main-content">
+
+    <!-- Page Header -->
+    <div class="page-header">
+      <h1>第十章：零知識計算的多項式方法</h1>
+      <p class="page-subtitle">
+        一種通用技術，用於在 ZK 電路內部計算任意函數 $f: \mathbb{F}_p \to \mathbb{F}_p$，
+        方法是對位元組分解後的輸入進行多項式插值，
+        並搭配一個共用的 256 項查找表。電路與函數無關 &mdash;
+        只有多項式係數會改變。精度呈線性擴展，而非指數級增長。
+      </p>
+    </div>
+
+    <!-- ================================================ -->
+    <!-- DEFINITIONS SECTION                              -->
+    <!-- ================================================ -->
+    <div class="definitions-section">
+      <h2>關鍵定義</h2>
+
+      <div class="def-item">
+        <div class="def-term">Polynomial Method <span class="zh">多項式方法</span></div>
+        <div class="def-body">
+          一種在 ZK 電路中計算任意函數 $f: \mathbb{F}_p \to \mathbb{F}_p$ 的技術，
+          透過對位元組分解後的輸入進行多項式插值，並搭配共用查找表來實現。
+          多項式方法不會在所有可能的輸入上預先計算 $f$（即查找表方法），而是
+          <strong>將輸入分解為位元組</strong>，透過多項式查找每個位元組的貢獻值，然後將結果加總。
+          關鍵洞察在於：任何定義在 256 個值上的函數都可以用一個次數 $\leq 255$ 的多項式唯一表示。
+          在位元組層級上運作，一個 256 項的 <em>ByteTable</em> 即可服務所有函數 &mdash; 取代了傳統查找方法中
+          每個函數需要大小為 $2^d$ 的專屬表。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">ByteTable <span class="zh">位元組表</span></div>
+        <div class="def-body">
+          一個單一的共用 256 項查找表，包含所有位元組值 $\{0, 1, 2, \ldots, 255\}$。
+          其用途是<strong>驗證每個位元組分解是否有效</strong> &mdash; 即
+          每個位元組 $b_i \in [0, 255]$。這個表服務於<em>所有</em>函數：它是
+          <strong>與函數無關的</strong>。不同於查找方法中每個函數 $f$ 需要其專屬的大小為 $2^d$ 的表，
+          ByteTable 固定為 256 項，不受需要計算多少函數或需要何種精度的影響。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Byte Decomposition <span class="zh">位元組分解</span></div>
+        <div class="def-body">
+          將一個值 $x$ 表示為一串位元組的序列：
+          $$x = \sum_{i=0}^{k-1} b_i \cdot 256^i = b_0 + b_1 \cdot 256 + b_2 \cdot 256^2 + \cdots + b_{k-1} \cdot 256^{k-1}$$
+          其中每個 $b_i \in [0, 255]$。對於一個 $d$ 位元的值，所需的位元組數為
+          $k = \lceil d/8 \rceil$。每個位元組 $b_i$ 會對照 ByteTable 進行範圍檢查以確保有效性。
+          這個分解是任意精度輸入與固定 256 點多項式求值域之間的橋樑。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Function Polynomial <span class="zh">函數多項式</span></div>
+        <div class="def-body">
+          對於一個函數 $f$，函數多項式 $P_f(x)$ 的次數 $\leq 255$，且滿足
+          $P_f(b) = f(b)$，對所有 $b \in \{0, 1, \ldots, 255\}$ 成立。這個多項式是透過
+          在位元組域 $\{0, 1, \ldots, 255\}$ 上進行 <strong>Lagrange 插值</strong>得到的。
+          給定 256 個求值點，插值多項式是唯一的（根據代數基本定理，
+          一個次數 $\leq 255$ 的多項式由 256 個點唯一確定）。
+          $P_f$ 的係數編碼了 $f$ 在位元組輸入上的完整行為。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Function-Independent Circuit <span class="zh">函數無關電路</span></div>
+        <div class="def-body">
+          電路結構 &mdash; 閘、佈線、複製約束、查找論證 &mdash;
+          <strong>不隨</strong>所計算的函數 $f$ 而改變。唯一改變的是
+          多項式係數 $\{c_0, c_1, \ldots, c_{255}\}$（儲存在固定欄中）。
+          這意味著：一個電路設計可以處理無限多個函數。
+          要計算一個新函數，只需提供一個新的係數向量 &mdash; 無需重新設計電路、
+          無需重新編譯、無需新的可信設定。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Coefficient Vector <span class="zh">係數向量</span></div>
+        <div class="def-body">
+          向量 $\mathbf{c}_f = (c_0, c_1, \ldots, c_{255})$，其中
+          $P_f(x) = \sum_{j=0}^{255} c_j x^j$。不同的函數有不同的係數向量，
+          但使用<em>相同的</em>電路。這些係數是離線（offline）透過 Lagrange 插值一次性計算得到的，
+          並作為電路中固定欄的值儲存。在證明生成期間，
+          證明者使用這些係數來為輸入的每個位元組 $b_i$ 計算 $P_f(b_i)$。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Precision Scalability <span class="zh">精度可擴展性</span></div>
+        <div class="def-body">
+          精度由位元組數 $k$ 決定。增加一個位元組會使精度加倍
+          （多 8 位元的輸入解析度），且僅在電路中增加 $O(256)$ 行用於額外的多項式求值。
+          相比之下，查找表的成長是<strong>指數級</strong>的：$k$ 個位元組精度需要 $2^{8k}$ 項。
+          這個根本性的漸近差異 &mdash; 線性對指數 &mdash; 正是多項式方法的核心優勢。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Lookup Bottleneck <span class="zh">查找瓶頸</span></div>
+        <div class="def-body">
+          基於查找的方法在 ZK 電路中計算非線性函數時所面臨的根本問題：
+          對於 $d$ 位元精度，查找表需要 $2^d$ 項。在 16 位元精度下，
+          這就是每個函數 65,536 項。對於 $m$ 個不同函數在 $d$ 位元精度下，
+          總表佔用量為 $m \times 2^d$ 行。這個成本隨精度呈指數增長、
+          隨函數數量呈線性增長，使得需要多個函數或高精度（或兩者兼需）的應用變得不切實際。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Universality <span class="zh">通用性</span></div>
+        <div class="def-body">
+          多項式方法可以計算<strong>任何</strong>函數
+          $f: \{0, 1, \ldots, 255\} \to \mathbb{F}_p$，只需改變係數向量
+          $\mathbf{c}_f$。無需修改電路。這包括連續函數
+          （sigmoid、tanh、GELU）、分段函數（ReLU、階梯函數）、排列（AES S-box）、
+          位元運算（對位元組輸入的 AND、OR、XOR），以及完全自定義的非線性函數。
+          唯一的要求是函數須定義在位元組域 $\{0, \ldots, 255\}$ 上
+          &mdash; 而任何函數都可以透過量化來滿足這個要求。
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================ -->
+    <!-- 10.1 THE LOOKUP BOTTLENECK PROBLEM               -->
+    <!-- ================================================ -->
+    <h2>10.1 查找瓶頸問題</h2>
+
+    <p>
+      現代 ZK 證明系統經常需要在算術電路內部計算<strong>非線性函數</strong>。
+      這些函數 &mdash; ReLU、sigmoid、tanh、AES S-box、
+      位元運算、雜湊函數組件 &mdash; 無法以原生域上的低次多項式高效表達。
+      標準解決方案是使用<strong>查找表</strong>：對所有相關輸入 $x$ 預先計算 $f(x)$，
+      並將結果儲存在一個可以透過查找論證查詢的表中
+      （參見第九章：Lookup Arguments）。
+    </p>
+
+    <p>
+      這種方法在小規模下可行，但隨著精度和函數數量的增長，會遇到三個根本性問題。
+    </p>
+
+    <h3>問題一：精度導致的指數級表增長</h3>
+
+    <p>
+      對於在 $d$ 位元輸入上運作的函數 $f$，查找表必須包含
+      $2^d$ 項 &mdash; 每個可能的輸入值一項。在 8 位元精度下，這是可以管理的 256 行。
+      但實際應用中的精度需求往往超過 8 位元：
+    </p>
+
+    <ul>
+      <li><strong>機器學習推論</strong>：通常為 16 位元或 32 位元定點數</li>
+      <li><strong>金融計算</strong>：32 位元或 64 位元精度</li>
+      <li><strong>密碼學運算</strong>：AES 在 8 位元位元組上運作（尚可管理），但鏈式運算會增加有效精度</li>
+      <li><strong>科學計算</strong>：IEEE 754 單精度（32 位元）或雙精度（64 位元）</li>
+    </ul>
+
+    <table>
+      <thead>
+        <tr>
+          <th>精度</th>
+          <th>輸入位元數 ($d$)</th>
+          <th>表項數 ($2^d$)</th>
+          <th>是否可行？</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>8 位元</td>
+          <td>8</td>
+          <td>256</td>
+          <td>可行</td>
+        </tr>
+        <tr>
+          <td>16 位元</td>
+          <td>16</td>
+          <td>65,536</td>
+          <td>勉強</td>
+        </tr>
+        <tr>
+          <td>24 位元</td>
+          <td>24</td>
+          <td>16,777,216</td>
+          <td>不可行</td>
+        </tr>
+        <tr>
+          <td>32 位元</td>
+          <td>32</td>
+          <td>4,294,967,296</td>
+          <td>不可能</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      超過 16 位元後，表的大小對於任何實際的 ZK 證明系統而言都變得不切實際。
+      證明者必須將整個表作為證明的一部分進行承諾，而驗證者的工作量
+      （或至少是證明大小）會隨表的大小而增長。
+    </p>
+
+    <h3>問題二：每個函數各自獨立的表</h3>
+
+    <p>
+      每個不同的函數都需要<em>自己的</em>查找表。如果一個電路計算
+      $m$ 個不同的非線性函數（例如 ReLU、sigmoid、tanh、softmax 組件和
+      一個自定義的啟動函數），每個函數都需要 $d$ 位元精度，則總表佔用量為：
+    </p>
+
+    $$\text{總行數} = m \times 2^d$$
+
+    <div class="callout example">
+      <div class="callout-title">範例 &mdash; 16 位元精度下的多個函數</div>
+      <p>
+        考慮一個需要 5 個啟動函數、16 位元精度的 ZK-ML 推論電路：
+      </p>
+      <ul>
+        <li>ReLU：65,536 項</li>
+        <li>Sigmoid：65,536 項</li>
+        <li>Tanh：65,536 項</li>
+        <li>GELU：65,536 項</li>
+        <li>Softmax 指數函數：65,536 項</li>
+      </ul>
+      <p>
+        <strong>總計：$5 \times 65{,}536 = 327{,}680$ 行</strong>，僅是查找表的部分，
+        還未計入任何實際的計算閘。這會主導整個電路的大小。
+      </p>
+    </div>
+
+    <h3>問題三：電路的僵化性</h3>
+
+    <p>
+      添加一個新函數需要<strong>修改電路</strong>：必須納入新的表、
+      定義新的查找選擇器，並重新編譯電路。在使用可信設定的系統中（Groth16），
+      這意味著需要一個新的儀式。即使在通用系統中（PLONK、Halo2），
+      電路描述也會改變，需要重新產生密鑰。
+    </p>
+
+    <p>
+      這種僵化性與應用程式的需求正好相反。在機器學習領域，研究人員
+      不斷實驗新的啟動函數。在密碼學應用中，新的雜湊函數和 S-box 不斷出現。
+      電路應該是一個<em>平台</em>，而非針對每個函數的專屬產物。
+    </p>
+
+    <div class="callout warning">
+      <div class="callout-title">警告 &mdash; 擴展性瓶頸</div>
+      <p>
+        查找瓶頸造成了一個硬性的擴展極限：隨著精度提高或新函數的加入，
+        電路大小會爆炸性增長。在某個臨界點，證明時間和記憶體需求會變得不可行。
+        這不是一個常數因子的問題 &mdash; 而是一個
+        <strong>漸近性</strong>的障礙（$2^d$ 增長），在查找範式內，再多的工程優化也無法克服。
+      </p>
+    </div>
+
+    <h3>小結：為何需要不同的方法</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>面向</th>
+          <th>查找方法</th>
+          <th>期望特性</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>精度擴展</td>
+          <td>指數級（$2^d$ 項）</td>
+          <td>線性或次線性</td>
+        </tr>
+        <tr>
+          <td>多函數成本</td>
+          <td>$m \times 2^d$ 總項數</td>
+          <td>跨函數共享基礎設施</td>
+        </tr>
+        <tr>
+          <td>添加新函數</td>
+          <td>需修改電路</td>
+          <td>無需更改電路</td>
+        </tr>
+        <tr>
+          <td>表的重用性</td>
+          <td>無（每個函數各自獨立）</td>
+          <td>單一共用表</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      多項式方法同時滿足了上述<em>全部四項</em>需求。
+    </p>
+
+
+    <!-- ================================================ -->
+    <!-- 10.2 CORE IDEA                                   -->
+    <!-- ================================================ -->
+    <h2>10.2 核心思想：基於位元組的多項式插值</h2>
+
+    <p>
+      多項式方法建立在兩個數學事實與一個架構洞察之上。
+    </p>
+
+    <h3>數學事實一：Lagrange 插值</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 10.1 &mdash; Lagrange 插值</div>
+      <p>
+        給定域 $\mathbb{F}$ 中的 $n+1$ 個相異點 $(x_0, y_0), (x_1, y_1), \ldots, (x_n, y_n)$，
+        存在一個<strong>唯一的</strong>次數 $\leq n$ 的多項式 $P(x)$，使得
+        $P(x_i) = y_i$ 對所有 $i$ 成立。該多項式為：
+      </p>
+      $$P(x) = \sum_{i=0}^{n} y_i \prod_{\substack{j=0 \\ j \neq i}}^{n} \frac{x - x_j}{x_i - x_j}$$
+    </div>
+
+    <p>
+      <strong>應用於我們的情境：</strong>取求值域為
+      $\{0, 1, 2, \ldots, 255\}$ &mdash; 所有可能的位元組值。對於任意函數
+      $f: \{0, \ldots, 255\} \to \mathbb{F}_p$，Lagrange 插值會產生一個唯一的多項式
+      $P_f(x)$，次數 $\leq 255$，使得：
+    </p>
+
+    $$P_f(b) = f(b) \quad \text{for all } b \in \{0, 1, \ldots, 255\}$$
+
+    <p>
+      這對<em>任何</em>函數都有效 &mdash; 連續或不連續、平滑或分段、
+      標準或自定義。多項式 $P_f$ 是 $f$ 在位元組域上的完美表示。
+    </p>
+
+    <h3>數學事實二：位元組分解</h3>
+
+    <p>
+      任何具有 $d$ 位元的非負整數 $x$ 都可以分解為 $k = \lceil d/8 \rceil$ 個位元組：
+    </p>
+
+    $$x = b_0 + b_1 \cdot 256 + b_2 \cdot 256^2 + \cdots + b_{k-1} \cdot 256^{k-1}$$
+
+    <p>
+      每個位元組 $b_i$ 都在 $\{0, 1, \ldots, 255\}$ 之中 &mdash; 恰好就是我們的
+      函數多項式所定義的域。這意味著我們可以在每個位元組上分別求值 $P_f$。
+    </p>
+
+    <h3>架構洞察：共用的位元組範圍檢查</h3>
+
+    <p>
+      為了驗證位元組分解是否有效（每個 $b_i \in [0, 255]$），我們使用一個包含
+      $\{0, 1, \ldots, 255\}$ 值的單一查找表。這就是 <strong>ByteTable</strong>。
+      關鍵在於，不論我們正在計算哪個函數 $f$，這個表都是<em>相同的</em>。
+      它服務於一個通用目的：驗證聲稱為位元組的值確實是位元組。
+    </p>
+
+    <div class="callout definition">
+      <div class="callout-title">多項式方法 &mdash; 一句話概述</div>
+      <p>
+        將輸入分解為位元組，對每個位元組求值一個函數專屬的多項式
+        （以多項式的係數作為固定的電路參數），合併結果，
+        並使用一個單一的共用 256 項表來對每個位元組進行範圍檢查。
+      </p>
+    </div>
+
+    <h3>為何次數 255 已足夠</h3>
+
+    <p>
+      一個次數 $\leq 255$ 的多項式有 256 個係數，由 256 個求值點唯一確定。
+      由於我們恰好在 256 個位元組值 $\{0, 1, \ldots, 255\}$ 上求值，
+      插值是精確的 &mdash; 沒有近似誤差。多項式 $P_f$ 在位元組域中的每一個點
+      都與 $f$ 完全吻合。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">注意 &mdash; 這不是近似</div>
+      <p>
+        與 Taylor 級數或 Chebyshev 近似不同，Lagrange 插值在有限域上是
+        <strong>精確的</strong>。沒有截斷誤差。$P_f(b) = f(b)$ 作為 $\mathbb{F}_p$ 中的恆等式，
+        對所有 $b \in \{0, \ldots, 255\}$ 成立。多項式方法精確地計算 $f$，而非近似。
+      </p>
+    </div>
+
+    <h3>係數表示法</h3>
+
+    <p>
+      Lagrange 插值之後，我們將 $P_f$ 轉換為其係數形式：
+    </p>
+
+    $$P_f(x) = c_0 + c_1 x + c_2 x^2 + \cdots + c_{255} x^{255} = \sum_{j=0}^{255} c_j x^j$$
+
+    <p>
+      係數向量 $\mathbf{c}_f = (c_0, c_1, \ldots, c_{255})$ 是函數 $f$ 的
+      <strong>指紋</strong>。不同的函數會產生不同的係數向量，
+      但求值過程（Horner 法或在電路中的直接計算）對所有函數都是相同的。
+    </p>
+
+    <div class="callout example">
+      <div class="callout-title">範例 &mdash; 常見函數的係數向量</div>
+      <p>
+        每個函數都有一個唯一的 256 元素係數向量。以下為一些說明性範例：
+      </p>
+      <ul>
+        <li>
+          <strong>恆等函數</strong> $f(b) = b$：$\mathbf{c}_f = (0, 1, 0, 0, \ldots, 0)$
+          &mdash; 一個次數為 1 的多項式
+        </li>
+        <li>
+          <strong>常數函數</strong> $f(b) = 42$：$\mathbf{c}_f = (42, 0, 0, \ldots, 0)$
+          &mdash; 一個次數為 0 的多項式
+        </li>
+        <li>
+          <strong>AES S-box</strong>：一個次數為 255 的多項式，所有 256 個係數皆為非零值
+          （S-box 是一個高度非線性的排列）
+        </li>
+        <li>
+          <strong>量化位元組上的 ReLU</strong> $f(b) = b$（$b < 128$ 時），$f(b) = 0$（$b \geq 128$ 時）
+          （範例；實際量化方式會有不同）：一個次數為 255、係數複雜的多項式
+        </li>
+      </ul>
+      <p>
+        不論函數的複雜度如何，係數向量始終恰好有 256 個元素，
+        而求值電路也始終相同。
+      </p>
+    </div>
+
+
+    <!-- ================================================ -->
+    <!-- 10.3 THE ALGORITHM                               -->
+    <!-- ================================================ -->
+    <h2>10.3 演算法</h2>
+
+    <p>
+      我們現在將多項式方法描述為一個具體的演算法，逐步說明。
+      輸入是一個值 $x$ 和一個目標函數 $f$。輸出是 $y = f(x)$
+      （更精確地說，是一個位元組層級的近似值，其精度取決於 $k$），
+      在 ZK 電路內以可驗證的正確性計算。
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <h4>位元組分解</h4>
+        <p>
+          將輸入 $x$ 分解為 $k$ 個位元組：
+        </p>
+        $$x = b_0 + b_1 \cdot 256 + b_2 \cdot 256^2 + \cdots + b_{k-1} \cdot 256^{k-1}$$
+        <p>
+          每個位元組 $b_i$ 被分配到電路中的一個見證格。電路對每個位元組
+          施加兩個約束：
+        </p>
+        <ul>
+          <li>
+            <strong>範圍檢查</strong>：$b_i \in \{0, 1, \ldots, 255\}$，透過對 ByteTable 的
+            查找來驗證。
+          </li>
+          <li>
+            <strong>分解一致性</strong>：算術約束
+            $x = \sum_{i=0}^{k-1} b_i \cdot 256^i$ 由電路閘強制執行。
+          </li>
+        </ul>
+        <p>
+          這兩個約束結合起來，保證了位元組 $b_0, \ldots, b_{k-1}$ 是 $x$ 的有效分解。
+        </p>
+      </div>
+      <div class="step">
+        <h4>逐位元組的多項式求值</h4>
+        <p>
+          對於目標函數 $f$，多項式係數
+          $\mathbf{c}_f = (c_0, c_1, \ldots, c_{255})$ 已在離線階段透過
+          Lagrange 插值預先計算。這些係數儲存在電路的<strong>固定欄</strong>中
+          （它們是公開的/驗證者已知的值，而非見證值）。
+        </p>
+        <p>
+          對於每個位元組 $b_i$，電路計算：
+        </p>
+        $$P_f(b_i) = \sum_{j=0}^{255} c_j \cdot b_i^j$$
+        <p>
+          這個求值可以使用 <strong>Horner 法</strong>來最小化乘法閘的數量：
+        </p>
+        $$P_f(b_i) = c_0 + b_i \bigl(c_1 + b_i \bigl(c_2 + \cdots + b_i(c_{254} + b_i \cdot c_{255})\cdots\bigr)\bigr)$$
+        <p>
+          Horner 法對每個位元組恰好需要 255 次乘法和 255 次加法 &mdash;
+          這是一個固定的成本，與函數 $f$ 無關。
+        </p>
+      </div>
+      <div class="step">
+        <h4>合併</h4>
+        <p>
+          位元組層級的多項式求值結果 $P_f(b_0), P_f(b_1), \ldots, P_f(b_{k-1})$
+          被合併以產生最終結果。合併規則取決於具體的函數分解策略：
+        </p>
+        $$f(x) \approx \sum_{i=0}^{k-1} P_f(b_i) \cdot w_i$$
+        <p>
+          其中 $w_i$ 是由分解方式決定的權重因子。對於許多函數，
+          自然的權重設定源自函數本身的結構。例如，如果 $f$ 是應用在
+          已被分解為位元組的完整值 $x$ 上，那麼權重會編碼位元組層級的貢獻
+          如何組合成完整精度的結果。
+        </p>
+        <p>
+          合併過程由電路中的算術約束強制執行。
+        </p>
+      </div>
+      <div class="step">
+        <h4>輸出驗證</h4>
+        <p>
+          結果 $y = f(x)$ 是輸出見證格。電路已驗證了：
+        </p>
+        <ol>
+          <li>$x$ 的位元組分解是有效的（範圍檢查 + 一致性）。</li>
+          <li>每個多項式求值 $P_f(b_i)$ 是正確的（使用固定係數的算術約束）。</li>
+          <li>合併產生了 $y$（算術約束）。</li>
+        </ol>
+        <p>
+          任何有效的證明都能證實 $y = f(x)$ 被正確計算。一個試圖聲稱錯誤輸出的
+          作弊證明者必須違反至少一個約束，而證明系統的健全性能
+          （以壓倒性的機率）防止這種情況發生。
+        </p>
+      </div>
+    </div>
+
+    <h3>演算法視覺化</h3>
+
+    <div class="diagram">
+<pre>
+Input x (e.g., 16-bit value)
+  |
+  v
++---------------------------+
+| Byte Decomposition        |      ByteTable (shared, 256 entries)
+| x = b_0 + b_1 * 256      |  <-- lookup: b_0 in {0..255}?
+|                           |  <-- lookup: b_1 in {0..255}?
++---------------------------+
+  |               |
+  v               v
++-------------+ +-------------+
+| Evaluate    | | Evaluate    |    Coefficients c_f (fixed columns)
+| P_f(b_0)    | | P_f(b_1)    |    = (c_0, c_1, ..., c_255)
+| = sum c_j   | | = sum c_j   |
+|   * b_0^j   | |   * b_1^j   |
++-------------+ +-------------+
+  |               |
+  v               v
++---------------------------+
+| Combine                   |
+| y = P_f(b_0) * w_0        |
+|   + P_f(b_1) * w_1        |
++---------------------------+
+  |
+  v
+Output y = f(x)
+</pre>
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">注意 &mdash; 離線計算與線上計算</div>
+      <p>
+        用以取得係數 $\mathbf{c}_f$ 的 Lagrange 插值是在
+        <strong>離線</strong>（電路之外）完成的，每個函數只需進行一次。它不屬於
+        證明成本的一部分。線上（電路內）的工作僅包括：位元組分解、
+        範圍檢查查找、透過 Horner 法的多項式求值，以及最終的合併。
+        插值本身是一個標準的 $O(n \log^2 n)$ 計算（使用快速多項式運算），
+        或者以樸素方式為 $O(n^2)$ &mdash; 對於 $n = 256$ 而言微不足道。
+      </p>
+    </div>
+
+
+    <!-- ================================================ -->
+    <!-- 10.4 WHY THIS WORKS: ADVANTAGES                  -->
+    <!-- ================================================ -->
+    <h2>10.4 為何可行：相較於查找的優勢</h2>
+
+    <p>
+      多項式方法在每一個重要面向上都實現了對基於查找方法的質的提升。
+      以下是並排比較。
+    </p>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>查找方法</h4>
+        <ul>
+          <li><strong>每個函數一張表：</strong>各 $2^d$ 項</li>
+          <li><strong>$m$ 個函數：</strong>共 $m \times 2^d$ 行</li>
+          <li><strong>電路：</strong>每組新函數都需要更改</li>
+          <li><strong>精度提升：</strong>指數級成本（每增加一個位元組，$2^d \to 2^{d+8}$）</li>
+          <li><strong>添加新函數：</strong>添加新表 + 新查找選擇器 + 重新編譯</li>
+        </ul>
+        <p style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0;">
+          <strong>範例：</strong>5 個函數、16 位元精度<br>
+          $= 5 \times 65{,}536 = \mathbf{327{,}680}$ 表行數
+        </p>
+      </div>
+      <div class="comparison-card">
+        <h4>多項式方法</h4>
+        <ul>
+          <li><strong>共用的 ByteTable：</strong>總共 256 項（固定，始終相同）</li>
+          <li><strong>$m$ 個函數：</strong>同一個 256 行的表（僅係數不同）</li>
+          <li><strong>電路：</strong>與函數無關（通用型）</li>
+          <li><strong>精度提升：</strong>線性成本（每多一個位元組多 256 行）</li>
+          <li><strong>添加新函數：</strong>提供新的係數向量即可</li>
+        </ul>
+        <p style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0;">
+          <strong>範例：</strong>5 個函數、16 位元精度<br>
+          $= 256$（ByteTable）$+ 5 \times 2 \times 256$（求值）$\approx \mathbf{2{,}816}$ 行
+        </p>
+      </div>
+    </div>
+
+    <p>
+      上述範例中的比率為 $327{,}680 / 2{,}816 \approx \mathbf{116\times}$ &mdash;
+      多項式方法大約少使用了 116 倍的表行數。而且這個差距只會隨著更高的精度或更多的函數而加大。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 10.2 &mdash; 漸近優勢</div>
+      <p>
+        對於 $m$ 個函數在 $d$ 位元精度（$k = \lceil d/8 \rceil$ 個位元組）下：
+      </p>
+      <ul>
+        <li><strong>查找：</strong>$m \times 2^d$ 表行數</li>
+        <li><strong>多項式方法：</strong>$256 + m \times k \times 256 = 256(1 + mk)$ 行用於求值的電路行數</li>
+      </ul>
+      <p>比率為：</p>
+      $$\frac{\text{Lookup}}{\text{Polynomial}} = \frac{m \cdot 2^d}{256(1 + mk)} = \frac{2^d}{256 \cdot (1/m + k)} \approx \frac{2^{8k}}{256k} = \frac{2^{8(k-1)}}{k}$$
+      <p>
+        當 $k = 2$（16 位元）：比率 $\approx 128$。當 $k = 3$（24 位元）：比率 $\approx 5{,}592{,}405$。
+        當 $k = 4$（32 位元）：比率 $\approx 4{,}294{,}967{,}296 / 1{,}024 \approx 4.2 \times 10^6$。
+        優勢隨精度<strong>指數級增長</strong>。
+      </p>
+    </div>
+
+    <h3>定性優勢</h3>
+
+    <p>
+      除了數據上的優勢外，多項式方法還提供了改變 ZK 電路設計和維護方式的定性優點：
+    </p>
+
+    <ul>
+      <li>
+        <strong>無需為新函數重新編譯電路。</strong>在查找方法中，添加新函數
+        意味著修改電路、添加新表、更新選擇器，以及（在某些系統中）
+        重新執行設定。使用多項式方法，你只需提供新的係數向量並重用同一個電路。
+      </li>
+      <li>
+        <strong>關注點分離。</strong>電路設計者負責通用的求值結構。
+        函數設計者負責係數向量。兩者是解耦的。
+      </li>
+      <li>
+        <strong>動態函數選擇。</strong>由於係數是固定欄的值，
+        在同一個電路上的不同證明可以計算不同的函數。這使得
+        在不更改電路的情況下實現執行時期的函數選擇成為可能。
+      </li>
+      <li>
+        <strong>可組合性。</strong>多個多項式求值可以鏈式串接 &mdash; 一個函數的輸出
+        成為另一個函數的輸入（經過位元組分解後）。ByteTable 在每個階段都被重用。
+      </li>
+    </ul>
+
+
+    <!-- ================================================ -->
+    <!-- 10.5 FUNCTION-INDEPENDENT CIRCUIT                -->
+    <!-- ================================================ -->
+    <h2>10.5 函數無關電路</h2>
+
+    <p>
+      <strong>函數無關電路</strong>的概念是多項式方法的架構標誌。
+      本節具體解釋其含義及重要性。
+    </p>
+
+    <h3>固定不變的部分</h3>
+
+    <p>
+      以下電路組件<strong>不隨</strong>所計算的函數 $f$ 而改變：
+    </p>
+
+    <ul>
+      <li><strong>閘的佈局：</strong>乘法閘和加法閘的數量與排列</li>
+      <li><strong>佈線（複製約束）：</strong>哪些格與哪些格連接</li>
+      <li><strong>查找論證：</strong>ByteTable 和查找選擇器</li>
+      <li><strong>欄位結構：</strong>用於見證的建議欄、用於係數的固定欄、用於閘的選擇器欄</li>
+      <li><strong>約束多項式：</strong>自定義閘的表達式（例如 Horner 步驟：$\text{acc}_{j+1} = \text{acc}_j \cdot b + c_j$）</li>
+    </ul>
+
+    <h3>會改變的部分</h3>
+
+    <p>
+      只有<strong>一件事</strong>會改變：儲存多項式係數 $\mathbf{c}_f = (c_0, c_1, \ldots, c_{255})$ 的
+      固定欄中的值。
+    </p>
+
+    <div class="diagram">
+<pre>
+Circuit Structure (FIXED for all functions):
+
+     advice cols          fixed cols        selectors
+    +----------+    +------------------+    +-----+
+    | b_i      |    | c_0  (varies!)   |    | s_0 |
+    | acc_0    |    | c_1  (varies!)   |    | s_1 |
+    | acc_1    |    | c_2  (varies!)   |    | s_2 |
+    | acc_2    |    | ...              |    | ... |
+    | ...      |    | c_255 (varies!)  |    | ... |
+    | y        |    |                  |    |     |
+    +----------+    +------------------+    +-----+
+
+     ^                ^                      ^
+     |                |                      |
+     Witness          ONLY PART THAT         Gate structure
+     (per proof)      CHANGES BETWEEN        (fixed)
+                      FUNCTIONS
+
+    Custom gate constraint (same for all f):
+    acc_{j+1} = acc_j * b_i + c_j
+    (Horner step)
+</pre>
+    </div>
+
+    <h3>對系統設計的影響</h3>
+
+    <div class="callout definition">
+      <div class="callout-title">設計原則 &mdash; 電路即平台</div>
+      <p>
+        函數無關電路將 ZK 電路從一個<em>依應用而定的產物</em>
+        轉變為一個<em>可重用的平台</em>。電路只需編譯一次，即可服務無限多個函數。
+        這類似於 CPU 執行任何程式 &mdash; 硬體（電路）是固定的，
+        而程式（係數）是可變的。
+      </p>
+    </div>
+
+    <p>
+      具體影響：
+    </p>
+
+    <ul>
+      <li>
+        <strong>無需重新產生密鑰。</strong>在 PLONK/Halo2 中，證明密鑰和驗證密鑰取決於
+        電路結構和固定欄。由於電路結構是不變的，密鑰可以生成一次並重複使用。
+        只有固定欄的值（係數）會改變，而這些是公開輸入的一部分或編碼在密鑰推導中。
+      </li>
+      <li>
+        <strong>可審計性。</strong>只需審計一個電路，不論它計算多少函數。
+        安全性分析只做一次，即可通用適用。
+      </li>
+      <li>
+        <strong>模組化開發。</strong>構建電路的團隊和定義函數的團隊
+        可以獨立工作。它們之間的介面就是係數向量 &mdash; 一個明確定義的簡單資料結構。
+      </li>
+    </ul>
+
+    <h3>添加新函數的步驟</h3>
+
+    <div class="steps">
+      <div class="step">
+        <h4>定義函數</h4>
+        <p>
+          指定 $f(b)$ 對所有 $b \in \{0, 1, \ldots, 255\}$ 的值。這就是一個 256 項的
+          （輸入，輸出）配對表。
+        </p>
+      </div>
+      <div class="step">
+        <h4>插值</h4>
+        <p>
+          執行 Lagrange 插值（離線）以取得係數向量
+          $\mathbf{c}_f = (c_0, \ldots, c_{255})$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>載入係數</h4>
+        <p>
+          將固定欄的值設定為 $\mathbf{c}_f$。無需其他電路更改。
+        </p>
+      </div>
+      <div class="step">
+        <h4>證明</h4>
+        <p>
+          如常生成證明。電路、證明密鑰和驗證密鑰的結構保持不變。
+          驗證者檢查的約束與以往相同。
+        </p>
+      </div>
+    </div>
+
+    <h3>更改精度的方法</h3>
+
+    <p>
+      提高精度意味著增加 $k$（位元組數）。這需要在電路中添加更多的位元組欄
+      和更多的 Horner 求值區塊。但是：
+    </p>
+
+    <ul>
+      <li>每增加一個位元組，恰好為其多項式求值區塊添加 256 行。</li>
+      <li>ByteTable 不會增長 &mdash; 它始終保持在 256 項。</li>
+      <li>每個位元組的求值電路是相同的（相同的 Horner 閘），只是實例化更多次。</li>
+    </ul>
+
+    <p>
+      在實務中，電路在編譯時期以 $k$ 作為參數化，一次編譯即可處理該精度等級下的所有函數。
+    </p>
+
+
+    <!-- ================================================ -->
+    <!-- 10.6 PRECISION ANALYSIS                          -->
+    <!-- ================================================ -->
+    <h2>10.6 精度分析</h2>
+
+    <p>
+      本節量化多項式方法作為精度函數的成本，並在每個等級上與查找方法進行比較。
+    </p>
+
+    <h3>成本模型</h3>
+
+    <p>
+      對於 $k$ 個位元組的精度：
+    </p>
+
+    <ul>
+      <li><strong>ByteTable：</strong>始終為 256 項（常數，與 $k$ 無關）</li>
+      <li><strong>位元組分解：</strong>$k$ 次範圍檢查查找 + 1 個一致性約束</li>
+      <li><strong>多項式求值：</strong>$k$ 次 Horner 求值，每次佔 256 行（255 個 Horner 步驟加上輸出）</li>
+      <li><strong>合併：</strong>$k$ 次乘法 + $k-1$ 次加法</li>
+    </ul>
+
+    <p>
+      多項式求值的電路總行數（不含 ByteTable）：
+      $k \times 256$ 行。包含 ByteTable：$256 + k \times 256 = 256(1 + k)$。
+    </p>
+
+    <h3>比較表</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>精度</th>
+          <th>位元組數 ($k$)</th>
+          <th>多項式方法（行數）</th>
+          <th>查找（每個函數的行數）</th>
+          <th>比率</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>8 位元</td>
+          <td>1</td>
+          <td>$256 + 256 = 512$</td>
+          <td>$256$</td>
+          <td>$0.5\times$（查找勝出）</td>
+        </tr>
+        <tr>
+          <td>16 位元</td>
+          <td>2</td>
+          <td>$256 + 512 = 768$</td>
+          <td>$65{,}536$</td>
+          <td>$85\times$</td>
+        </tr>
+        <tr>
+          <td>24 位元</td>
+          <td>3</td>
+          <td>$256 + 768 = 1{,}024$</td>
+          <td>$16{,}777{,}216$</td>
+          <td>$16{,}384\times$</td>
+        </tr>
+        <tr>
+          <td>32 位元</td>
+          <td>4</td>
+          <td>$256 + 1{,}024 = 1{,}280$</td>
+          <td>$4{,}294{,}967{,}296$</td>
+          <td>$3{,}355{,}443\times$</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">注意 &mdash; 8 位元交叉點</div>
+      <p>
+        在 8 位元精度下，查找方法實際上使用更少的行數（256 對比 512），因為
+        多項式求值的開銷（256 個 Horner 步驟）超過了共用表帶來的節省。
+        多項式方法的優勢在 <strong>16 位元及以上</strong>時顯現，
+        此時查找表的指數增長使其變得不可行。在實務中，
+        大多數應用需要 $\geq 16$ 位元精度，因此多項式方法在所有實際場景中都佔優。
+      </p>
+    </div>
+
+    <h3>多函數擴展</h3>
+
+    <p>
+      當在同一個電路中計算多個函數時，優勢更加顯著。
+      對於 $m$ 個函數在 $d$ 位元精度下：
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>場景</th>
+          <th>多項式方法</th>
+          <th>查找</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1 個函數，16 位元</td>
+          <td>$256 + 512 = 768$</td>
+          <td>$65{,}536$</td>
+        </tr>
+        <tr>
+          <td>5 個函數，16 位元</td>
+          <td>$256 + 2{,}560 = 2{,}816$</td>
+          <td>$327{,}680$</td>
+        </tr>
+        <tr>
+          <td>10 個函數，16 位元</td>
+          <td>$256 + 5{,}120 = 5{,}376$</td>
+          <td>$655{,}360$</td>
+        </tr>
+        <tr>
+          <td>5 個函數，24 位元</td>
+          <td>$256 + 3{,}840 = 4{,}096$</td>
+          <td>$83{,}886{,}080$</td>
+        </tr>
+        <tr>
+          <td>10 個函數，32 位元</td>
+          <td>$256 + 10{,}240 = 10{,}496$</td>
+          <td>$42{,}949{,}672{,}960$</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      關鍵洞察：ByteTable（256 行）是一個<strong>一次性成本</strong>，在所有函數和所有精度等級之間共享。
+      每個函數的成本是 $k \times 256$ 行求值行數，隨函數數量和精度呈線性增長。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 10.3 &mdash; 線性 vs 指數增長</div>
+      <p>
+        令 $C_{\text{poly}}(m, k)$ 和 $C_{\text{lookup}}(m, k)$ 分別表示
+        $m$ 個函數在 $k$ 個位元組精度下的電路行數。
+      </p>
+      $$C_{\text{poly}}(m, k) = 256 + 256mk = O(mk)$$
+      $$C_{\text{lookup}}(m, k) = m \cdot 2^{8k} = O(m \cdot 2^{8k})$$
+      <p>
+        多項式方法在 $m$ 和 $k$ 上都是<strong>多項式級</strong>的。
+        查找方法在 $k$ 上是<strong>指數級</strong>的。
+        沒有任何工程優化能彌合這個漸近差距。
+      </p>
+    </div>
+
+
+    <!-- ================================================ -->
+    <!-- 10.7 SUPPORTED FUNCTIONS                         -->
+    <!-- ================================================ -->
+    <h2>10.7 支援的函數</h2>
+
+    <p>
+      多項式方法支援<strong>任何</strong>函數
+      $f: \{0, 1, \ldots, 255\} \to \mathbb{F}_p$，沒有任何限制。這種通用性直接來自
+      Lagrange 插值：給定任意 256 個目標值，都存在一個唯一的次數 $\leq 255$ 的插值多項式。
+    </p>
+
+    <h3>支援的函數類別</h3>
+
+    <h4>密碼學基本元件</h4>
+
+    <ul>
+      <li>
+        <strong>AES S-box：</strong>AES 替換盒是 $\{0, \ldots, 255\}$ 上的一個固定排列，
+        由 $\text{GF}(2^8)$ 中的逆元運算和一個仿射變換的合成定義。
+        它是一個具有高度非線性的雙射。多項式方法將其表示為
+        $\mathbb{F}_p$ 上次數為 255 的多項式。
+      </li>
+      <li>
+        <strong>其他 S-box：</strong>Camellia、SM4、DES S-box（在零填充至 8 位元域後）
+        &mdash; 都可以表示為位元組層級的多項式。
+      </li>
+      <li>
+        <strong>位元運算：</strong>對位元組輸入的 AND、OR、XOR。對於雙參數運算
+        如 $f(a, b) = a \oplus b$，輸入被編碼為 16 位元的值 $(a \| b)$
+        並分解為兩個位元組。
+      </li>
+    </ul>
+
+    <h4>機器學習啟動函數</h4>
+
+    <ul>
+      <li>
+        <strong>ReLU：</strong>$f(x) = \max(0, x)$，應用於量化後的位元組輸入。由於 ReLU 是
+        分段線性的，它具有相對簡單的多項式表示。
+      </li>
+      <li>
+        <strong>Sigmoid：</strong>$\sigma(x) = 1/(1+e^{-x})$，量化至位元組域。
+        平滑的 S 型曲線可以被次數為 255 的多項式完美捕捉。
+      </li>
+      <li>
+        <strong>Tanh：</strong>$\tanh(x) = (e^x - e^{-x})/(e^x + e^{-x})$，量化處理。
+      </li>
+      <li>
+        <strong>GELU：</strong>$\text{GELU}(x) = x \cdot \Phi(x)$，其中 $\Phi$ 是
+        標準常態分佈的累積分佈函數，量化處理。
+      </li>
+      <li>
+        <strong>Softmax 組件：</strong>指數函數 $e^x$ 量化至位元組，
+        用作 softmax 的構建模組。
+      </li>
+      <li>
+        <strong>SiLU/Swish：</strong>$f(x) = x \cdot \sigma(x)$，量化處理。
+      </li>
+    </ul>
+
+    <h4>數學函數</h4>
+
+    <ul>
+      <li><strong>平方根：</strong>$\lfloor\sqrt{x}\rfloor$，對位元組輸入</li>
+      <li><strong>對數：</strong>$\lfloor\log_2(x)\rfloor$ 或定點數 $\ln(x)$</li>
+      <li><strong>倒數：</strong>$\lfloor 256/x \rfloor$（避免除以零）</li>
+      <li><strong>三角函數：</strong>$\sin, \cos, \tan$ 量化至位元組精度</li>
+      <li><strong>冪函數：</strong>固定 $n$ 的 $x^n$（雖然低次冪作為直接算術運算可能更有效率）</li>
+    </ul>
+
+    <h4>自定義非線性函數</h4>
+
+    <p>
+      任何使用者定義的函數都可以透過提供其 256 個求值點來計算。
+      這就是通用性的本質：電路不需要「理解」函數
+      &mdash; 它只需要係數向量 $\mathbf{c}_f$。
+    </p>
+
+    <div class="callout example">
+      <div class="callout-title">範例 &mdash; 自定義評分函數</div>
+      <p>
+        假設一個應用程式需要一個自定義的非線性評分函數：
+      </p>
+      $$f(x) = \begin{cases} 0 & \text{if } x < 50 \\ 3x - 150 & \text{if } 50 \leq x < 100 \\ 150 & \text{if } 100 \leq x < 200 \\ 255 - \lfloor(x-200)^2/55\rfloor & \text{if } x \geq 200 \end{cases}$$
+      <p>
+        這個混合了線性、常數和二次段的分段函數可以輕易處理：
+        對 $b = 0, 1, \ldots, 255$ 求值 $f(b)$，插值得到 $\mathbf{c}_f$，
+        並將係數載入電路。函數可以任意複雜 &mdash; 電路成本始終相同。
+      </p>
+    </div>
+
+    <h3>多變數函數</h3>
+
+    <p>
+      對於多變數函數 $f(x_1, x_2, \ldots, x_n)$，多項式方法在位元組分解後
+      分別應用於每個變數。多變數函數被分解為單變數的位元組層級求值並加以合併：
+    </p>
+
+    <ol>
+      <li>將每個輸入 $x_i$ 分解為位元組。</li>
+      <li>對每個輸入的每個位元組，求值相應的單變數多項式。</li>
+      <li>使用函數特定的多變數結構進行合併。</li>
+    </ol>
+
+    <p>
+      對於可分離函數 $f(x_1, x_2) = g(x_1) \cdot h(x_2)$ 或
+      $f(x_1, x_2) = g(x_1) + h(x_2)$，這種分解是直接了當的。對於一般的
+      多變數函數，可能需要更精密的分解策略，
+      但位元組層級的多項式求值仍然是核心的構建模組。
+    </p>
+
+
+    <!-- ================================================ -->
+    <!-- 10.8 DETAILED EXAMPLE                            -->
+    <!-- ================================================ -->
+    <h2>10.8 完整範例：透過多項式方法實現 AES S-box</h2>
+
+    <p>
+      為了使多項式方法更加具體，讓我們以 AES S-box &mdash; 密碼學中最重要的
+      非線性函數之一 &mdash; 為例，追蹤一個完整的範例。
+    </p>
+
+    <h3>AES S-box</h3>
+
+    <p>
+      AES S-box 是一個雙射 $S: \{0, \ldots, 255\} \to \{0, \ldots, 255\}$，定義為：
+    </p>
+
+    <ol>
+      <li>
+        <strong>$\text{GF}(2^8)$ 中的逆元運算：</strong>計算 $\text{GF}(2^8)$ 中的 $x^{-1}$
+        （其中 $0^{-1} := 0$），使用不可約多項式 $m(x) = x^8 + x^4 + x^3 + x + 1$。
+      </li>
+      <li>
+        <strong>仿射變換：</strong>應用一個固定的 $\text{GF}(2)$ 線性映射加上一個常數。
+      </li>
+    </ol>
+
+    <p>
+      結果是一個高度非線性的排列。部分值如下：
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>輸入 $b$</th>
+          <th>$S(b)$（十六進位）</th>
+          <th>$S(b)$（十進位）</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>0x00</td><td>0x63</td><td>99</td></tr>
+        <tr><td>0x01</td><td>0x7C</td><td>124</td></tr>
+        <tr><td>0x02</td><td>0x77</td><td>119</td></tr>
+        <tr><td>0x0F</td><td>0x76</td><td>118</td></tr>
+        <tr><td>0xFF</td><td>0x16</td><td>22</td></tr>
+      </tbody>
+    </table>
+
+    <h3>步驟一：計算係數向量</h3>
+
+    <p>
+      在離線階段，我們收集所有 256 個配對 $(b, S(b))$（$b = 0, \ldots, 255$），
+      並在 $\mathbb{F}_p$（電路的原生域質數）上執行 Lagrange 插值。
+      結果是一個係數向量 $\mathbf{c}_S = (c_0, c_1, \ldots, c_{255})$，使得：
+    </p>
+
+    $$P_S(x) = \sum_{j=0}^{255} c_j x^j \quad \text{and} \quad P_S(b) = S(b) \;\;\forall b \in \{0, \ldots, 255\}$$
+
+    <p>
+      S-box 多項式的次數恰好為 255（如同對 256 個元素上的雙射所預期的），
+      所有 256 個係數通常都是非零的。
+    </p>
+
+    <h3>步驟二：輸入 $b = 2$ 的電路執行</h3>
+
+    <p>
+      假設我們要在電路中證明 $S(2) = 119$：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <h4>位元組分解</h4>
+        <p>
+          輸入為 $x = 2$。由於這已經是一個 8 位元的值，$k = 1$ 且 $b_0 = 2$。
+          電路檢查：$b_0 \in \text{ByteTable}$？是的，$2 \in \{0, \ldots, 255\}$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>透過 Horner 法的多項式求值</h4>
+        <p>
+          使用預先計算的係數求值 $P_S(2)$：
+        </p>
+        <p>
+          $\text{acc}_{255} = c_{255}$<br>
+          $\text{acc}_{254} = \text{acc}_{255} \cdot 2 + c_{254}$<br>
+          $\text{acc}_{253} = \text{acc}_{254} \cdot 2 + c_{253}$<br>
+          $\;\;\vdots$<br>
+          $\text{acc}_{0} = \text{acc}_{1} \cdot 2 + c_{0}$
+        </p>
+        <p>
+          經過 255 個 Horner 步驟後，$\text{acc}_0 = P_S(2) = 119$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>輸出</h4>
+        <p>
+          電路輸出 $y = 119 = S(2)$。此值由 255 個 Horner 步驟約束和位元組範圍檢查驗證。
+          該證明證實了 $S(2) = 119$。
+        </p>
+      </div>
+    </div>
+
+    <h3>比較：AES S-box 的查找方法 vs 多項式方法</h3>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>查找方法</h4>
+        <p>將所有 256 個配對 $(b, S(b))$ 儲存在查找表中。對於每次求值，
+          對這個 256 行的表執行一次查找。</p>
+        <p><strong>表的成本：</strong>256 行（專屬於 S-box）</p>
+        <p><strong>每次求值的成本：</strong>1 次查找</p>
+        <p><strong>$n$ 次 S-box 調用：</strong>256 行表 + $n$ 次查找</p>
+      </div>
+      <div class="comparison-card">
+        <h4>多項式方法</h4>
+        <p>將 256 個係數 $\mathbf{c}_S$ 儲存在固定欄中。對於每次求值，
+          執行一次 Horner 求值（255 個乘加閘）+ 1 次 ByteTable 查找。</p>
+        <p><strong>表的成本：</strong>256 行（ByteTable，與其他函數共用）</p>
+        <p><strong>每次求值的成本：</strong>256 行（Horner）+ 1 次查找</p>
+        <p><strong>$n$ 次 S-box 調用：</strong>256（共用表）+ $n \times 256$ 行</p>
+      </div>
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">注意 &mdash; 單一函數時查找更便宜的情況</div>
+      <p>
+        對於<em>單一</em>函數在 8 位元精度下（如僅有 AES S-box），查找方法
+        實際上更有效率：每次求值 1 次查找 vs. 255 個 Horner 步驟。
+        多項式方法的優勢在以下情況下顯現：(1) 精度超過 8 位元，或 (2)
+        多個函數共享同一個電路，或 (3) 函數集合需要是動態的。
+        在包含 SubBytes + MixColumns + ShiftRows + AddRoundKey 的完整 AES 電路中，
+        多項式方法的通用性和表共享提供了顯著的優勢。
+      </p>
+    </div>
+
+
+    <!-- ================================================ -->
+    <!-- 10.9 SECURITY CONSIDERATIONS                     -->
+    <!-- ================================================ -->
+    <h2>10.9 安全性考量</h2>
+
+    <p>
+      多項式方法的安全性繼承自底層的證明系統（Halo2、PLONK 等）
+      以及用於位元組範圍檢查的查找論證。本節分析三個核心安全性質。
+    </p>
+
+    <h3>完備性</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 10.4 &mdash; 多項式方法的完備性</div>
+      <p>
+        如果 $f(x) = y$ 且位元組分解 $x = \sum b_i \cdot 256^i$ 是正確的，且每個
+        $b_i \in [0, 255]$，則多項式方法電路接受。
+      </p>
+      <p>
+        <strong>證明。</strong>由於 $P_f$ 在所有位元組值上與 $f$ 一致（透過 Lagrange 插值構造），
+        對每個位元組 $b_i$ 都有 $P_f(b_i) = f(b_i)$。Horner 求值正確地計算了 $P_f(b_i)$
+        （Horner 法在代數上是精確的）。位元組範圍檢查通過，因為每個 $b_i \in [0, 255]$
+        都在 ByteTable 中。分解約束 $x = \sum b_i \cdot 256^i$ 由假設滿足。
+        合併步驟正確地組合出最終輸出。因此所有電路約束都被滿足，
+        證明系統接受。$\square$
+      </p>
+    </div>
+
+    <h3>健全性</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 10.5 &mdash; 多項式方法的健全性</div>
+      <p>
+        如果底層的證明系統和查找論證是健全的，則沒有多項式時間的敵手能夠
+        為不正確的求值 $f(x) \neq y$ 產生有效的證明。
+      </p>
+      <p>
+        <strong>證明概要。</strong>假設一個作弊的證明者聲稱 $f(x) = y'$，其中
+        $y' \neq f(x)$。若要使證明通過驗證，所有電路約束都必須被滿足：
+      </p>
+      <ol>
+        <li>
+          <strong>位元組分解必須有效。</strong>查找論證確保每個
+          $b_i \in [0, 255]$（查找的健全性）。算術約束確保
+          $x = \sum b_i \cdot 256^i$。兩者結合，唯一地固定了位元組值。
+        </li>
+        <li>
+          <strong>多項式求值必須正確。</strong>Horner 步驟約束
+          $\text{acc}_{j+1} = \text{acc}_j \cdot b_i + c_j$ 是算術恆等式檢查。
+          在位元組和係數固定的情況下，輸出 $P_f(b_i)$ 是唯一確定的。
+        </li>
+        <li>
+          <strong>合併必須正確。</strong>合併步驟的算術約束固定了輸出 $y$。
+        </li>
+      </ol>
+      <p>
+        由於每個步驟都由前一個步驟唯一確定，最終輸出 $y = f(x)$
+        由 $x$ 和 $\mathbf{c}_f$ 唯一確定。任何 $y' \neq f(x)$ 都會違反至少一個約束，
+        而證明系統的健全性會捕捉到這一點。$\square$
+      </p>
+    </div>
+
+    <h3>零知識性</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 10.6 &mdash; 零知識性質</div>
+      <p>
+        如果底層的證明系統提供零知識性（例如，透過 Halo2 中的盲化行），
+        則多項式方法電路也提供零知識性：證明不會揭露關於見證
+        $(x, b_0, \ldots, b_{k-1})$ 的任何資訊，除了命題 $f(x) = y$ 的真值之外。
+      </p>
+      <p>
+        <strong>證明概要。</strong>包含 $x$、位元組 $b_i$ 和中間 Horner 累加器的
+        見證欄（建議欄）由證明系統的標準機制進行盲化
+        （Halo2 中附加到每個欄多項式的盲化行，或 PLONK 中的隨機化見證多項式）。
+        包含 $\mathbf{c}_f$ 的固定欄是公開的（不屬於見證），不需要盲化。
+        ByteTable 是一個固定的公開表。因此，證明不會揭露見證的任何資訊，
+        超出公開命題所隱含的範圍。$\square$
+      </p>
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">注意 &mdash; Halo2 中的盲化行</div>
+      <p>
+        在 Halo2 中，每個建議欄都會擴展 $k$ 個盲化行（通常 $k = 5$），
+        包含隨機域元素。這些盲化行確保欄多項式（透過 IPA 或 KZG 承諾）
+        不會揭露實際的見證值。這個機制自動適用於多項式方法電路中的所有建議欄，
+        包括位元組值和 Horner 累加器。
+      </p>
+    </div>
+
+    <p>
+      關於這些性質在多項式方法具體上下文中的正式證明，
+      請參見第十一章：安全性證明。
+    </p>
+
+
+    <!-- ================================================ -->
+    <!-- 10.10 COMPARISON WITH RELATED WORK               -->
+    <!-- ================================================ -->
+    <h2>10.10 與相關工作的比較</h2>
+
+    <p>
+      多項式方法最好透過與 ZK 電路中計算非線性函數的替代方法進行對比來理解。
+      本節提供系統性的比較。
+    </p>
+
+    <h3>方法分類</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>方法</th>
+          <th>表大小</th>
+          <th>電路類型</th>
+          <th>新函數</th>
+          <th>精度擴展</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>直接算術化</td>
+          <td>不適用（無表）</td>
+          <td>函數專屬</td>
+          <td>重新設計整個電路</td>
+          <td>不適用（取決於函數）</td>
+        </tr>
+        <tr>
+          <td>查找表</td>
+          <td>每個函數 $2^d$</td>
+          <td>依函數集合固定</td>
+          <td>添加表 + 修改電路</td>
+          <td>指數級（$2^d$）</td>
+        </tr>
+        <tr>
+          <td>分段線性近似</td>
+          <td>小（斷點）</td>
+          <td>函數專屬</td>
+          <td>新的斷點表</td>
+          <td>與分段數呈線性</td>
+        </tr>
+        <tr>
+          <td><strong>多項式方法</strong></td>
+          <td><strong>256（共用）</strong></td>
+          <td><strong>函數無關</strong></td>
+          <td><strong>僅更改係數</strong></td>
+          <td><strong>線性（$256k$）</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>直接算術化</h3>
+
+    <p>
+      某些函數可以直接表達為 $\mathbb{F}_p$ 上的低次多項式。
+      例如，$f(x) = x^2$ 只需一個乘法閘，$f(x) = x^3$ 需要兩個乘法閘。
+      這是<em>可行時</em>最有效率的方法。
+    </p>
+
+    <p>
+      問題在於：大多數我們關注的非線性函數（S-box、啟動函數、位元運算）
+      無法表達為 $\mathbb{F}_p$ 上的低次多項式。以 AES S-box 為例，
+      它在代數上是定義在 $\text{GF}(2^8)$ 上的，而非 $\mathbb{F}_p$。
+      將其表達為 $\mathbb{F}_p$ 上的多項式會產生次數 255 &mdash;
+      這正是多項式方法所提供的，但額外帶有通用電路結構的好處。
+    </p>
+
+    <h3>查找表（第九章）</h3>
+
+    <p>
+      查找表是 ZK 電路中處理非線性函數的當前業界標準。
+      Halo2（具有查找論證）、Plookup 和 LogUp 等系統提供了
+      在證明系統內進行高效表查找的機制。
+    </p>
+
+    <p>
+      <strong>查找表的優勢：</strong>
+    </p>
+    <ul>
+      <li>實現簡單 &mdash; 只需列出所有（輸入，輸出）配對</li>
+      <li>在低精度（8 位元）下高效 &mdash; 256 行表 + 每次求值 1 次查找</li>
+      <li>沒有多項式求值的開銷</li>
+    </ul>
+
+    <p>
+      <strong>劣勢（多項式方法已解決）：</strong>
+    </p>
+    <ul>
+      <li>隨精度的指數級增長</li>
+      <li>每個函數的表開銷</li>
+      <li>新函數必須更改電路</li>
+    </ul>
+
+    <h3>分段線性近似</h3>
+
+    <p>
+      某些系統使用分段線性段來近似非線性函數。這避免了大型表，
+      但引入了近似誤差，且需要針對比較和線性插值的函數專屬電路設計。
+    </p>
+
+    <p>
+      <strong>優勢：</strong>表小（僅包含斷點），適用於平滑函數。
+    </p>
+    <p>
+      <strong>劣勢：</strong>存在近似誤差（非精確），比較閘在 ZK 中代價高昂，
+      電路是函數專屬的，不適用於不連續函數（如 AES S-box）。
+    </p>
+
+    <h3>總結比較</h3>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>最適合單一 8 位元函數</h4>
+        <p>
+          <strong>勝出者：查找表。</strong>256 項的查找比 255 個 Horner 步驟更簡單且成本更低。
+          當你僅有一個 8 位元精度的函數時，使用查找。
+        </p>
+      </div>
+      <div class="comparison-card">
+        <h4>最適合多函數或高精度場景</h4>
+        <p>
+          <strong>勝出者：多項式方法。</strong>共用的 ByteTable、函數無關電路
+          和線性精度擴展，使得多項式方法在任何包含 $\geq 2$ 個函數或
+          $\geq 16$ 位元精度的場景中都是明確的選擇。
+        </p>
+      </div>
+    </div>
+
+
+    <!-- ================================================ -->
+    <!-- 10.11 IMPLEMENTATION CONSIDERATIONS              -->
+    <!-- ================================================ -->
+    <h2>10.11 實現考量</h2>
+
+    <p>
+      本節討論在實際的 ZK 電路中（特別是 Halo2 或 PLONK 風格的系統中）
+      實現多項式方法的實務面向。
+    </p>
+
+    <h3>電路約束中的 Horner 法</h3>
+
+    <p>
+      核心計算 &mdash; 對一個位元組 $b$ 求值 $P_f(b)$ &mdash; 透過
+      Horner 法實現，表示為一連串的自定義閘約束：
+    </p>
+
+    <pre><code>// Horner step constraint (repeated 255 times):
+// acc_next = acc_current * b + c_j
+//
+// In PLONKish constraint form:
+// s_horner * (acc_next - acc_current * b - c_j) = 0
+
+gate("horner_step", |meta| {
+    let acc_cur  = meta.query_advice(acc_col, Rotation::cur());
+    let acc_next = meta.query_advice(acc_col, Rotation::next());
+    let byte_val = meta.query_advice(byte_col, Rotation::cur());
+    let coeff    = meta.query_fixed(coeff_col, Rotation::cur());
+    let s        = meta.query_selector(s_horner);
+
+    vec![s * (acc_next - acc_cur * byte_val - coeff)]
+});</code></pre>
+
+    <p>
+      Horner 求值需要 255 行（每個步驟一行），從 $\text{acc}_0 = c_{255}$
+      （最高次係數）開始，到 $\text{acc}_{255} = P_f(b)$（最終結果）結束。
+      每行執行一次乘法和一次加法。
+    </p>
+
+    <h3>ByteTable 的實現</h3>
+
+    <p>
+      ByteTable 是一個固定欄的表，有 256 行，包含值 $0, 1, \ldots, 255$。
+      在 Halo2 中，它實現為一個 <code>TableColumn</code>：
+    </p>
+
+    <pre><code>// ByteTable: 256-row table for byte range checks
+fn load_byte_table(
+    &amp;self,
+    layouter: &amp;mut impl Layouter&lt;F&gt;,
+) -> Result&lt;(), Error&gt; {
+    layouter.assign_table(|| "byte_table", |mut table| {
+        for i in 0..256 {
+            table.assign_cell(
+                || format!("byte {}", i),
+                self.config.byte_table_col,
+                i,
+                || Value::known(F::from(i as u64)),
+            )?;
+        }
+        Ok(())
+    })
+}</code></pre>
+
+    <p>
+      分解中的每個位元組都透過對此表的查找約束進行範圍檢查。
+      查找論證（Halo2 的內建機制，或 LogUp 以獲得更好的效率）確保
+      位元組值存在於表中。
+    </p>
+
+    <h3>係數儲存</h3>
+
+    <p>
+      256 個係數 $\mathbf{c}_f$ 儲存在一個<strong>固定欄</strong>中。在 Halo2 中，
+      固定欄在密鑰生成期間被承諾，並且是驗證密鑰的一部分。這意味著：
+    </p>
+
+    <ul>
+      <li>
+        係數是<strong>公開的</strong> &mdash; 驗證者知道正在計算哪個函數。
+      </li>
+      <li>
+        更改函數（更改係數）需要重新生成證明密鑰和驗證密鑰，
+        但<em>不需要</em>更改電路結構。
+      </li>
+      <li>
+        或者，如果需要在證明時選擇函數，係數可以作為
+        <strong>instance</strong>（公開輸入）值提供，使函數完全動態化，
+        但代價是更大的公開輸入。
+      </li>
+    </ul>
+
+    <h3>優化：批次 Horner 求值</h3>
+
+    <div class="callout note">
+      <div class="callout-title">注意 &mdash; 多位元組求值中的平行性</div>
+      <p>
+        當對同一輸入的多個位元組 $(b_0, b_1, \ldots, b_{k-1})$ 求值 $P_f$ 時，
+        這些求值是<strong>獨立的</strong>，可以佈局在電路的平行欄中。
+        這不會減少總行數（仍為 $k \times 256$），但可以提高電路對可用欄的利用率。
+        在 Halo2 中，行數通常是 2 的冪次，高效的欄打包可以透過
+        將更多求值放入相同行數中來減少整體電路大小。
+      </p>
+    </div>
+
+    <h3>潛在陷阱</h3>
+
+    <div class="callout warning">
+      <div class="callout-title">警告 &mdash; 域溢位</div>
+      <p>
+        多項式 $P_f(b)$ 是在 $\mathbb{F}_p$（電路的原生域）上求值的。
+        當 $j$ 高達 255 時，中間值 $b^j$ 可能非常大。由於所有算術都是模運算（mod $p$），
+        在數學意義上不存在溢位。然而，透過 Lagrange 插值計算得到的係數 $c_j$
+        也可能是非常大的域元素，必須確保插值是在 $\mathbb{F}_p$ 中進行的
+        （而非在浮點數或有限精度整數算術中）。
+      </p>
+    </div>
+
+    <div class="callout warning">
+      <div class="callout-title">警告 &mdash; 係數預計算</div>
+      <p>
+        計算 $\mathbf{c}_f$ 的 Lagrange 插值必須在電路所使用的<em>同一個域</em>
+        $\mathbb{F}_p$ 中進行。在不同的域中執行插值
+        （例如在有理數域或不同的質數域上），然後對 $p$ 取模會產生
+        不正確的係數。這是一個微妙但關鍵的實現細節。
+      </p>
+    </div>
+
+
+    <!-- ================================================ -->
+    <!-- 10.12 SUMMARY                                    -->
+    <!-- ================================================ -->
+    <h2>10.12 總結與關鍵要點</h2>
+
+    <p>
+      多項式方法是一種根本性的技術，解決了 ZK 電路設計中的查找瓶頸。
+      其關鍵特性：
+    </p>
+
+    <ul>
+      <li>
+        <strong>通用性：</strong>透過僅更改係數向量 $\mathbf{c}_f$，
+        即可計算<em>任何</em>函數 $f: \{0, \ldots, 255\} \to \mathbb{F}_p$。
+      </li>
+      <li>
+        <strong>共享基礎設施：</strong>一個 256 項的 ByteTable 服務所有函數，
+        取代了每個函數大小為 $2^d$ 的專屬表。
+      </li>
+      <li>
+        <strong>函數無關電路：</strong>電路結構（閘、佈線、查找）
+        對所有函數都相同。只有固定欄的值會改變。
+      </li>
+      <li>
+        <strong>線性精度擴展：</strong>增加一個位元組的精度僅需 $O(256)$ 行，
+        相比之下查找表需要 $O(2^8)$ 倍的乘法增長。
+      </li>
+      <li>
+        <strong>健全且完備：</strong>安全性繼承自底層的證明系統和查找論證。
+      </li>
+    </ul>
+
+    <div class="callout definition">
+      <div class="callout-title">核心創新的一句話概述</div>
+      <p>
+        不在所有可能的輸入上預先計算函數（查找），而是將輸入分解為位元組，
+        將函數表示為位元組域上的多項式，在電路中求值該多項式，
+        並使用一個共用表來驗證位元組的有效性 &mdash; 同時實現通用性和線性擴展。
+      </p>
+    </div>
+
+    <h3>何時使用多項式方法</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>場景</th>
+          <th>建議</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>單一函數，8 位元精度</td>
+          <td>查找表（更簡單，開銷更低）</td>
+        </tr>
+        <tr>
+          <td>單一函數，$\geq$ 16 位元精度</td>
+          <td><strong>多項式方法</strong>（指數級節省）</td>
+        </tr>
+        <tr>
+          <td>多個函數，任意精度</td>
+          <td><strong>多項式方法</strong>（共用 ByteTable，一個電路）</td>
+        </tr>
+        <tr>
+          <td>動態函數集合（電路編譯時未知函數）</td>
+          <td><strong>多項式方法</strong>（唯一支援此場景的方法）</td>
+        </tr>
+        <tr>
+          <td>低次多項式函數（如 $x^2$、$x^3$）</td>
+          <td>直接算術化（無需表或多項式）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">注意 &mdash; 展望</div>
+      <p>
+        第十一章（安全性證明）提供多項式方法的正式安全性證明，
+        包括完備性、健全性和零知識性的詳細歸約論證。
+        這些證明將第 10.9 節中給出的概要形式化，並證明多項式方法的安全性
+        可歸約至底層證明系統和查找論證的安全性。
+      </p>
+    </div>
+
+    <h2>對本研究的意義</h2>
+    <div class="callout theorem">
+      <div class="callout-title">這是論文的核心貢獻</div>
+      <p>
+        本章描述的多項式方法是論文的<strong>主體技術</strong>。論文的四步方法論直接對應本章的內容：
+      </p>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>論文步驟</th><th>技術內容</th><th>對應章節</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Step 1</strong></td><td>Range Reduction — 將輸入映射到窄區間</td><td>§13.6</td></tr>
+        <tr><td><strong>Step 2</strong></td><td>Minimax 係數計算 — Remez 演算法 + 量化</td><td>§13.4, §13.8</td></tr>
+        <tr><td><strong>Step 3</strong></td><td>Deferred Truncation — 預縮放係數</td><td>§14.4</td></tr>
+        <tr><td><strong>Step 4</strong></td><td>Horner Circuit — 電路設計與 ByteTable</td><td>§14.7, §10.5</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">為何不用其他 ZK 函數計算方法？</div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>方法</th><th>表大小</th><th>精度</th><th>函數通用性</th><th>電路成本</th><th>論文選擇</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>直接查找表</td>
+          <td>$O(2^{pp})$</td>
+          <td>精確（離散值）</td>
+          <td>✗ 每函數一表</td>
+          <td>1 次查找</td>
+          <td>✗ 不可擴展</td>
+        </tr>
+        <tr>
+          <td>分段線性插值</td>
+          <td>$O(2^{pp}/k)$</td>
+          <td>低</td>
+          <td>✗ 每函數不同</td>
+          <td>查找 + 1 乘法</td>
+          <td>✗ 精度不足</td>
+        </tr>
+        <tr>
+          <td>CORDIC</td>
+          <td>小</td>
+          <td>高</td>
+          <td>△ 僅旋轉函數</td>
+          <td>$O(pp)$ 迭代</td>
+          <td>✗ 非多項式</td>
+        </tr>
+        <tr>
+          <td>Taylor 多項式</td>
+          <td>256（ByteTable）</td>
+          <td>差（遠離展開點）</td>
+          <td>✓ 通用</td>
+          <td>$d$ 乘法 + 1 截斷</td>
+          <td>✗ ULP 太大</td>
+        </tr>
+        <tr>
+          <td><strong>Minimax 多項式</strong></td>
+          <td><strong>256（ByteTable）</strong></td>
+          <td><strong>最優（ULP=1）</strong></td>
+          <td><strong>✓ 通用</strong></td>
+          <td><strong>$d$ 乘法 + 1 截斷</strong></td>
+          <td style="color: green;"><strong>✓ 本論文</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ================================================ -->
+    <!-- PAGE NAVIGATION                                  -->
+    <!-- ================================================ -->
+    <div class="page-nav">
+      <a href="lookup-arguments.html"><span class="nav-label">上一章</span><span class="nav-title">&larr; 9. Lookup Arguments</span></a>
+      <a href="security-proofs.html"><span class="nav-label">下一章</span><span class="nav-title">11. Security Proofs &rarr;</span></a>
+    </div>
+  </main>
+</body>
+</html>

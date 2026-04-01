@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ch.6 Groth16 — ZK Handbook</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>ZK Handbook</h1>
+      <div class="subtitle">零知識證明系統</div>
+    </div>
+    <nav>
+      <div class="section-label">總覽</div>
+      <a href="index.html"><span class="page-num">0.</span> 首頁</a>
+
+      <div class="section-label">基礎</div>
+      <a href="foundations.html"><span class="page-num">1.</span> 數學基礎</a>
+      <a href="zkp-basics.html"><span class="page-num">2.</span> ZKP：基礎與性質</a>
+
+      <div class="section-label">構建模組</div>
+      <a href="polynomial-commitments.html"><span class="page-num">3.</span> 多項式承諾</a>
+      <a href="arithmetization.html"><span class="page-num">4.</span> 算術化</a>
+      <a href="fft-domains.html"><span class="page-num">5.</span> FFT 與求值域</a>
+
+      <div class="section-label">證明系統</div>
+      <a href="groth16.html" class="active"><span class="page-num">6.</span> Groth16</a>
+      <a href="plonk.html"><span class="page-num">7.</span> PLONK</a>
+      <a href="halo2.html"><span class="page-num">8.</span> Halo2</a>
+
+      <div class="section-label">進階主題</div>
+      <a href="lookup-arguments.html"><span class="page-num">9.</span> 查找論證</a>
+      <a href="polynomial-method.html"><span class="page-num">10.</span> 多項式方法</a>
+      <a href="security-proofs.html"><span class="page-num">11.</span> 安全性證明</a>
+
+      <div class="section-label">論文方法論</div>
+      <a href="fixed-point.html"><span class="page-num">12.</span> 有限域定點運算</a>
+      <a href="approximation-theory.html"><span class="page-num">13.</span> 多項式逼近理論</a>
+      <a href="horner-evaluation.html"><span class="page-num">14.</span> Horner 求值</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>第六章：Groth16</h1>
+      <p class="page-subtitle">
+        目前生產環境中最高效的基於配對之 zkSNARK。常數大小的證明（3 個群元素）、
+        常數時間的驗證（3 次配對運算）、電路特定的可信設定。自 2016 年以來，
+        一直是鏈上證明驗證的黃金標準。
+      </p>
+    </div>
+
+    <!-- ============================================
+         DEFINITIONS SECTION
+         ============================================ -->
+    <div class="definitions-section">
+      <h2>關鍵定義</h2>
+
+      <div class="def-item">
+        <div class="def-term">Groth16 <span class="zh">Groth16</span></div>
+        <div class="def-body">
+          Jens Groth 於 2016 年提出的 zkSNARK 構造，發表為
+          <em>"On the Size of Pairing-based Non-interactive Arguments"</em>（EUROCRYPT 2016）。
+          這是目前已知最高效的基於配對之證明系統：證明恰好由
+          <strong>3 個群元素</strong>組成（一個在 $\mathbb{G}_1$、一個在 $\mathbb{G}_2$、一個在 $\mathbb{G}_1$），
+          驗證僅需恰好 <strong>3 次配對運算</strong>加上一次對公開輸入的多重純量乘法。
+          無論電路大小如何，證明大小和驗證時間均為常數。其根本的取捨在於可信設定是<em>電路特定的</em>：
+          即使電路僅改變一個閘，整個設定就必須重新產生。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Circuit-Specific Trusted Setup <span class="zh">電路特定可信設定</span></div>
+        <div class="def-body">
+          一種與特定算術電路 $C$ 綁定的設定儀式。該儀式產生結構化參考字串
+          （證明金鑰 $\text{pk}$ 與驗證金鑰 $\text{vk}$），其中編碼了 $C$ 的 QAP 多項式
+          在秘密求值點 $\tau$ 處的值。若電路發生變更
+          &mdash; 即使僅增減一條約束 &mdash; 整個設定就必須從頭重做。
+          這與<em>通用</em>設定（如 PLONK 的設定）形成對比，後者的 SRS
+          適用於任何不超過給定大小的電路。Groth16 的設定分為兩個階段：一個
+          <strong>powers-of-tau</strong> 階段（與電路無關）和一個
+          <strong>電路特定的第二階段</strong>（編碼 QAP）。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Proving Key (pk) <span class="zh">證明金鑰</span></div>
+        <div class="def-body">
+          證明金鑰包含 QAP 多項式在秘密點 $\tau$ 處的加密求值。
+          它由一組群元素組成，證明者利用這些元素在不直接知道 $\tau$ 的情況下計算證明：
+          $$\text{pk} = \Big\{
+            [\alpha]_1,\; [\beta]_1,\; [\beta]_2,\; [\delta]_1,\; [\delta]_2,\;
+            \{[\tau^j]_1\}_{j=0}^{n-1},\;
+            \{[\tau^j]_2\}_{j=0}^{n-1},\;
+            \{[A_i(\tau)]_1\}_{i=0}^{m},\;
+            \{[B_i(\tau)]_1\}_{i=0}^{m},\;
+            \{[B_i(\tau)]_2\}_{i=0}^{m},
+          $$
+          $$
+            \Big\{\Big[\frac{\beta A_i(\tau) + \alpha B_i(\tau) + C_i(\tau)}{\delta}\Big]_1\Big\}_{i=\ell+1}^{m},\;
+            \Big\{\Big[\frac{\tau^j \cdot Z_H(\tau)}{\delta}\Big]_1\Big\}_{j=0}^{n-2}
+          \Big\}$$
+          其中 $m$ 是線路總數，$\ell$ 是公開輸入的數量，$n$ 是約束的數量。
+          $\text{pk}$ 的大小為 $O(m + n)$，隨電路大小線性增長。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Verification Key (vk) <span class="zh">驗證金鑰</span></div>
+        <div class="def-body">
+          驗證金鑰結構緊湊，僅包含驗證者所需的元素：
+          $$\text{vk} = \Big\{
+            [\alpha]_1,\; [\beta]_2,\; [\gamma]_2,\; [\delta]_2,\;
+            \Big\{\Big[\frac{\beta A_i(\tau) + \alpha B_i(\tau) + C_i(\tau)}{\gamma}\Big]_1\Big\}_{i=0}^{\ell}
+          \Big\}$$
+          驗證金鑰的大小為 $O(\ell)$ &mdash; 固定開銷加上每個公開輸入一個 $\mathbb{G}_1$ 元素。
+          對於公開輸入數量較少的電路（這是典型情況），驗證金鑰非常小。
+          除以 $\gamma$ 的元素對應<em>公開</em>輸入線路，而在證明金鑰中除以 $\delta$ 的元素
+          對應<em>私有</em>（見證）線路。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Toxic Waste <span class="zh">有毒廢料</span></div>
+        <div class="def-body">
+          可信設定儀式中產生的秘密隨機值 $\tau, \alpha, \beta, \gamma, \delta \in \mathbb{F}_r$。
+          這些值在設定完成後<strong>必須被不可恢復地銷毀</strong>。
+          若<em>任何一方</em>恢復了完整的有毒廢料，他們就能為虛假陳述偽造任意證明
+          &mdash; 完全破壞系統的健全性。
+          這就是為何可信設定使用多方計算（MPC）的原因：每位參與者貢獻自己的隨機性，
+          只要<em>至少一位參與者</em>誠實地銷毀其秘密份額，
+          組合後的有毒廢料就不可恢復。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">QAP (Quadratic Arithmetic Program) <span class="zh">二次算術程式</span></div>
+        <div class="def-body">
+          R1CS 約束系統的多項式編碼。給定 $m+1$ 個見證變數和 $n$ 條約束，
+          QAP 由多項式 $\{A_i(X), B_i(X), C_i(X)\}_{i=0}^{m}$（次數 $&lt; n$）組成，
+          通過在求值域 $H = \{\omega^0, \omega^1, \ldots, \omega^{n-1}\}$ 上的
+          Lagrange 插值構造。QAP 條件指出，見證
+          $\mathbf{w} = (w_0, w_1, \ldots, w_m)$（其中 $w_0 = 1$）有效若且唯若：
+          $$\Big(\sum_{i=0}^{m} w_i A_i(X)\Big) \cdot \Big(\sum_{i=0}^{m} w_i B_i(X)\Big) - \sum_{i=0}^{m} w_i C_i(X) = H(X) \cdot Z_H(X)$$
+          其中 $Z_H(X) = X^n - 1$ 是消失多項式，$H(X)$ 是商多項式。
+          $H(X)$ 的次數至多為 $n - 2$。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Proof <span class="zh">證明</span></div>
+        <div class="def-body">
+          一個 Groth16 證明恰好由三個群元素組成：
+          $$\pi = \big([A]_1,\; [B]_2,\; [C]_1\big) \in \mathbb{G}_1 \times \mathbb{G}_2 \times \mathbb{G}_1$$
+          在 BN254 曲線上，每個 $\mathbb{G}_1$ 元素為 32 位元組（壓縮），每個 $\mathbb{G}_2$
+          元素為 64 位元組（壓縮），因此證明總大小為 <strong>128 位元組</strong>
+          （未壓縮為 192 位元組）。在 BLS12-381 上，壓縮後的證明大小為 <strong>192 位元組</strong>
+          （$\mathbb{G}_1$：48 位元組，$\mathbb{G}_2$：96 位元組）。這是所有已部署在生產環境中的
+          ZK 證明系統中最小的證明。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Pairing Check <span class="zh">配對檢查</span></div>
+        <div class="def-body">
+          驗證方程使用三次雙線性配對 $e: \mathbb{G}_1 \times \mathbb{G}_2 \to \mathbb{G}_T$：
+          $$e(A,\; B) = e\big([\alpha]_1,\; [\beta]_2\big) \;\cdot\; e\!\Big(\sum_{i=0}^{\ell} x_i \Big[\frac{\beta A_i(\tau) + \alpha B_i(\tau) + C_i(\tau)}{\gamma}\Big]_1,\; [\gamma]_2\Big) \;\cdot\; e\big(C,\; [\delta]_2\big)$$
+          左側編碼了證明者宣稱的計算。右側有三個因子：
+          (1) 來自 $\alpha, \beta$ 的「結構」項，將 $A$ 和 $B$ 綁定在一起；
+          (2) 公開輸入的貢獻（除以 $\gamma$）；
+          (3) 私有見證的貢獻 $C$（除以 $\delta$）。此方程可以高效檢查：
+          右側的第一個配對是預計算的（僅依賴於驗證金鑰），因此驗證者只需計算
+          3 次配對和 1 次對 $\ell$ 個公開輸入的 MSM。
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================
+         6.1 WHY GROTH16 MATTERS
+         ============================================ -->
+    <h2>6.1 為何 Groth16 重要</h2>
+
+    <p>
+      儘管 Groth16 已問世近十年，它仍然是生產環境中部署最廣泛的 zkSNARK。
+      其主導地位源於一個壓倒性的優勢：<strong>證明大小和驗證成本都是常數</strong>，
+      與被證明的電路無關。目前沒有其他生產系統能做到這一點。
+    </p>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>證明大小</h4>
+        <ul>
+          <li><strong>BN254：</strong>壓縮後 128 位元組（未壓縮 192 位元組）</li>
+          <li><strong>BLS12-381：</strong>壓縮後 192 位元組（未壓縮 384 位元組）</li>
+          <li>始終恰好 3 個群元素</li>
+          <li>對比：PLONK 約 400-800 位元組，STARK 約 45-200 KB</li>
+        </ul>
+      </div>
+      <div class="comparison-card">
+        <h4>驗證成本</h4>
+        <ul>
+          <li><strong>3 次配對</strong> + 1 次對公開輸入的 MSM</li>
+          <li>典型耗時：在現代硬體上約 3 毫秒</li>
+          <li>鏈上（Ethereum）：透過預編譯約 230,000 gas</li>
+          <li>對比：PLONK 約 300K gas，STARK 約 2-5M gas</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>生產環境部署</h3>
+    <table>
+      <thead>
+        <tr><th>專案</th><th>用途</th><th>曲線</th><th>備註</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Zcash Sapling</strong></td>
+          <td>隱私交易</td>
+          <td>BLS12-381</td>
+          <td>首個大規模 Groth16 部署（2018）</td>
+        </tr>
+        <tr>
+          <td><strong>Tornado Cash</strong></td>
+          <td>Ethereum 上的隱私混幣器</td>
+          <td>BN254</td>
+          <td>使用 Ethereum 的 BN254 預編譯</td>
+        </tr>
+        <tr>
+          <td><strong>Filecoin</strong></td>
+          <td>複製證明／時空證明</td>
+          <td>BLS12-381</td>
+          <td>GPU 加速證明，大規模電路</td>
+        </tr>
+        <tr>
+          <td><strong>Loopring</strong></td>
+          <td>DEX rollup</td>
+          <td>BN254</td>
+          <td>批次交易證明</td>
+        </tr>
+        <tr>
+          <td><strong>Semaphore</strong></td>
+          <td>匿名信號</td>
+          <td>BN254</td>
+          <td>身份／群組成員資格證明</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>根本的取捨</h3>
+    <p>
+      Groth16 的最小證明大小是有代價的。你必須接受以下<em>所有</em>約束：
+    </p>
+    <ul>
+      <li><strong>電路特定設定：</strong>每個不同的電路都需要自己的可信設定儀式。
+        即使改變電路中的一個閘，現有的金鑰就會失效。</li>
+      <li><strong>僅支援 R1CS：</strong>Groth16 使用 Rank-1 Constraint Systems（R1CS），
+        每條約束編碼為 $\mathbf{a} \circ \mathbf{w} \times \mathbf{b} \circ \mathbf{w} = \mathbf{c} \circ \mathbf{w}$。
+        不支援自訂閘、不支援查找表、不支援高次約束。</li>
+      <li><strong>需要可信設定：</strong>若有毒廢料被洩露，證明就能被偽造。
+        STARK 完全避免了這個問題。</li>
+      <li><strong>非後量子安全：</strong>依賴於配對友好群中離散對數問題的困難性，
+        這會被量子電腦破解。</li>
+    </ul>
+
+    <div class="callout note">
+      <div class="callout-title">何時選擇 Groth16</div>
+      <p>
+        在以下情況選擇 Groth16：(1) 你的電路穩定且不會頻繁更改；(2) 鏈上驗證成本至關重要
+        （每個位元組和 gas 單位都很重要）；(3) 你能組織一場可信設定儀式。
+        若你的電路經常演化或需要自訂閘，請考慮 PLONK。
+        若你需要透明性（無可信設定），請考慮 STARK。
+      </p>
+    </div>
+
+    <!-- ============================================
+         6.2 FROM R1CS TO QAP
+         ============================================ -->
+    <h2>6.2 從 R1CS 到 QAP</h2>
+
+    <p>
+      Groth16 在 QAP（Quadratic Arithmetic Program）上運作，這是 R1CS 的多項式重新表述。
+      從電路到 QAP 的轉換是約束系統世界（第四章）與 Groth16 運作所在的多項式世界之間的關鍵橋樑。
+    </p>
+
+    <h3>R1CS 回顧</h3>
+    <p>
+      一個具有 $n$ 條約束和 $m+1$ 個變數（包括常數線路 $w_0 = 1$）的 R1CS 實例，
+      由三個矩陣 $\mathbf{A}, \mathbf{B}, \mathbf{C} \in \mathbb{F}^{n \times (m+1)}$ 定義。
+      見證 $\mathbf{w} = (1, x_1, \ldots, x_\ell, w_{\ell+1}, \ldots, w_m)$ 有效若對每條
+      約束 $k \in \{1, \ldots, n\}$：
+    </p>
+    $$(\mathbf{A}_k \cdot \mathbf{w}) \times (\mathbf{B}_k \cdot \mathbf{w}) = \mathbf{C}_k \cdot \mathbf{w}$$
+    <p>
+      其中 $\mathbf{A}_k$ 表示 $\mathbf{A}$ 的第 $k$ 行，$\cdot$ 為內積。
+      常數之後的前 $\ell$ 個變數是<em>公開輸入</em>（驗證者已知）；
+      其餘 $m - \ell$ 個是<em>私有見證</em>值。
+    </p>
+
+    <h3>Lagrange 插值轉換為 QAP</h3>
+    <p>
+      固定一個求值域 $H = \{\omega^0, \omega^1, \ldots, \omega^{n-1}\}$，其中 $\omega$ 是
+      原始 $n$ 次單位根。對每條線路 $i \in \{0, \ldots, m\}$，透過 Lagrange 插值定義多項式：
+    </p>
+    $$A_i(X) = \sum_{k=1}^{n} a_{k,i} \cdot L_k(X), \qquad
+      B_i(X) = \sum_{k=1}^{n} b_{k,i} \cdot L_k(X), \qquad
+      C_i(X) = \sum_{k=1}^{n} c_{k,i} \cdot L_k(X)$$
+    <p>
+      其中 $L_k(X)$ 是 $H$ 上第 $k$ 個 Lagrange 基底多項式，滿足
+      $L_k(\omega^j) = \delta_{k,j}$。現在定義組合多項式：
+    </p>
+    $$A(X) = \sum_{i=0}^{m} w_i \cdot A_i(X), \qquad
+      B(X) = \sum_{i=0}^{m} w_i \cdot B_i(X), \qquad
+      C(X) = \sum_{i=0}^{m} w_i \cdot C_i(X)$$
+
+    <h3>QAP 條件</h3>
+    <p>
+      根據構造，R1CS 約束被滿足若且唯若對所有 $k$ 有 $A(\omega^k) \cdot B(\omega^k) = C(\omega^k)$。
+      等價地，多項式 $A(X) \cdot B(X) - C(X)$ 在 $H$ 的所有點上消失。
+      由於 $Z_H(X) = X^n - 1 = \prod_{k=0}^{n-1}(X - \omega^k)$ 是 $H$ 的消失多項式，
+      我們有：
+    </p>
+    $$A(X) \cdot B(X) - C(X) = H(X) \cdot Z_H(X)$$
+    <p>
+      其中 $H(X)$ 是次數至多為 $n - 2$ 的<strong>商多項式</strong>。此方程就是 QAP 條件：
+      它將<em>所有</em> R1CS 約束同時編碼為一個單一的多項式等式。
+    </p>
+
+    <div class="callout definition">
+      <div class="callout-title">Schwartz-Zippel 引理（應用）</div>
+      <p>
+        在每個點檢查多項式等式 $A(X) \cdot B(X) - C(X) = H(X) \cdot Z_H(X)$
+        需要在 $2n - 1$ 個點上求值次數為 $(2n-2)$ 的多項式。取而代之，根據
+        Schwartz-Zippel 引理，只需在<em>單一隨機點</em> $\tau$ 上檢查即可。若兩個
+        次數 $\leq d$ 的不同多項式在一個大小為 $p \gg d$ 的域的隨機點上一致，
+        其機率 $\leq d/p$，對密碼學域大小而言這是可忽略的。
+        這就是為何可信設定在單一秘密點 $\tau$ 上求值一切。
+      </p>
+    </div>
+
+    <div class="diagram">
+      <pre>
+  R1CS                          QAP                              Groth16
+  ─────                         ───                              ───────
+  矩陣 A, B, C                  多項式 A_i, B_i, C_i             證明 = (A, B, C)
+  n 條約束                      次數 < n                          3 個群元素
+  m+1 個變數                    消失多項式 Z_H(X)
+
+  約束 k：                      QAP 條件：                       驗證：
+  (A_k . w)(B_k . w)           A(X)B(X) - C(X)                  e(A, B) = e(α, β)
+    = C_k . w                    = H(X) Z_H(X)                     · e(PI, γ)
+                                                                    · e(C, δ)
+        │                             │                               │
+        ▼                             ▼                               ▼
+  在域 H 上進行                在指數中對秘密 τ                  用配對（雙線性映射）
+  Lagrange 插值                求值                              進行檢查
+      </pre>
+    </div>
+
+    <!-- ============================================
+         6.3 TRUSTED SETUP CEREMONY
+         ============================================ -->
+    <h2>6.3 可信設定儀式</h2>
+
+    <p>
+      可信設定是 Groth16 中安全性最關鍵的組件。它透過在秘密點 $\tau$ 上「在指數中」
+      （即作為橢圓曲線點，使 $\tau$ 本身永遠不被揭露）求值 QAP 多項式，來產生證明金鑰和驗證金鑰。
+    </p>
+
+    <h3>第一階段：Powers of Tau</h3>
+    <p>
+      第一階段與<em>電路無關</em>。它在兩個群中產生秘密 $\tau$ 的冪次：
+    </p>
+    $$\{[\tau^0]_1, [\tau^1]_1, \ldots, [\tau^{N-1}]_1\}, \qquad \{[\tau^0]_2, [\tau^1]_2, \ldots, [\tau^{N-1}]_2\}$$
+    <p>
+      以及涉及 $\alpha$ 和 $\beta$ 的交叉項。此階段可以被多個電路共享
+      （只要 $N$ 對該電路足夠大）。
+      <a href="https://github.com/iden3/snarkjs">Hermez/Iden3 Powers of Tau 儀式</a>產生了
+      一個通用的第一階段輸出，支援至多 $2^{28}$ 條約束的電路。
+    </p>
+
+    <h3>第二階段：電路特定</h3>
+    <p>
+      第二階段接收第一階段的輸出和特定的 R1CS 電路，以產生證明金鑰和驗證金鑰。
+      它計算以下內容：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <h4>產生額外的隨機性</h4>
+        <p>
+          取樣新的隨機值 $\gamma, \delta \in \mathbb{F}_r$（除了第一階段的 $\tau, \alpha, \beta$ 之外）。
+          這些值將證明的公開部分與私有部分分離。
+        </p>
+      </div>
+      <div class="step">
+        <h4>計算 QAP 多項式求值</h4>
+        <p>
+          利用 R1CS 矩陣，透過第一階段的 $\tau$ 冪次「在指數中」計算每條線路 $i$ 的
+          $A_i(\tau), B_i(\tau), C_i(\tau)$：
+          $[A_i(\tau)]_1 = \sum_k a_{k,i} [\tau^k]_1$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>計算證明金鑰的組合項（私有線路）</h4>
+        <p>
+          對每條私有線路 $i \in \{\ell+1, \ldots, m\}$，計算：
+          $$\Big[\frac{\beta A_i(\tau) + \alpha B_i(\tau) + C_i(\tau)}{\delta}\Big]_1$$
+          這需要知道 $\delta^{-1}$（這是有毒廢料的一部分）。
+        </p>
+      </div>
+      <div class="step">
+        <h4>計算驗證金鑰的組合項（公開線路）</h4>
+        <p>
+          對每條公開輸入線路 $i \in \{0, 1, \ldots, \ell\}$，計算：
+          $$\Big[\frac{\beta A_i(\tau) + \alpha B_i(\tau) + C_i(\tau)}{\gamma}\Big]_1$$
+          這些被放入驗證金鑰。
+        </p>
+      </div>
+      <div class="step">
+        <h4>計算商多項式冪次</h4>
+        <p>
+          計算 $\big\{[\frac{\tau^j Z_H(\tau)}{\delta}]_1\big\}_{j=0}^{n-2}$。
+          這些允許證明者在證明中編碼商多項式 $H(X)$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>組裝證明金鑰和驗證金鑰，銷毀有毒廢料</h4>
+        <p>
+          將所有計算出的元素打包為 $\text{pk}$ 和 $\text{vk}$。不可恢復地銷毀
+          所有秘密值：$\tau, \alpha, \beta, \gamma, \delta$ 以及所有中間計算。
+        </p>
+      </div>
+    </div>
+
+    <h3>多方計算（MPC）</h3>
+    <p>
+      在實際應用中，不應由單一方知道有毒廢料。儀式使用順序式 MPC：
+    </p>
+    <ul>
+      <li><strong>參與者 $i$</strong> 接收當前的 SRS，乘入自己的隨機值
+        $\tau_i, \alpha_i, \beta_i, \gamma_i, \delta_i$，然後將結果傳遞給參與者 $i+1$。</li>
+      <li>有效的秘密是 $\tau = \tau_1 \cdot \tau_2 \cdots \tau_k$（所有貢獻的乘積）。
+        沒有單一參與者知道組合後的值。</li>
+      <li><strong>安全保證：</strong>若至少<em>一位</em>參與者誠實地銷毀了其貢獻，
+        組合後的有毒廢料就不可恢復。</li>
+      <li>每位參與者發布一個<em>正確貢獻的證明</em>，以便其他人驗證儀式未被篡改。</li>
+    </ul>
+
+    <div class="callout warning">
+      <div class="callout-title">危險：有毒廢料洩露</div>
+      <p>
+        若有毒廢料 $(\tau, \alpha, \beta, \gamma, \delta)$ 被攻擊者恢復，
+        他們就能為<strong>任何</strong>虛假陳述偽造證明。具體而言，他們可以為一個
+        不存在有效見證的陳述 $x$ 計算出有效的證明 $\pi$。這完全破壞了健全性
+        &mdash; 系統變得毫無用處。
+      </p>
+      <p>
+        這不僅是理論上的擔憂。2019 年，研究人員證明了 Zcash Sprout 儀式中的一個漏洞
+        本可允許偽造（該漏洞在被利用之前已被修補）。Sapling 升級使用了規模更大的 MPC 儀式
+        （超過 90 名參與者），專門用於緩解這一風險。
+      </p>
+    </div>
+
+    <!-- ============================================
+         6.4 PROVING ALGORITHM
+         ============================================ -->
+    <h2>6.4 證明演算法</h2>
+
+    <p>
+      給定一個電路及其見證 $\mathbf{w}$、公開輸入 $(x_1, \ldots, x_\ell)$ 和
+      證明金鑰 $\text{pk}$，證明者計算一個證明 $\pi = ([A]_1, [B]_2, [C]_1)$，步驟如下：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <h4>計算完整見證</h4>
+        <p>
+          求值電路以獲得所有線路值：
+          $\mathbf{w} = (1, x_1, \ldots, x_\ell, w_{\ell+1}, \ldots, w_m)$
+          其中 $w_0 = 1$ 是常數線路，$x_1, \ldots, x_\ell$ 是公開輸入，
+          $w_{\ell+1}, \ldots, w_m$ 是私有見證值。驗證所有 R1CS 約束均被滿足（完整性檢查）。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>取樣盲化因子</h4>
+        <p>
+          選擇隨機值 $r, s \xleftarrow{\$} \mathbb{F}_r$。這些值提供零知識性：
+          它們隨機化證明，使得同一陳述的不同證明之間不可連結。
+          若沒有 $r$ 和 $s$，證明將是確定性的，可能洩露見證的資訊。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>計算 $[A]_1$</h4>
+        <p>
+          $$[A]_1 = [\alpha]_1 + \sum_{i=0}^{m} w_i [A_i(\tau)]_1 + r[\delta]_1$$
+          這是 QAP 的「左輸入」，用 $\alpha$（結構綁定）和 $r\delta$（零知識）進行盲化。
+          計算是一次對證明金鑰中 $m+1$ 個點的多重純量乘法（MSM）加上兩次加法。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>計算 $[B]_2$ 和 $[B]_1$</h4>
+        <p>
+          $$[B]_2 = [\beta]_2 + \sum_{i=0}^{m} w_i [B_i(\tau)]_2 + s[\delta]_2$$
+          $$[B]_1 = [\beta]_1 + \sum_{i=0}^{m} w_i [B_i(\tau)]_1 + s[\delta]_1$$
+          $\mathbb{G}_2$ 版本是放入證明中的。$\mathbb{G}_1$ 版本是在下一步計算
+          $[C]_1$ 時所需的（因為我們無法將兩個 $\mathbb{G}_2$ 元素相乘）。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>計算商多項式 $H(X)$</h4>
+        <p>
+          首先，利用 iNTT + coset NTT 在 $H$ 的陪集上求值 $A(X), B(X), C(X)$：
+        </p>
+        <ol>
+          <li>以係數形式計算 $A(X) = \sum_{i} w_i A_i(X)$（透過 iNTT 對 Lagrange 多項式的線性組合）</li>
+          <li>在陪集 $\{g\omega^0, g\omega^1, \ldots, g\omega^{n-1}\}$ 上透過 NTT 求值 $A, B, C$</li>
+          <li>逐點計算 $H'(g\omega^k) = \frac{A(g\omega^k) \cdot B(g\omega^k) - C(g\omega^k)}{Z_H(g\omega^k)}$</li>
+          <li>透過 coset iNTT 恢復 $H(X)$ 的係數</li>
+        </ol>
+        <p>
+          這是證明過程中最昂貴的部分：透過 FFT 需要 $O(n \log n)$ 次域運算。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>計算商多項式承諾</h4>
+        <p>
+          $$[H(\tau) \cdot Z_H(\tau) / \delta]_1 = \sum_{j=0}^{n-2} h_j \Big[\frac{\tau^j Z_H(\tau)}{\delta}\Big]_1$$
+          其中 $h_j$ 是 $H(X)$ 的係數。這是一次對證明金鑰中 $n-1$ 個點的 MSM。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>計算 $[C]_1$（私有見證證明元素）</h4>
+        <p>
+          $$[C]_1 = \sum_{i=\ell+1}^{m} w_i \Big[\frac{\beta A_i(\tau) + \alpha B_i(\tau) + C_i(\tau)}{\delta}\Big]_1
+                    + [H(\tau) Z_H(\tau) / \delta]_1
+                    + s[A]_1 + r[B]_1 - rs[\delta]_1$$
+          這結合了：(1) 私有見證貢獻、(2) 商多項式、(3) 盲化因子的交叉項。
+          注意此處僅出現私有線路（$i > \ell$） &mdash; 公開輸入的貢獻由驗證者
+          使用驗證金鑰單獨處理。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>輸出證明</h4>
+        <p>
+          $$\pi = \big([A]_1,\; [B]_2,\; [C]_1\big)$$
+          三個群元素。完成。
+        </p>
+      </div>
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">證明成本分析</div>
+      <p>
+        兩個主要成本是：(1) 計算 $H(X)$ 的 <strong>FFT</strong> &mdash; $O(n \log n)$
+        次域運算；(2) 計算 $[A]_1, [B]_1, [B]_2, [C]_1$ 的<strong>多重純量乘法（MSM）</strong>
+        &mdash; 每個都是 $O(m)$ 個點的 MSM。總計，證明時間為
+        $O((m + n) \log(m + n))$，由 $m$ 和 $n$ 中較大者主導。對典型電路而言，
+        $m \approx n$，因此證明時間為 $O(n \log n)$。
+      </p>
+    </div>
+
+    <!-- ============================================
+         6.5 VERIFICATION ALGORITHM
+         ============================================ -->
+    <h2>6.5 驗證演算法</h2>
+
+    <p>
+      驗證過程非常簡潔且高效。給定公開輸入 $(x_1, \ldots, x_\ell)$、
+      證明 $\pi = (A, B, C)$ 和驗證金鑰 $\text{vk}$，驗證者執行以下步驟：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <h4>計算公開輸入貢獻</h4>
+        <p>
+          使用驗證金鑰中的公開輸入元素：
+          $$\text{PI} = [w_0 \cdot \text{vk}_0]_1 + \sum_{i=1}^{\ell} x_i \cdot [\text{vk}_i]_1
+                      = \sum_{i=0}^{\ell} x_i \Big[\frac{\beta A_i(\tau) + \alpha B_i(\tau) + C_i(\tau)}{\gamma}\Big]_1$$
+          其中 $x_0 = w_0 = 1$（常數線路）。這是一次對 $\ell + 1$ 個點的多重純量乘法
+          &mdash; 唯一隨公開輸入數量增長的計算。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>檢查配對方程</h4>
+        <p>
+          驗證：
+          $$e(A,\; B) \stackrel{?}{=} e\big([\alpha]_1,\; [\beta]_2\big) \;\cdot\; e\big(\text{PI},\; [\gamma]_2\big) \;\cdot\; e\big(C,\; [\delta]_2\big)$$
+          這需要計算 4 次配對（左側 + 右側 3 次），但實際上配對
+          $e([\alpha]_1, [\beta]_2)$ 是預計算的，作為驗證金鑰的一部分儲存，
+          從而將線上成本降低為 <strong>3 次配對</strong>。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>接受或拒絕</h4>
+        <p>
+          若方程成立，輸出<strong>接受</strong>。否則，輸出<strong>拒絕</strong>。
+          沒有糾錯或重試 &mdash; 有效的證明總是通過，無效的證明以壓倒性的機率失敗。
+        </p>
+      </div>
+    </div>
+
+    <h3>為何驗證方程成立</h3>
+    <p>
+      要了解為何正確計算的證明能通過驗證，展開證明者公式中的 $A$、$B$ 和 $C$。
+      定義簡寫：
+    </p>
+    <ul>
+      <li>$a = \alpha + \sum_i w_i A_i(\tau) + r\delta$</li>
+      <li>$b = \beta + \sum_i w_i B_i(\tau) + s\delta$</li>
+    </ul>
+    <p>然後根據配對的雙線性性 $e([x]_1, [y]_2) = e(G_1, G_2)^{xy}$：</p>
+    $$e(A, B) = e(G_1, G_2)^{a \cdot b}$$
+    <p>展開乘積 $a \cdot b$：</p>
+    $$a \cdot b = \alpha\beta + \alpha \sum w_i B_i + \beta \sum w_i A_i + \sum_i \sum_j w_i w_j A_i B_j + \delta(\alpha s + \beta r + r s \delta + r \sum w_i B_i + s \sum w_i A_i)$$
+    <p>
+      利用 QAP 關係 $\sum_i \sum_j w_i w_j A_i(\tau) B_j(\tau) = \sum_i w_i C_i(\tau) + H(\tau) Z_H(\tau)$，
+      並將公開（$i \leq \ell$）和私有（$i > \ell$）線路的貢獻分離，我們得到：
+    </p>
+    $$a \cdot b = \alpha\beta
+      + \underbrace{\sum_{i=0}^{\ell} w_i \frac{\beta A_i + \alpha B_i + C_i}{\gamma} \cdot \gamma}_{\text{公開輸入}}
+      + \underbrace{\Big(\sum_{i=\ell+1}^{m} w_i \frac{\beta A_i + \alpha B_i + C_i}{\delta} + \frac{H(\tau)Z_H(\tau)}{\delta} + as + rb - rs\delta\Big) \cdot \delta}_{\text{私有部分 (= C)}\cdot\delta}$$
+    <p>
+      當在配對中計算時，這恰好等於 $\alpha\beta + \text{PI} \cdot \gamma + C \cdot \delta$。
+      金鑰中 $\gamma$ 和 $\delta$ 的分母正是使公開與私有的分離乾淨運作的關鍵。
+    </p>
+
+    <div class="callout example">
+      <div class="callout-title">範例：Ethereum 上的驗證成本</div>
+      <p>
+        在 Ethereum 上，Groth16 驗證使用 <code>ecPairing</code> 預編譯（EIP-197）。
+        每次配對花費約 80,000 gas 的基礎費用加上每個 (G1, G2) 對約 34,000 gas。
+        3 個配對為：$80{,}000 + 3 \times 34{,}000 = 182{,}000$ gas 用於配對，加上
+        每個公開輸入約 6,000 gas（橢圓曲線點加法）。一個具有 1 個公開輸入的電路
+        大約花費 <strong>~230,000 gas</strong> &mdash; 比大多數 DeFi 操作更便宜。
+      </p>
+    </div>
+
+    <!-- ============================================
+         6.6 SECURITY: WHY IT WORKS
+         ============================================ -->
+    <h2>6.6 安全性：為何它有效</h2>
+
+    <p>
+      Groth16 的安全性建立在三大支柱上：<em>完備性</em>（誠實的證明者總是能說服驗證者）、
+      <em>健全性</em>（沒有作弊的證明者能偽造）以及<em>零知識性</em>（證明不洩露
+      任何關於見證的資訊）。我們逐一審視每個性質以及每個設定參數的角色。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理（Groth16 安全性）</div>
+      <p>
+        在<strong>通用群模型（GGM）</strong>和<strong>代數群模型（AGM）</strong>下，
+        Groth16 證明系統滿足：
+      </p>
+      <ol>
+        <li><strong>完美完備性：</strong>對任何有效的陳述-見證對 $(x, w)$，
+          誠實證明者的輸出總是通過驗證。</li>
+        <li><strong>計算知識健全性：</strong>對任何 PPT 代數對手 $\mathcal{A}$，
+          若其為陳述 $x$ 產生了有效的證明 $\pi$，則存在一個 PPT 提取器 $\mathcal{E}$
+          能從 $\mathcal{A}$ 的內部狀態提取有效的見證 $w$，除了可忽略的機率之外。</li>
+        <li><strong>完美零知識性：</strong>存在一個模擬器 $\mathcal{S}$，僅給定
+          陳述 $x$（不需要見證），就能產生與真實證明不可區分的證明，前提是
+          $\mathcal{S}$ 知道模擬陷門（有毒廢料）。</li>
+      </ol>
+    </div>
+
+    <h3>每個參數的角色</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>參數</th>
+          <th>用途</th>
+          <th>缺少它會破壞什麼</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>$\tau$</td>
+          <td>QAP 多項式的秘密求值點</td>
+          <td>證明者可以在沒有有效見證的情況下構造通過檢查的 $H(X)$</td>
+        </tr>
+        <tr>
+          <td>$\alpha, \beta$</td>
+          <td>強制 $A$、$B$、$C$ 使用<em>相同的</em>見證 $\mathbf{w}$</td>
+          <td>證明者可以獨立地為 $A$ 和 $B$ 使用不同的見證</td>
+        </tr>
+        <tr>
+          <td>$\gamma$</td>
+          <td>在驗證中將公開輸入與私有見證分離</td>
+          <td>證明者可以混合公開和私有貢獻來偽造</td>
+        </tr>
+        <tr>
+          <td>$\delta$</td>
+          <td>分離私有見證貢獻；啟用零知識盲化</td>
+          <td>可以從證明結構中提取見證</td>
+        </tr>
+        <tr>
+          <td>$r, s$</td>
+          <td>隨機化每個證明以實現零知識性</td>
+          <td>證明變為確定性的；同一見證的重複證明可被連結</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>為何 $\alpha, \beta$ 強制一致的見證</h3>
+    <p>
+      若沒有 $\alpha$ 和 $\beta$，證明者可以用一組線路值 $\{w_i\}$ 計算 $[A]_1$，
+      再用一組完全不同的值 $\{w'_i\}$ 計算 $[B]_2$。只要證明者精心構造 $C$ 和 $H$ 來補償，
+      QAP 檢查 $A(\tau) \cdot B(\tau) - C(\tau) = H(\tau) Z_H(\tau)$ 仍然會成立。
+      藉由在 $A$ 中包含 $\alpha$、在 $B$ 中包含 $\beta$，驗證方程強制交叉項
+      $\alpha \sum w_i B_i + \beta \sum w_i A_i$ 出現。
+      試圖使用不同見證的對手需要正確產生這些交叉項，
+      而在不單獨知道 $\alpha$ 和 $\beta$ 的情況下這是不可行的
+      （它們僅以組合形式 $\beta A_i + \alpha B_i + C_i$ 出現）。
+    </p>
+
+    <h3>透過 AGM 的知識健全性</h3>
+    <p>
+      Groth16 的安全性證明使用了由 Fuchsbauer、Kiltz 和 Loss（2018）提出的
+      <strong>代數群模型（AGM）</strong>。在 AGM 中，任何輸出群元素的對手
+      也必須輸出該元素作為先前所見群元素之線性組合的表示。這使得提取成為可能：
+    </p>
+    <ol>
+      <li>對手接收 CRS（所有 $\text{pk}$ 元素）。</li>
+      <li>當它輸出證明元素 $A, B, C$ 時，根據 AGM 它也必須揭示這些元素是如何
+        從 CRS 元素計算出來的。</li>
+      <li>提取器從這些表示中讀取係數 $w_i$。</li>
+      <li>由於 $\alpha, \beta, \gamma, \delta$ 的結構，這些係數必須構成
+        一個一致的有效見證。</li>
+    </ol>
+
+    <div class="callout note">
+      <div class="callout-title">零知識性的模擬</div>
+      <p>
+        模擬器 $\mathcal{S}$ 知道陷門 $(\tau, \alpha, \beta, \gamma, \delta)$，
+        可以在沒有見證的情況下為任何陳述 $x$ 產生看起來有效的證明。它只需計算
+        $A, B, C$ 在 $\tau$ 處應有的求值以滿足驗證方程，然後直接構造群元素。
+        這就是為何有毒廢料被稱為「陷門」 &mdash; 它使模擬成為可能
+        （零知識性證明所需），但必須保持秘密（否則健全性被破壞）。
+      </p>
+    </div>
+
+    <!-- ============================================
+         6.7 GROTH16 LIMITATIONS
+         ============================================ -->
+    <h2>6.7 Groth16 的限制</h2>
+
+    <p>
+      儘管 Groth16 效率很高，它具有根本性的限制，這些限制推動了替代證明系統的發展。
+      理解這些限制對於為特定應用選擇正確的系統至關重要。
+    </p>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>電路特定設定</h4>
+        <p>
+          最顯著的實際限制。每個電路都需要自己的可信設定儀式，這既昂貴、耗時，又依賴於信任。
+          若你在電路設計上反覆迭代（這在開發中很常見），每次都需要一個新的儀式。PLONK 的
+          通用設定消除了這個問題：一次儀式適用於不超過給定大小的任何電路。
+        </p>
+      </div>
+      <div class="comparison-card">
+        <h4>僅支援 R1CS</h4>
+        <p>
+          Groth16 僅適用於 R1CS / QAP 算術化。這意味著：
+          不支援自訂閘（每個閘都是 rank-1 乘法）、不支援查找表（查找表能顯著減少範圍檢查、
+          位元運算等的約束數量）、也不支援高次約束。
+          PLONKish 系統支援所有這些，對實際計算常能將電路大小減少 5-10 倍。
+        </p>
+      </div>
+    </div>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>非通用性</h4>
+        <p>
+          通用性意味著單一設定適用於任何電路。Groth16 是反通用的：設定將特定的電路結構
+          編碼進金鑰。PLONK、Marlin 和 Sonic 都以僅少量增加證明大小的代價實現了通用性。
+          對於擁有多種不同電路的生態系統（如通用 rollup），通用性是必不可少的。
+        </p>
+      </div>
+      <div class="comparison-card">
+        <h4>需要可信設定</h4>
+        <p>
+          STARK 和 Bulletproofs 完全不需要可信設定（透明的）。對於不接受信任儀式的應用
+          （例如沒有天然協調者的去中心化系統），儘管透明系統的證明較大，
+          仍然更受偏好。Groth16 的設定信任可以透過大規模 MPC 儀式來緩解，但永遠無法完全消除。
+        </p>
+      </div>
+    </div>
+
+    <div class="callout warning">
+      <div class="callout-title">非後量子安全</div>
+      <p>
+        Groth16 依賴於橢圓曲線群中離散對數問題的困難性以及雙線性配對的安全性。
+        這兩者都會被足夠強大的量子電腦上的 Shor 演算法破解。
+        雖然目前尚無能力破解這些假設的實用量子電腦，
+        但基於格或雜湊函數的後量子 zkSNARK（如 STARK）正在開發中，以提供長期安全性。
+        具有數十年安全性需求的應用應評估後量子替代方案。
+      </p>
+    </div>
+
+    <h3>比較摘要</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>屬性</th>
+          <th>Groth16</th>
+          <th>PLONK</th>
+          <th>STARK</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>證明大小</td>
+          <td>128-192 B</td>
+          <td>400-800 B</td>
+          <td>45-200 KB</td>
+        </tr>
+        <tr>
+          <td>驗證</td>
+          <td>3 次配對（約 3 ms）</td>
+          <td>約 2 次配對 + 運算（約 5 ms）</td>
+          <td>基於雜湊（約 50 ms）</td>
+        </tr>
+        <tr>
+          <td>設定</td>
+          <td>電路特定</td>
+          <td>通用</td>
+          <td>透明</td>
+        </tr>
+        <tr>
+          <td>算術化</td>
+          <td>僅 R1CS</td>
+          <td>PLONKish（自訂閘）</td>
+          <td>AIR</td>
+        </tr>
+        <tr>
+          <td>查找表</td>
+          <td>否</td>
+          <td>是（Plookup）</td>
+          <td>是</td>
+        </tr>
+        <tr>
+          <td>後量子</td>
+          <td>否</td>
+          <td>否</td>
+          <td>是（基於雜湊）</td>
+        </tr>
+        <tr>
+          <td>鏈上成本（ETH）</td>
+          <td>約 230K gas</td>
+          <td>約 300K gas</td>
+          <td>約 2-5M gas</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ============================================
+         6.8 IMPLEMENTATIONS
+         ============================================ -->
+    <h2>6.8 實作</h2>
+
+    <p>
+      Groth16 在多種程式語言中擁有成熟的實作。選擇取決於你的生態系統
+      （Ethereum 還是通用）、效能需求和語言偏好。
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>程式庫</th>
+          <th>語言</th>
+          <th>曲線</th>
+          <th>備註</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>snarkjs</strong></td>
+          <td>JavaScript</td>
+          <td>BN254</td>
+          <td>
+            Ethereum dApp 中使用最廣泛。與 Circom 電路搭配使用。
+            包含設定、證明和驗證功能。相容於瀏覽器。
+            比原生實作慢，但開發者體驗極佳。
+          </td>
+        </tr>
+        <tr>
+          <td><strong>bellman</strong></td>
+          <td>Rust</td>
+          <td>BN254, BLS12-381</td>
+          <td>
+            Zcash 的官方 Groth16 程式庫。自 Sapling（2018）以來在生產環境中久經考驗。
+            透過 bellperson 分支支援 GPU 加速。
+            Filecoin 用其處理大規模電路（數十億約束）。
+          </td>
+        </tr>
+        <tr>
+          <td><strong>arkworks/groth16</strong></td>
+          <td>Rust</td>
+          <td>通用（任何配對曲線）</td>
+          <td>
+            arkworks 生態系統的一部分。學術品質的實作，支援通用曲線。
+            程式碼清晰、模組化。是理解演算法的參考實作。
+            比 gnark 慢但更靈活。
+          </td>
+        </tr>
+        <tr>
+          <td><strong>gnark</strong></td>
+          <td>Go</td>
+          <td>BN254, BLS12-381, BW6-761</td>
+          <td>
+            目前最快的 Groth16 實作。高度最佳化的組合語言級別有限域和橢圓曲線算術。
+            透過 BW6-761 迴圈支援遞迴證明組合。
+            被 Linea 和其他生產系統使用。
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>典型工作流程（snarkjs + Circom）</h3>
+    <p>
+      Groth16 開發最常見的入門途徑是 Circom/snarkjs 工具鏈。
+      以下是端到端的工作流程：
+    </p>
+
+    <pre><code># 1. 用 Circom 撰寫你的電路
+circom circuit.circom --r1cs --wasm --sym
+
+# 2. 第一階段：Powers of Tau（使用現有儀式或啟動新的）
+snarkjs powersoftau new bn128 14 pot14_0000.ptau
+snarkjs powersoftau contribute pot14_0000.ptau pot14_0001.ptau --name="First"
+snarkjs powersoftau prepare phase2 pot14_0001.ptau pot14_final.ptau
+
+# 3. 第二階段：電路特定設定
+snarkjs groth16 setup circuit.r1cs pot14_final.ptau circuit_0000.zkey
+snarkjs zkey contribute circuit_0000.zkey circuit_0001.zkey --name="First"
+snarkjs zkey export verificationkey circuit_0001.zkey verification_key.json
+
+# 4. 計算見證
+node generate_witness.js circuit.wasm input.json witness.wtns
+
+# 5. 產生證明
+snarkjs groth16 prove circuit_0001.zkey witness.wtns proof.json public.json
+
+# 6. 驗證（鏈下）
+snarkjs groth16 verify verification_key.json public.json proof.json
+
+# 7. 匯出 Solidity 驗證器以供鏈上使用
+snarkjs zkey export solidityverifier circuit_0001.zkey verifier.sol</code></pre>
+
+    <div class="callout note">
+      <div class="callout-title">鏈上驗證（Solidity）</div>
+      <p>
+        匯出的 Solidity 驗證器包含作為硬編碼常數的驗證金鑰，以及一個
+        <code>verifyProof()</code> 函數，該函數使用 Ethereum 的
+        <code>ecPairing</code> 預編譯執行配對檢查。函數簽名通常為：
+      </p>
+      <pre><code>function verifyProof(
+    uint[2] memory a,     // [A]_1 = (x, y)
+    uint[2][2] memory b,  // [B]_2 = ((x1, x2), (y1, y2))
+    uint[2] memory c,     // [C]_1 = (x, y)
+    uint[] memory input   // 公開輸入
+) public view returns (bool)</code></pre>
+      <p>
+        這是智慧合約用於在鏈上驗證 Groth16 證明的介面。證明大小為
+        256 位元組（未壓縮 BN254：每個 G1 點 2 x 32 位元組，G2 點 4 x 32 位元組）。
+      </p>
+    </div>
+
+    <h3>效能基準測試</h3>
+    <p>
+      在現代機器（AMD Ryzen 9、32 GB RAM）上，具有 $2^{20}$（約 100 萬）條約束的電路的
+      近似證明時間：
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>程式庫</th>
+          <th>曲線</th>
+          <th>證明時間</th>
+          <th>驗證時間</th>
+          <th>證明大小</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>gnark</td>
+          <td>BN254</td>
+          <td>約 1.5 秒</td>
+          <td>約 2 毫秒</td>
+          <td>128 B</td>
+        </tr>
+        <tr>
+          <td>arkworks</td>
+          <td>BN254</td>
+          <td>約 4 秒</td>
+          <td>約 3 毫秒</td>
+          <td>128 B</td>
+        </tr>
+        <tr>
+          <td>bellman</td>
+          <td>BLS12-381</td>
+          <td>約 6 秒</td>
+          <td>約 4 毫秒</td>
+          <td>192 B</td>
+        </tr>
+        <tr>
+          <td>snarkjs</td>
+          <td>BN254</td>
+          <td>約 30 秒</td>
+          <td>約 10 毫秒</td>
+          <td>128 B</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout example">
+      <div class="callout-title">範例：最小 Groth16 電路</div>
+      <p>
+        一個簡單的電路，證明知道 $a, b$ 使得 $a \times b = c$（其中 $c$ 是公開的）：
+      </p>
+      <pre><code>// Circom 2.0
+pragma circom 2.0.0;
+
+template Multiply() {
+    signal input a;   // 私有
+    signal input b;   // 私有
+    signal output c;  // 公開
+
+    c &lt;== a * b;      // 單一 R1CS 約束
+}
+
+component main = Multiply();</code></pre>
+      <p>
+        這產生 1 條 R1CS 約束、4 條線路（$w_0 = 1, a, b, c$）、1 個公開輸出。
+        QAP 具有 1 次多項式。即使對這個簡單的電路，證明仍然是
+        3 個群元素（BN254 上 128 位元組），驗證仍然需要 3 次配對。
+        無論電路複雜度如何，常數開銷都是相同的。
+      </p>
+    </div>
+
+    <h2>對本研究的意義</h2>
+    <div class="callout theorem">
+      <div class="callout-title">設計選擇：為何不選 Groth16</div>
+      <p>
+        Groth16 是驗證成本最低的 ZK 系統（恆定大小證明 + 3 次配對），但對本論文來說存在根本性的限制：
+      </p>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>Groth16 特性</th><th>對本研究的影響</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>電路特定可信設定</strong></td>
+          <td>研究階段頻繁修改電路（調整 degree、新增函數），每次修改都要重做儀式——完全不實際</td>
+        </tr>
+        <tr>
+          <td><strong>僅支援 R1CS</strong></td>
+          <td>無法使用自定義閘。Horner 乘加必須拆成多個 $a \cdot b = c$ 約束，電路效率大幅下降</td>
+        </tr>
+        <tr>
+          <td><strong>無原生查找表</strong></td>
+          <td>ByteTable 的 256 行查找無法直接實現，需要用 $O(256)$ 個約束模擬——完全失去查找的效率優勢</td>
+        </tr>
+        <tr>
+          <td><strong>無遞迴支援</strong></td>
+          <td>BN254 配對曲線不形成曲線循環，難以實現遞迴證明組合</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">Groth16 的適用場景</div>
+      <p>
+        儘管本論文不使用 Groth16，但在<strong>電路已固定、需要最小化鏈上驗證成本</strong>的生產部署中，
+        Groth16 仍然是最佳選擇。例如 Zcash Sapling（隱私交易）和 Tornado Cash（混幣協議）都採用 Groth16，
+        因為它的 3 群元素證明（128 bytes）和 3 次配對驗證無與倫比。
+        若我們的研究成果未來要部署到以太坊，可以考慮先用 Halo2 開發，再將最終電路移植到 Groth16（通過 R1CS 轉換）。
+      </p>
+    </div>
+
+    <!-- ============================================
+         NAVIGATION FOOTER
+         ============================================ -->
+    <div class="page-nav">
+      <a href="fft-domains.html">
+        <span class="nav-label">上一章</span>
+        <span class="nav-title">&larr; 5. FFT 與求值域</span>
+      </a>
+      <a href="plonk.html">
+        <span class="nav-label">下一章</span>
+        <span class="nav-title">7. PLONK &rarr;</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

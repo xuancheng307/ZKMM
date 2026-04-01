@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ch.4 算術化 — ZK Handbook</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>ZK Handbook</h1>
+      <div class="subtitle">Zero-Knowledge Proof Systems</div>
+    </div>
+    <nav>
+      <div class="section-label">總覽</div>
+      <a href="index.html"><span class="page-num">0.</span> 首頁</a>
+
+      <div class="section-label">基礎</div>
+      <a href="foundations.html"><span class="page-num">1.</span> 數學基礎</a>
+      <a href="zkp-basics.html"><span class="page-num">2.</span> ZKP：基本概念與性質</a>
+
+      <div class="section-label">構建模組</div>
+      <a href="polynomial-commitments.html"><span class="page-num">3.</span> 多項式承諾</a>
+      <a href="arithmetization.html" class="active"><span class="page-num">4.</span> 算術化</a>
+      <a href="fft-domains.html"><span class="page-num">5.</span> FFT 與求值域</a>
+
+      <div class="section-label">證明系統</div>
+      <a href="groth16.html"><span class="page-num">6.</span> Groth16</a>
+      <a href="plonk.html"><span class="page-num">7.</span> PLONK</a>
+      <a href="halo2.html"><span class="page-num">8.</span> Halo2</a>
+
+      <div class="section-label">進階主題</div>
+      <a href="lookup-arguments.html"><span class="page-num">9.</span> 查找論證</a>
+      <a href="polynomial-method.html"><span class="page-num">10.</span> 多項式方法</a>
+      <a href="security-proofs.html"><span class="page-num">11.</span> 安全性證明</a>
+
+      <div class="section-label">論文方法論</div>
+      <a href="fixed-point.html"><span class="page-num">12.</span> 有限域定點運算</a>
+      <a href="approximation-theory.html"><span class="page-num">13.</span> 多項式逼近理論</a>
+      <a href="horner-evaluation.html"><span class="page-num">14.</span> Horner 求值</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>第四章：算術化</h1>
+      <p class="page-subtitle">
+        計算如何轉化為代數。算術化是「執行程式」與「證明多項式恆等式」之間的橋樑
+        &mdash; 這一步驟使得所有零知識證明系統得以運作。
+        本章涵蓋 R1CS（Groth16 的語言）、QAP（其多項式編碼），以及 PLONKish
+        （PLONK 和 Halo2 所使用的靈活表格式格式）。
+      </p>
+    </div>
+
+    <!-- ============================== DEFINITIONS ============================== -->
+    <div class="definitions-section">
+      <h2>關鍵定義</h2>
+
+      <div class="def-item">
+        <div class="def-term">Arithmetization <span class="zh">算術化</span></div>
+        <div class="def-body">
+          將任意計算轉換為有限域 $\mathbb{F}_p$ 上一組<strong>多項式約束</strong>的過程。
+          證明者的任務因此被簡化為展示一組多項式滿足某些代數關係，而這些關係可以透過多項式承諾
+          與隨機求值高效地進行驗證。每個零知識證明系統都需要一個算術化步驟：算術化格式的選擇
+          （R1CS、AIR、PLONKish、CCS 等）決定了哪個證明系統可以使用其結果。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">R1CS (Rank-1 Constraint System) <span class="zh">秩一約束系統</span></div>
+        <div class="def-body">
+          一個由 $m$ 個約束組成的系統，作用於見證向量 $\mathbf{w} \in \mathbb{F}_p^n$ 上。
+          每個約束 $i$ 具有如下形式：
+          $(\mathbf{a}_i \cdot \mathbf{w}) \times (\mathbf{b}_i \cdot \mathbf{w}) = (\mathbf{c}_i \cdot \mathbf{w})$，
+          其中 $\mathbf{a}_i, \mathbf{b}_i, \mathbf{c}_i \in \mathbb{F}_p^n$ 為係數向量
+          （分別為矩陣 $A, B, C$ 的列向量）。「秩一」意味著每個約束恰好捕捉一次乘法
+          &mdash; 加法被無成本地折疊進線性組合中。
+          被 Groth16、Spartan 和 Marlin 所使用。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">QAP (Quadratic Arithmetic Program) <span class="zh">二次算術程式</span></div>
+        <div class="def-body">
+          R1CS 的多項式編碼。$A, B, C$ 矩陣的每一行被內插為定義域
+          $H = \{\omega^0, \ldots, \omega^{m-1}\}$ 上的多項式，產生多項式
+          $A(X), B(X), C(X)$。R1CS 的滿足條件變成：
+          $$A(X) \cdot B(X) - C(X) = H(X) \cdot Z_H(X)$$
+          其中 $Z_H(X) = \prod_{i=0}^{m-1}(X - \omega^i)$ 是 $H$ 的消沒多項式，
+          而 $H(X)$ 是見證整除性的商多項式。此恆等式透過 Schwartz-Zippel 在隨機挑戰點進行驗證。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">PLONKish Arithmetization <span class="zh">PLONKish 算術化</span></div>
+        <div class="def-body">
+          一種基於表格的算術化方式，其中執行軌跡是一個矩陣，列以單位根的冪次
+          $\omega^i$ 為索引，行則代表 <strong>advice</strong>（私有見證）、
+          <strong>fixed</strong>（選擇器/常數）和 <strong>instance</strong>（公開輸入）的值。
+          閘方程式 &mdash; 一個以行值為變數的多項式 &mdash; 必須在每一列都成立。
+          單元格之間的連線透過<em>排列論證</em>而非矩陣結構來強制執行。
+          被 PLONK、Halo2 及其變體所使用。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Witness (Assignment) <span class="zh">見證/賦值</span></div>
+        <div class="def-body">
+          向量 $\mathbf{w} = (1,\; x_1, \ldots, x_\ell,\; w_1, \ldots, w_m)$，包含常數 $1$、
+          $\ell$ 個公開輸入 $x_i$，以及 $m$ 個私有（秘密）中間值 $w_j$。
+          在 R1CS 中，見證是一個單一的行向量。在 PLONKish 中，見證是軌跡表中所有列的
+          所有 advice 行單元格值的集合。證明者知道完整的見證；驗證者僅能看到公開輸入。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Gate <span class="zh">閘</span></div>
+        <div class="def-body">
+          約束系統中的一個原子約束。在 R1CS 中，一個閘就是一列
+          $(\mathbf{a}_i, \mathbf{b}_i, \mathbf{c}_i)$，代表一次乘法。在 PLONKish 中，
+          一個閘是執行軌跡的一列，必須滿足閘多項式
+          $g(a, b, c, q_L, q_R, q_M, q_O, q_C) = 0$。Halo2 中的自定義閘可以引用多列多行
+          的單元格，使單一「閘」能編碼更複雜的邏輯。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Constraint <span class="zh">約束</span></div>
+        <div class="def-body">
+          一個見證有效時必須成立的方程式。每個約束編碼原始計算的一個步驟。
+          一個被滿足的約束系統意味著整個計算被正確執行。約束的總數決定了電路大小 $n$，
+          這驅動了證明者的成本（大多數系統為 $O(n \log n)$）。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Selector Polynomial <span class="zh">選擇器多項式</span></div>
+        <div class="def-body">
+          在 PLONK 中，固定多項式 $q_L(X), q_R(X), q_M(X), q_O(X), q_C(X)$ 決定了每列的
+          閘類型。它們在預處理階段被承諾（證明者和驗證者皆已知）。閘方程式為：
+          $$q_L(X) \cdot a(X) + q_R(X) \cdot b(X) + q_M(X) \cdot a(X) \cdot b(X) + q_O(X) \cdot c(X) + q_C(X) = 0$$
+          透過在每列選擇不同的選擇器值，同一通用電路結構可以表達加法閘、乘法閘、常數閘等。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Wiring / Copy Constraint <span class="zh">接線/複製約束</span></div>
+        <div class="def-body">
+          一種強制執行軌跡中兩個單元格持有<em>相同值</em>的約束。
+          例如，如果閘 1 的輸出饋入閘 3 的左輸入，則複製約束確保 $c_1 = a_3$。
+          在 PLONKish 系統中，複製約束透過對所有單元格的排列論證來強制執行，而非透過矩陣中的
+          結構性接線。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Permutation Argument <span class="zh">排列論證</span></div>
+        <div class="def-body">
+          一個證明兩個（多重）集合互為排列的子協議。
+          在 PLONK 中，它用於強制執行複製約束：建構一個累積乘積 $Z(X)$，使得
+          $Z(\omega^0) = 1$ 且 $Z(\omega^{n-1}) = 1$（乘積收縮為 1），
+          若且唯若排列 $\sigma$ 被遵守 &mdash; 即所有複製約束成立。此論證使用隨機挑戰
+          $\beta, \gamma$ 將多行檢查壓縮為單一乘積。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Custom Gate <span class="zh">自定義閘</span></div>
+        <div class="def-body">
+          一種 PLONKish 擴展（在 Halo2 中廣泛使用），其中閘多項式可以引用
+          <strong>多列</strong>（透過相對旋轉如 <code>Rotation::cur()</code>、
+          <code>Rotation::next()</code>、<code>Rotation::prev()</code>）和<strong>多行</strong>的單元格。
+          這允許單一閘編碼複雜運算（例如橢圓曲線加法、雜湊回合函數），而在標準 5 選擇器
+          PLONK 格式中則需要多列。
+          權衡：更寬/更複雜的閘減少列數，但增加行數和多項式次數。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Circuit Satisfiability <span class="zh">電路可滿足性</span></div>
+        <div class="def-body">
+          NP 完全決定問題：給定 $\mathbb{F}_p$ 上的算術電路 $C$ 和公開輸入
+          $(x_1, \ldots, x_\ell)$，是否存在一個見證
+          $(w_1, \ldots, w_m)$ 使得 $C$ 的所有約束都被滿足？每個零知識證明系統都歸結為
+          證明電路可滿足性。此問題的 NP 完全性使零知識證明具有普遍適用性
+          &mdash; 任何 NP 陳述都可以歸約至此。
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================== 4.1 ============================== -->
+    <h2>4.1 從計算到約束</h2>
+
+    <p>
+      所有零知識證明系統背後的根本洞見是：與其重新執行一個計算，我們可以
+      <strong>驗證一個關於計算中間值的代數聲明</strong>。算術化就是使這成為可能的過程。
+    </p>
+
+    <p>
+      任何計算 &mdash; 無論是雜湊函數、簽章驗證、資料庫查詢，還是機器學習推論 &mdash;
+      都可以被分解為有限域上的一系列基本算術運算（加法和乘法）。每個運算成為一個<em>約束</em>，
+      而證明者的工作是展示一個<em>見證</em>（所有中間值的賦值），使其同時滿足每一個約束。
+    </p>
+
+    <div class="callout example">
+      <div class="callout-title">貫穿全章的範例</div>
+      <p>
+        <strong>陳述：</strong>「我知道 $x$ 使得 $x^3 + x + 5 = 35$。」
+      </p>
+      <p>
+        解為 $x = 3$（因為 $27 + 3 + 5 = 35$），但我們想要以零知識的方式證明這一點。
+        第一步是將表達式<em>展平</em>為基本運算：
+      </p>
+      <ol>
+        <li>$v_1 = x \times x$ &emsp;（平方）</li>
+        <li>$v_2 = v_1 \times x$ &emsp;（立方）</li>
+        <li>$v_3 = v_2 + x$ &emsp;（加 $x$）</li>
+        <li>$v_4 = v_3 + 5$ &emsp;（加常數）</li>
+        <li>$v_4 = 35$ &emsp;（輸出約束）</li>
+      </ol>
+      <p>
+        每一行都是一個約束。$x = 3$ 時的<strong>見證</strong>為：
+        $v_1 = 9,\; v_2 = 27,\; v_3 = 30,\; v_4 = 35$。
+      </p>
+    </div>
+
+    <p>
+      為何需要這種展平？因為零知識系統不「執行程式」&mdash; 它們證明一個多項式方程組是可滿足的。
+      展平後的形式正是給出了這個方程組。不同的算術化格式（R1CS、PLONKish、AIR）以不同方式
+      表示這些約束，但它們都始於同一理念：<strong>分解計算，為每個中間值命名，每一步寫一個方程式</strong>。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">注意 &mdash; 為何使用有限域？</div>
+      <p>
+        所有運算都在 $\mathbb{F}_p$ 上進行（而非 $\mathbb{Z}$ 或 $\mathbb{R}$），原因有二。
+        首先，有限域具有精確的算術運算，沒有捨入誤差。其次，Schwartz-Zippel 引理
+        &mdash; 健全性的基礎 &mdash; 需要從有限域中抽取隨機挑戰。一個在 $\mathbb{F}_p$
+        上次數為 $d$ 的非零多項式至多有 $d$ 個根，因此在隨機點求值可以以
+        $\geq 1 - d/p$ 的概率偵測作弊。
+      </p>
+    </div>
+
+    <!-- ============================== 4.2 ============================== -->
+    <h2>4.2 R1CS 詳解</h2>
+
+    <p>
+      <strong>R1CS (Rank-1 Constraint System)</strong> 是最廣為人知的算術化格式。
+      它與第一批實用的 zkSNARK 構造一同被引入，至今仍是 Groth16、Spartan
+      和原始 Marlin 的原生格式。
+    </p>
+
+    <h3>格式</h3>
+    <p>
+      一個 R1CS 實例由三個矩陣 $A, B, C \in \mathbb{F}_p^{m \times n}$
+      和一個見證向量 $\mathbf{w} \in \mathbb{F}_p^n$ 組成。系統被滿足的條件為：
+    </p>
+    $$(\mathbf{A} \cdot \mathbf{w}) \circ (\mathbf{B} \cdot \mathbf{w}) = \mathbf{C} \cdot \mathbf{w}$$
+    <p>
+      其中 $\circ$ 表示 Hadamard（逐元素）乘積。逐列展開，每個約束
+      $i \in \{1, \ldots, m\}$ 表述為：
+    </p>
+    $$\left(\sum_{j=1}^{n} A_{ij} \cdot w_j\right) \times \left(\sum_{j=1}^{n} B_{ij} \cdot w_j\right) = \sum_{j=1}^{n} C_{ij} \cdot w_j$$
+
+    <div class="callout definition">
+      <div class="callout-title">關鍵性質：秩一</div>
+      <p>
+        每個約束恰好捕捉<strong>一次乘法</strong>。左因子
+        $\mathbf{a}_i \cdot \mathbf{w}$ 和右因子 $\mathbf{b}_i \cdot \mathbf{w}$ 是見證變數的
+        <em>線性組合</em> &mdash; 加法被嵌入這些線性組合中，不產生額外成本。只有兩個線性形式的
+        乘積才產生次數為 2（二次）的約束，故名「秩一」。
+      </p>
+    </div>
+
+    <h3>詳細範例：$x^3 + x + 5 = 35$ 的 R1CS 表示</h3>
+
+    <p>
+      令見證向量為 $\mathbf{w} = (1,\; x,\; v_1,\; v_2,\; v_3)$，其中：
+    </p>
+    <ul>
+      <li>$w_0 = 1$（常數項，始終存在）</li>
+      <li>$w_1 = x$（秘密輸入）</li>
+      <li>$w_2 = v_1 = x^2$</li>
+      <li>$w_3 = v_2 = x^3$</li>
+      <li>$w_4 = v_3 = x^3 + x + 5$（必須等於 35）</li>
+    </ul>
+
+    <p>我們需要三個約束（每次乘法一個；加法是免費的）：</p>
+
+    <div class="steps">
+      <div class="step">
+        <h4>約束 1：$v_1 = x \times x$</h4>
+        <p>左：$x$，右：$x$，輸出：$v_1$</p>
+        <p>
+          $\mathbf{a}_1 = (0, 1, 0, 0, 0)$, &ensp;
+          $\mathbf{b}_1 = (0, 1, 0, 0, 0)$, &ensp;
+          $\mathbf{c}_1 = (0, 0, 1, 0, 0)$
+        </p>
+        <p>驗算：$(0 \cdot 1 + 1 \cdot x) \times (0 \cdot 1 + 1 \cdot x) = 0 \cdot 1 + 0 \cdot x + 1 \cdot v_1$，即 $x \cdot x = v_1$。</p>
+      </div>
+
+      <div class="step">
+        <h4>約束 2：$v_2 = v_1 \times x$</h4>
+        <p>左：$v_1$，右：$x$，輸出：$v_2$</p>
+        <p>
+          $\mathbf{a}_2 = (0, 0, 1, 0, 0)$, &ensp;
+          $\mathbf{b}_2 = (0, 1, 0, 0, 0)$, &ensp;
+          $\mathbf{c}_2 = (0, 0, 0, 1, 0)$
+        </p>
+        <p>驗算：$v_1 \times x = v_2$，即 $x^2 \cdot x = x^3$。</p>
+      </div>
+
+      <div class="step">
+        <h4>約束 3：$v_3 = (v_2 + x + 5) \times 1$</h4>
+        <p>
+          此約束同時編碼加法與輸出檢查。
+          左：$v_2 + x + 5$，右：$1$，輸出：$v_3$。
+        </p>
+        <p>
+          $\mathbf{a}_3 = (5, 1, 0, 1, 0)$, &ensp;
+          $\mathbf{b}_3 = (1, 0, 0, 0, 0)$, &ensp;
+          $\mathbf{c}_3 = (0, 0, 0, 0, 1)$
+        </p>
+        <p>驗算：$(5 \cdot 1 + 1 \cdot x + 1 \cdot v_2) \times (1) = v_3$，即 $x^3 + x + 5 = v_3$。</p>
+        <p>公開輸出約束 $v_3 = 35$ 被單獨強制執行（作為公開輸入的一部分）。</p>
+      </div>
+    </div>
+
+    <h3>完整矩陣</h3>
+
+    <p>將列向量堆疊，$3 \times 5$ 的矩陣為：</p>
+
+    $$A = \begin{pmatrix} 0 & 1 & 0 & 0 & 0 \\ 0 & 0 & 1 & 0 & 0 \\ 5 & 1 & 0 & 1 & 0 \end{pmatrix}, \quad
+      B = \begin{pmatrix} 0 & 1 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 & 0 \\ 1 & 0 & 0 & 0 & 0 \end{pmatrix}, \quad
+      C = \begin{pmatrix} 0 & 0 & 1 & 0 & 0 \\ 0 & 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 0 & 1 \end{pmatrix}$$
+
+    <p>當 $x = 3$ 時，見證為 $\mathbf{w} = (1, 3, 9, 27, 35)$。驗證：</p>
+    <ul>
+      <li>第 1 列：$(0 + 3) \times (0 + 3) = 9$，而 $C_1 \cdot \mathbf{w} = 9$。正確。</li>
+      <li>第 2 列：$(9) \times (3) = 27$，而 $C_2 \cdot \mathbf{w} = 27$。正確。</li>
+      <li>第 3 列：$(5 + 3 + 27) \times (1) = 35$，而 $C_3 \cdot \mathbf{w} = 35$。正確。</li>
+    </ul>
+
+    <div class="callout warning">
+      <div class="callout-title">常見誤解</div>
+      <p>
+        「R1CS 只能做乘法。」這種說法具有誤導性。每個 R1CS 約束的形式為
+        （線性）$\times$（線性）=（線性）。加法、減法和標量乘法都被吸收進線性組合中。
+        只有當你需要<em>將兩個依賴於見證的量相乘</em>時，才會出現新的約束列。因此，約束數量
+        等於<strong>非線性乘法</strong>的數量，而非運算的總數。
+      </p>
+    </div>
+
+    <h3>使用 R1CS 的系統</h3>
+    <table>
+      <thead>
+        <tr><th>系統</th><th>承諾方案</th><th>設置</th><th>備註</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Groth16</strong></td><td>配對（類 KZG）</td><td>電路專用可信設置</td><td>最小證明（3 $\mathbb{G}_1$ + 1 $\mathbb{G}_2$）</td></tr>
+        <tr><td><strong>Spartan</strong></td><td>IPA / Hyrax</td><td>透明設置</td><td>基於求和檢查，不需要 FFT</td></tr>
+        <tr><td><strong>Marlin</strong></td><td>KZG / IPA</td><td>通用 SRS</td><td>代數全像證明</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ============================== 4.3 ============================== -->
+    <h2>4.3 QAP：R1CS 的多項式形式</h2>
+
+    <p>
+      R1CS 給出了矩陣方程式，但證明系統需要<strong>多項式恆等式</strong>
+      （以便在隨機點求值並利用 Schwartz-Zippel）。QAP 就是這座橋樑：
+      它將離散的矩陣約束轉換為一個多項式整除性檢查。
+    </p>
+
+    <h3>構造方法</h3>
+
+    <div class="steps">
+      <div class="step">
+        <h4>選擇求值定義域 $H$</h4>
+        <p>
+          令 $H = \{r_1, r_2, \ldots, r_m\} \subset \mathbb{F}_p$ 為 $m$ 個相異點的集合
+          （通常取 $m$ 次單位根：$r_i = \omega^{i-1}$）。每個點對應一個約束。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>對矩陣的行進行內插</h4>
+        <p>
+          對矩陣 $A$ 的每一行 $j$，內插多項式 $A_j(X)$ 使得
+          $A_j(r_i) = A_{ij}$，對所有 $i = 1, \ldots, m$ 成立。對 $B$ 和 $C$ 的行做同樣處理，
+          得到多項式 $B_j(X)$ 和 $C_j(X)$。每個多項式的次數 $\leq m - 1$。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>形成聚合多項式</h4>
+        <p>
+          給定見證 $\mathbf{w} = (w_1, \ldots, w_n)$，定義：
+        </p>
+        $$A(X) = \sum_{j=1}^{n} w_j \cdot A_j(X), \quad B(X) = \sum_{j=1}^{n} w_j \cdot B_j(X), \quad C(X) = \sum_{j=1}^{n} w_j \cdot C_j(X)$$
+      </div>
+
+      <div class="step">
+        <h4>檢查整除性條件</h4>
+        <p>
+          定義消沒多項式 $Z_H(X) = \prod_{i=1}^{m}(X - r_i)$。R1CS 被滿足若且唯若：
+        </p>
+        $$A(X) \cdot B(X) - C(X) \equiv 0 \pmod{Z_H(X)}$$
+        <p>
+          等價地，存在商多項式 $H(X)$ 使得：
+        </p>
+        $$A(X) \cdot B(X) - C(X) = H(X) \cdot Z_H(X)$$
+      </div>
+    </div>
+
+    <div class="callout theorem">
+      <div class="callout-title">為何有效</div>
+      <p>
+        在每個點 $r_i \in H$ 上，我們有 $A(r_i) = \mathbf{a}_i \cdot \mathbf{w}$、
+        $B(r_i) = \mathbf{b}_i \cdot \mathbf{w}$、$C(r_i) = \mathbf{c}_i \cdot \mathbf{w}$。
+        因此 $A(r_i) \cdot B(r_i) - C(r_i) = 0$ 對所有 $i$ 成立，恰好等同於每個 R1CS 約束
+        都被滿足。一個在 $H$ 的所有點上為零的多項式可被 $Z_H(X)$ 整除。
+      </p>
+    </div>
+
+    <h3>透過 Schwartz-Zippel 進行驗證</h3>
+
+    <p>
+      驗證者不會在每個點檢查多項式恆等式 &mdash; 那需要 $O(m)$ 的工作量。
+      取而代之，證明者對 $A(X), B(X), C(X), H(X)$ 使用多項式承諾方案進行承諾，
+      而驗證者在單一隨機點 $s$ 檢查恆等式：
+    </p>
+    $$A(s) \cdot B(s) - C(s) \stackrel{?}{=} H(s) \cdot Z_H(s)$$
+    <p>
+      根據 Schwartz-Zippel，如果多項式 $A(X) \cdot B(X) - C(X) - H(X) \cdot Z_H(X)$
+      非零（即證明者正在作弊），此檢查以概率
+      $\geq 1 - \frac{\deg}{|\mathbb{F}_p|}$ 失敗，對於 256 位元素數 $p$ 來說此概率壓倒性地高。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">從 QAP 到 Groth16</div>
+      <p>
+        在 Groth16 中，隨機點 $s$ 被嵌入可信設置 SRS
+        （$[s^i]_1, [s^i]_2$，$i = 0, \ldots, d$）中。證明者使用 SRS
+        「在指數中」求值多項式，而驗證者檢查配對方程式
+        $e([\pi_A]_1, [\pi_B]_2) = e([\alpha]_1, [\beta]_2) \cdot e([\text{pub}]_1, [\delta]_2) \cdot e([\pi_C]_1, [\delta]_2)$。
+        QAP 的結構正是使此配對檢查得以運作的關鍵。
+      </p>
+    </div>
+
+    <h3>次數分析</h3>
+
+    <table>
+      <thead>
+        <tr><th>多項式</th><th>次數</th><th>說明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>$A(X), B(X), C(X)$</td><td>$\leq m - 1$</td><td>在 $m$ 個點上內插</td></tr>
+        <tr><td>$A(X) \cdot B(X)$</td><td>$\leq 2(m-1)$</td><td>兩個次數 $(m-1)$ 多項式之乘積</td></tr>
+        <tr><td>$Z_H(X)$</td><td>$m$</td><td>$H$ 的消沒多項式</td></tr>
+        <tr><td>$H(X)$</td><td>$\leq m - 2$</td><td>$\deg(A \cdot B - C) - \deg(Z_H) = 2(m-1) - m$</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ============================== 4.4 ============================== -->
+    <h2>4.4 PLONKish 算術化</h2>
+
+    <p>
+      PLONKish 是一種根本不同的算術化方法。
+      它不將約束編碼為矩陣列（R1CS），而是將計算佈局為一張<strong>執行軌跡表</strong>。
+      表的每一列是計算的一個「步驟」，而一個<strong>閘多項式</strong>必須在每一列上求值為零。
+    </p>
+
+    <h3>執行軌跡</h3>
+
+    <p>
+      軌跡是一張有 $n$ 列（以 $\omega^0, \omega^1, \ldots, \omega^{n-1}$ 為索引）和
+      若干行的表格。在最簡單的 PLONK 配置中，有三個 <em>advice 行</em>：
+    </p>
+
+    <table>
+      <thead>
+        <tr><th>列 $i$</th><th>$a$（左輸入）</th><th>$b$（右輸入）</th><th>$c$（輸出）</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>$\omega^0$</td><td>$a_0$</td><td>$b_0$</td><td>$c_0$</td></tr>
+        <tr><td>$\omega^1$</td><td>$a_1$</td><td>$b_1$</td><td>$c_1$</td></tr>
+        <tr><td>$\omega^2$</td><td>$a_2$</td><td>$b_2$</td><td>$c_2$</td></tr>
+        <tr><td>$\vdots$</td><td>$\vdots$</td><td>$\vdots$</td><td>$\vdots$</td></tr>
+        <tr><td>$\omega^{n-1}$</td><td>$a_{n-1}$</td><td>$b_{n-1}$</td><td>$c_{n-1}$</td></tr>
+      </tbody>
+    </table>
+
+    <h3>閘方程式</h3>
+
+    <p>
+      在每一列，以下方程式必須成立：
+    </p>
+    $$q_L \cdot a + q_R \cdot b + q_M \cdot a \cdot b + q_O \cdot c + q_C = 0$$
+    <p>
+      五個選擇器值 $(q_L, q_R, q_M, q_O, q_C)$ 在每列是<strong>固定的</strong>
+      （在預處理階段承諾）。它們決定了閘的<em>類型</em>：
+    </p>
+
+    <table>
+      <thead>
+        <tr><th>閘類型</th><th>$q_L$</th><th>$q_R$</th><th>$q_M$</th><th>$q_O$</th><th>$q_C$</th><th>方程式</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>加法</strong></td>
+          <td>$1$</td><td>$1$</td><td>$0$</td><td>$-1$</td><td>$0$</td>
+          <td>$a + b - c = 0$，即 $c = a + b$</td>
+        </tr>
+        <tr>
+          <td><strong>乘法</strong></td>
+          <td>$0$</td><td>$0$</td><td>$1$</td><td>$-1$</td><td>$0$</td>
+          <td>$ab - c = 0$，即 $c = a \cdot b$</td>
+        </tr>
+        <tr>
+          <td><strong>常數</strong></td>
+          <td>$1$</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$-k$</td>
+          <td>$a - k = 0$，即 $a = k$</td>
+        </tr>
+        <tr>
+          <td><strong>布林檢查</strong></td>
+          <td>$0$</td><td>$0$</td><td>$1$</td><td>$-1$</td><td>$0$</td>
+          <td>$a \cdot a - a = 0$（設 $b = a$，$c = a$）</td>
+        </tr>
+        <tr>
+          <td><strong>公開輸入</strong></td>
+          <td>$1$</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$-\text{pub}_i$</td>
+          <td>$a = \text{pub}_i$</td>
+        </tr>
+        <tr>
+          <td><strong>空操作</strong></td>
+          <td>$0$</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$0$</td>
+          <td>$0 = 0$（未使用的列）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout definition">
+      <div class="callout-title">多項式形式</div>
+      <p>
+        每一行 $a, b, c$ 和每一個選擇器 $q_L, q_R, q_M, q_O, q_C$ 都被內插為
+        定義域 $H = \{\omega^0, \ldots, \omega^{n-1}\}$ 上的多項式。閘方程式
+        成為一個必須在 $H$ 的所有點上消沒的多項式恆等式：
+      </p>
+      $$q_L(X) \cdot a(X) + q_R(X) \cdot b(X) + q_M(X) \cdot a(X) b(X) + q_O(X) \cdot c(X) + q_C(X) \equiv 0 \pmod{Z_H(X)}$$
+    </div>
+
+    <h3>詳細範例：$x^3 + x + 5 = 35$ 的 PLONKish 表示</h3>
+
+    <p>
+      我們將計算佈局為 5 列（部分為純加法，部分為乘法）：
+    </p>
+
+    <table>
+      <thead>
+        <tr><th>列</th><th>$a$</th><th>$b$</th><th>$c$</th><th>$q_L$</th><th>$q_R$</th><th>$q_M$</th><th>$q_O$</th><th>$q_C$</th><th>閘類型</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>0</td><td>$x = 3$</td><td>$x = 3$</td><td>$x^2 = 9$</td>
+          <td>$0$</td><td>$0$</td><td>$1$</td><td>$-1$</td><td>$0$</td>
+          <td>乘法：$x \cdot x = x^2$</td>
+        </tr>
+        <tr>
+          <td>1</td><td>$x^2 = 9$</td><td>$x = 3$</td><td>$x^3 = 27$</td>
+          <td>$0$</td><td>$0$</td><td>$1$</td><td>$-1$</td><td>$0$</td>
+          <td>乘法：$x^2 \cdot x = x^3$</td>
+        </tr>
+        <tr>
+          <td>2</td><td>$x^3 = 27$</td><td>$x = 3$</td><td>$x^3 + x = 30$</td>
+          <td>$1$</td><td>$1$</td><td>$0$</td><td>$-1$</td><td>$0$</td>
+          <td>加法：$x^3 + x$</td>
+        </tr>
+        <tr>
+          <td>3</td><td>$30$</td><td>$0$</td><td>$35$</td>
+          <td>$1$</td><td>$0$</td><td>$0$</td><td>$-1$</td><td>$5$</td>
+          <td>加常數：$a + 5 = c$</td>
+        </tr>
+        <tr>
+          <td>4</td><td>$35$</td><td>$0$</td><td>$0$</td>
+          <td>$1$</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$-35$</td>
+          <td>公開輸入：$a = 35$</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      注意所需的<strong>複製約束</strong>：$c_0 = a_1$（第 0 列的輸出饋入第 1 列的左輸入）、
+      $b_0 = b_1 = b_2 = a_0$（$x$ 的所有使用都必須接線在一起）、
+      $c_1 = a_2$、$c_2 = a_3$、$c_3 = a_4$。這些由排列論證（第 4.5 節）強制執行。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">此範例中 R1CS 與 PLONKish 的比較</div>
+      <p>
+        R1CS 需要 3 個約束（每次乘法一個；加法在線性組合中是免費的）。PLONKish 使用 5 列，
+        因為加法和公開輸入檢查是明確的列。然而，PLONKish 獲得了靈活性：我們可以添加自定義閘、
+        查找表和更複雜的操作，而無需改變證明系統。額外列數的開銷由設置的通用性來補償。
+      </p>
+    </div>
+
+    <!-- ============================== 4.5 ============================== -->
+    <h2>4.5 排列論證（PLONK 的複製約束）</h2>
+
+    <p>
+      在 R1CS 中，接線是隱式的：見證向量 $\mathbf{w}$ 在所有約束間共享，因此同一變數在任何地方
+      自動具有相同的值。在 PLONKish 中，每個單元格是獨立的 &mdash; 值 $a_2$ 與 $c_1$
+      之間沒有結構性連接。需要<strong>複製約束</strong>來強制那些應該持有相同值的單元格確實如此。
+    </p>
+
+    <h3>問題</h3>
+    <p>
+      我們需要證明：「單元格 $(a, 2)$ 與單元格 $(c, 1)$ 具有相同的值。」更一般地，
+      我們需要在軌跡中所有 $3n$ 個單元格之間強制執行一組任意的相等關係。
+    </p>
+
+    <h3>排列 $\sigma$</h3>
+    <p>
+      為所有單元格編號：位置 $1, 2, \ldots, n$ 對應行 $a$；位置 $n+1, \ldots, 2n$
+      對應行 $b$；位置 $2n+1, \ldots, 3n$ 對應行 $c$。定義一個排列
+      $\sigma: \{1, \ldots, 3n\} \to \{1, \ldots, 3n\}$，使得 $\sigma$ 將每個單元格
+      映射到其「相等群組」中的下一個單元格。必須相等的單元格在 $\sigma$ 下形成一個循環。
+    </p>
+
+    <div class="callout example">
+      <div class="callout-title">範例：接線 $a_0 = b_0 = b_1 = b_2$</div>
+      <p>
+        這四個單元格必須全部持有值 $x$。在 $\sigma$ 下，它們形成一個循環：
+        $a_0 \to b_0 \to b_1 \to b_2 \to a_0$。對於不涉及任何複製約束的單元格，
+        $\sigma$ 將該單元格映射到自身（恆等映射）。
+      </p>
+    </div>
+
+    <h3>累積乘積論證</h3>
+    <p>
+      複製約束成立若且唯若值遵守排列 $\sigma$。
+      這透過一個<strong>累積乘積</strong> $Z(X)$ 來檢查。
+    </p>
+
+    <p>
+      使用隨機挑戰 $\beta, \gamma$（來自 Fiat-Shamir 轉錄），遞迴定義累加器。
+      初始化 $Z(\omega^0) = 1$，對每個 $i$：
+    </p>
+
+    $$Z(\omega^{i+1}) = Z(\omega^i) \cdot \frac{(a_i + \beta \cdot \omega^i + \gamma)\;(b_i + \beta \cdot k_1 \omega^i + \gamma)\;(c_i + \beta \cdot k_2 \omega^i + \gamma)}{(a_i + \beta \cdot \sigma_a(i) + \gamma)\;(b_i + \beta \cdot \sigma_b(i) + \gamma)\;(c_i + \beta \cdot \sigma_c(i) + \gamma)}$$
+
+    <p>
+      此處 $k_1, k_2$ 是相異常數（陪集生成元），用於區分三個行，
+      而 $\sigma_a(i), \sigma_b(i), \sigma_c(i)$ 編碼了排列 $\sigma$ 限制在每行上的映射。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">正確性</div>
+      <p>
+        <strong>聲明：</strong>$Z(\omega^n) = 1$（等價地，$Z(\omega^{n-1}) \cdot (\text{最後因子}) = 1$）
+        若且唯若所有複製約束成立（以壓倒性的概率，取決於 $\beta, \gamma$）。
+      </p>
+      <p>
+        <strong>直覺：</strong>分子透過 $\beta \cdot \text{位置} + \gamma$ 為每個單元格值 $v$
+        標記其<em>位置</em>。分母則標記其被排列到的位置。如果排列被遵守（被排列的位置上的值相等），
+        分子和分母的項會配對，乘積收縮為 1。如果任何複製約束被違反，乘積不為 1，
+        這可以以 $1 - O(n/p)$ 的概率偵測到。
+      </p>
+    </div>
+
+    <h3>證明者須承諾的內容</h3>
+    <ul>
+      <li>累加器多項式 $Z(X)$（次數 $\leq n$）</li>
+      <li>排列多項式 $\sigma_a(X), \sigma_b(X), \sigma_c(X)$ 是預處理驗證金鑰的一部分（每個電路固定）</li>
+    </ul>
+
+    <h3>$Z(X)$ 上的約束</h3>
+    <p>驗證者檢查三個多項式恆等式（皆模 $Z_H(X)$）：</p>
+    <ol>
+      <li><strong>初始化：</strong>$L_0(X) \cdot (Z(X) - 1) = 0$（確保 $Z(\omega^0) = 1$，其中 $L_0$ 是第一個 Lagrange 基底多項式）</li>
+      <li><strong>遞推：</strong>$Z(\omega X) \cdot [\text{分母}] - Z(X) \cdot [\text{分子}] = 0$（遞迴關係）</li>
+      <li><strong>終止：</strong>$L_{n-1}(X) \cdot (Z(X) - 1) = 0$（確保 $Z(\omega^{n-1}) = 1$；實際上，這由遞推檢查的環繞性所蘊含）</li>
+    </ol>
+
+    <div class="diagram">
+<pre>
+  單元格值：     a₀  a₁  a₂  ...  b₀  b₁  b₂  ...  c₀  c₁  c₂  ...
+
+  排列 σ：       a₀ → b₀ → b₁ → b₂ → a₀     （循環：全等於 x）
+                 c₀ → a₁                       （循環：x² 接線）
+                 c₁ → a₂                       （循環：x³ 接線）
+                 c₂ → a₃                       （循環：x³+x 接線）
+                 c₃ → a₄                       （循環：35 接線）
+
+  累積乘積 Z(ωⁱ) 累加：
+  Z(ω⁰) = 1
+  Z(ω¹) = 1 · (分子₀ / 分母₀)
+  Z(ω²) = Z(ω¹) · (分子₁ / 分母₁)
+  ...
+  Z(ωⁿ) = 1  ← 若所有複製約束成立則必須等於 1
+</pre>
+    </div>
+
+    <!-- ============================== 4.6 ============================== -->
+    <h2>4.6 自定義閘（Halo2 擴展）</h2>
+
+    <p>
+      標準 PLONK 有五個選擇器和一個固定的閘多項式。這對於任意計算已足夠，但可能效率不高：
+      單一個 SHA-256 回合可能需要數百列。<strong>自定義閘</strong>透過允許對當前列<em>及相鄰列</em>
+      中的單元格使用任意多項式表達式，來擴展 PLONKish 框架。
+    </p>
+
+    <h3>自定義閘的運作方式</h3>
+    <p>
+      在 Halo2 中，閘多項式不是固定的。電路開發者定義一個或多個<em>閘約束</em>，
+      每個約束是一個多項式表達式，可以引用：
+    </p>
+    <ul>
+      <li><strong>任何行</strong>（advice、fixed 或 instance）</li>
+      <li><strong>任何相對列</strong>，透過旋轉：<code>Rotation::cur()</code>（列 $i$）、
+          <code>Rotation::next()</code>（列 $i+1$）、<code>Rotation::prev()</code>（列 $i-1$）、
+          或 <code>Rotation(k)</code> 用於任意偏移 $k$</li>
+    </ul>
+    <p>
+      一個選擇器行為每個約束進行閘控，使其僅在特定列上「啟用」。
+    </p>
+
+    <div class="callout example">
+      <div class="callout-title">範例：分支邏輯閘</div>
+      <p>
+        假設我們想要一個閘來檢查：「若 $a_0 \neq 0$，則 $a_2 = a_0 \cdot a_1$；
+        否則 $a_3 = a_0 + a_1$。」這可以表達為：
+      </p>
+      $$q(X) \cdot \big(a_0 \cdot a_1 - a_2\big) \cdot \big(a_0 + a_1 - a_3\big) = 0$$
+      <p>
+        在每個 $q = 1$ 的列上，兩個因子中至少有一個必須為零。這個單一閘取代了在標準 PLONK 中
+        需要多列條件邏輯才能完成的工作。
+      </p>
+    </div>
+
+    <h3>Halo2 中的相對引用</h3>
+
+    <p>考慮一個檢查類 Fibonacci 遞迴的約束：$a_{i+2} = a_{i+1} + a_i$。</p>
+
+<pre><code>meta.create_gate("fibonacci", |meta| {
+    let a_cur  = meta.query_advice(col_a, Rotation::cur());
+    let a_next = meta.query_advice(col_a, Rotation::next());
+    let a_next2 = meta.query_advice(col_a, Rotation(2));
+    let s = meta.query_selector(sel);
+
+    vec![s * (a_cur + a_next - a_next2)]
+});</code></pre>
+
+    <p>
+      這個單一閘由選擇器 <code>sel</code> 啟用，在每個選擇器啟用的列上檢查遞迴關係。
+      標準 PLONK 閘需要三列的工作被一個引用三個連續列的自定義閘所取代。
+    </p>
+
+    <h3>權衡</h3>
+
+    <table>
+      <thead>
+        <tr><th>面向</th><th>標準 PLONK（5 選擇器）</th><th>自定義閘（Halo2）</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>閘複雜度</td><td>低（次數 2）</td><td>高（次數可達 $d$）</td></tr>
+        <tr><td>所需列數</td><td>較多（每列一個運算）</td><td>較少（每列可做複雜運算）</td></tr>
+        <tr><td>所需行數</td><td>3 advice + 5 選擇器</td><td>多個 advice + 多個選擇器</td></tr>
+        <tr><td>每列證明者成本</td><td>較低</td><td>較高（更高次數多項式）</td></tr>
+        <tr><td>總證明者成本</td><td>視情況而定</td><td>通常較低（列數減少佔優）</td></tr>
+        <tr><td>電路編寫</td><td>簡單</td><td>需要仔細設計</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout warning">
+      <div class="callout-title">次數預算</div>
+      <p>
+        每個自定義閘都會增加約束系統中的<strong>最高多項式次數</strong>。
+        商多項式的次數上界為 $(\text{最高閘次數} - 1) \cdot n$，
+        且必須被拆分為符合承諾方案次數上限的區塊。次數為 5 的閘意味著商多項式拆分為 4 個區塊
+        而非 1 個。更多區塊 = 更多承諾 = 更大的證明和更多的驗證者工作。
+        實際上的甜蜜點是次數 3-5。
+      </p>
+    </div>
+
+    <h3>常見自定義閘模式</h3>
+    <ul>
+      <li><strong>範圍檢查：</strong>$q \cdot a \cdot (a - 1) \cdot (a - 2) \cdot \ldots \cdot (a - k) = 0$（次數 $k+1$；確保 $a \in \{0, 1, \ldots, k\}$）</li>
+      <li><strong>條件選擇：</strong>$q \cdot (s \cdot (a - b) + b - c) = 0$（若 $s = 1$ 則 $c = a$，否則 $c = b$）</li>
+      <li><strong>Poseidon 回合：</strong>單一閘編碼完整的回合函數（MDS 矩陣乘法 + S-box），將 Poseidon 雜湊從數百列減少到數十列</li>
+      <li><strong>橢圓曲線點加法：</strong>仿射加法公式編碼在一個具有 5+ advice 行的閘中</li>
+    </ul>
+
+    <!-- ============================== 4.7 ============================== -->
+    <h2>4.7 R1CS 與 PLONKish 比較</h2>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>R1CS</h4>
+        <ul>
+          <li><strong>結構：</strong>三個矩陣 $A, B, C$ 作用於見證向量 $\mathbf{w}$</li>
+          <li><strong>約束形式：</strong>$(A\mathbf{w}) \circ (B\mathbf{w}) = C\mathbf{w}$</li>
+          <li><strong>閘類型：</strong>固定 &mdash; 每列一次乘法</li>
+          <li><strong>接線：</strong>透過共享見證向量隱式實現</li>
+          <li><strong>加法：</strong>免費（被吸收進線性組合）</li>
+          <li><strong>自定義閘：</strong>不支援</li>
+          <li><strong>查找表：</strong>原生不支援</li>
+          <li><strong>設置：</strong>電路專用（Groth16）或通用（Marlin）</li>
+          <li><strong>證明大小：</strong>Groth16 可達最小（128 位元組）</li>
+          <li><strong>生態系統：</strong>Circom、libsnark、bellman（舊版）、arkworks</li>
+          <li><strong>最適用於：</strong>證明大小至上的場景；結構明確的電路</li>
+        </ul>
+      </div>
+
+      <div class="comparison-card">
+        <h4>PLONKish</h4>
+        <ul>
+          <li><strong>結構：</strong>執行軌跡表（列 $\times$ 行）</li>
+          <li><strong>約束形式：</strong>閘多項式在每列 $= 0$，模 $Z_H$</li>
+          <li><strong>閘類型：</strong>靈活 &mdash; 選擇器配置每列</li>
+          <li><strong>接線：</strong>透過排列論證（複製約束）顯式實現</li>
+          <li><strong>加法：</strong>需要明確的列（但可合併進自定義閘）</li>
+          <li><strong>自定義閘：</strong>完全支援（Halo2）</li>
+          <li><strong>查找表：</strong>原生支援（Plookup、LogUp）</li>
+          <li><strong>設置：</strong>通用 SRS（PLONK）或透明（Halo2）</li>
+          <li><strong>證明大小：</strong>小，但大於 Groth16</li>
+          <li><strong>生態系統：</strong>halo2、plonky2、plonky3、Noir、PSE</li>
+          <li><strong>最適用於：</strong>複雜電路、自定義邏輯、大量查找的操作</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">何時使用哪種</div>
+      <p>
+        <strong>使用 R1CS + Groth16</strong>：當你需要絕對最小的證明大小和最快的驗證速度時
+        （例如在 Ethereum 上的鏈上驗證，其中 gas 成本佔主導地位）。
+        缺點是需要針對每個電路進行可信設置儀式。
+      </p>
+      <p>
+        <strong>使用 PLONKish + PLONK/Halo2</strong>：當你需要靈活性（自定義閘、查找論證）、
+        通用或透明設置，或者當電路邏輯足夠複雜以至於自定義閘能顯著減少約束數量時。
+        大多數現代零知識應用（zkEVM、zkBridge、隱私協議）已轉向 PLONKish。
+      </p>
+    </div>
+
+    <h3>量化比較</h3>
+
+    <table>
+      <thead>
+        <tr><th>指標</th><th>R1CS (Groth16)</th><th>PLONKish (PLONK/KZG)</th><th>PLONKish (Halo2/IPA)</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>證明大小</td>
+          <td>$\sim$128 位元組（3 $\mathbb{G}_1$ + 1 $\mathbb{G}_2$）</td>
+          <td>$\sim$400-600 位元組</td>
+          <td>$O(\log n)$ &mdash; $\sim$1-4 KB</td>
+        </tr>
+        <tr>
+          <td>驗證時間</td>
+          <td>$\sim$3 配對（$\sim$1.5 ms）</td>
+          <td>$\sim$2 配對 + 域運算</td>
+          <td>$O(n)$ &mdash; 較慢</td>
+        </tr>
+        <tr>
+          <td>證明者時間</td>
+          <td>$O(n \log n)$ FFT + $O(n)$ MSM</td>
+          <td>$O(n \log n)$ FFT + $O(n)$ MSM</td>
+          <td>$O(n \log n)$ FFT + $O(n)$ MSM</td>
+        </tr>
+        <tr>
+          <td>設置</td>
+          <td>電路專用（有毒廢料）</td>
+          <td>通用 SRS（一次儀式）</td>
+          <td>透明（無需信任）</td>
+        </tr>
+        <tr>
+          <td>自定義閘</td>
+          <td>否</td>
+          <td>有限</td>
+          <td>完全支援</td>
+        </tr>
+        <tr>
+          <td>查找</td>
+          <td>否</td>
+          <td>Plookup</td>
+          <td>Plookup / LogUp</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ============================== Summary ============================== -->
+    <h2>總結</h2>
+
+    <div class="callout definition">
+      <div class="callout-title">全局觀</div>
+      <p>
+        算術化是零知識證明的編譯器前端。它將「證明此計算被正確執行」翻譯為
+        「證明這些多項式滿足一個代數關係」。算術化格式的選擇決定了你可以使用哪個證明系統：
+      </p>
+      <ul>
+        <li>$\text{計算} \xrightarrow{\text{展平}} \text{R1CS} \xrightarrow{\text{內插}} \text{QAP} \xrightarrow{\text{Groth16}}$ 最小證明</li>
+        <li>$\text{計算} \xrightarrow{\text{軌跡表}} \text{PLONKish} \xrightarrow{\text{PLONK/Halo2}}$ 靈活證明</li>
+      </ul>
+      <p>
+        在下一章中，我們將看到 <strong>FFT 與求值域</strong>如何使兩條管線中的多項式運算
+        變得高效 &mdash; 將 $O(n^2)$ 的內插和乘法轉化為 $O(n \log n)$。
+      </p>
+    </div>
+
+    <div class="diagram">
+<pre>
+                       ┌─────────────────────────────┐
+                       │           計算               │
+                       │  （程式 / 函數 / ...）        │
+                       └──────────┬──────────────────┘
+                                  │
+                    ┌─────────────┴─────────────┐
+                    ▼                             ▼
+           ┌───────────────┐            ┌────────────────┐
+           │     R1CS      │            │   PLONKish     │
+           │  (Aw)∘(Bw)=Cw │            │   軌跡表       │
+           └───────┬───────┘            │  + 閘多項式    │
+                   │                    │  + 排列論證    │
+                   ▼                    └───────┬────────┘
+           ┌───────────────┐                    │
+           │     QAP       │                    │
+           │  A·B - C =    │                    │
+           │  H · Zₕ       │                    │
+           └───────┬───────┘                    │
+                   │                            │
+                   ▼                            ▼
+           ┌───────────────┐            ┌────────────────┐
+           │   Groth16     │            │  PLONK / Halo2 │
+           │   Spartan     │            │  plonky2/3     │
+           │   Marlin      │            │  Noir / PSE    │
+           └───────────────┘            └────────────────┘
+</pre>
+    </div>
+
+    <h2>對本研究的意義</h2>
+    <div class="callout theorem">
+      <div class="callout-title">設計選擇：為何選 PLONKish 而非 R1CS</div>
+      <p>
+        論文的電路使用 PLONKish 算術化（透過 Halo2），而非 R1CS（Groth16/Circom 使用）。以下是關鍵差異：
+      </p>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>特性</th><th>PLONKish（我們的選擇）</th><th>R1CS</th><th>對論文的影響</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>自定義閘</strong></td>
+          <td style="color: green;">✓ 支援任意多項式約束</td>
+          <td style="color: red;">✗ 僅 $a \cdot b = c$ 形式</td>
+          <td>可為 Horner 乘加設計專用閘，減少行數</td>
+        </tr>
+        <tr>
+          <td><strong>查找表</strong></td>
+          <td style="color: green;">✓ 原生支援 <code>lookup_any()</code></td>
+          <td style="color: red;">✗ 需要外部擴展</td>
+          <td>ByteTable（256 行）直接在 PLONKish 中使用</td>
+        </tr>
+        <tr>
+          <td><strong>列的靈活性</strong></td>
+          <td>advice / fixed / instance 列</td>
+          <td>固定的 A·B=C 結構</td>
+          <td>可自由安排 Horner 鏈的資料佈局</td>
+        </tr>
+        <tr>
+          <td><strong>相對引用</strong></td>
+          <td style="color: green;">✓ <code>Rotation::prev()</code> / <code>next()</code></td>
+          <td style="color: red;">✗ 只能引用同行</td>
+          <td>Horner 鏈的連續行可直接引用上一步結果</td>
+        </tr>
+        <tr>
+          <td><strong>通用 SRS</strong></td>
+          <td style="color: green;">✓ 改電路不需重做設置</td>
+          <td>電路特定</td>
+          <td>研究階段頻繁修改電路時極為重要</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">排列論證的角色</div>
+      <p>
+        在我們的 Horner 電路中，排列論證確保各步驟之間的接線正確——例如，
+        第 $i$ 步的輸出 $H_i$ 確實被第 $i-1$ 步用作輸入。若攻擊者試圖「斷開」Horner 鏈
+        （在某步使用不同的中間值），排列論證的累積乘積檢查將以壓倒性機率偵測到此作弊行為。
+      </p>
+    </div>
+
+    <!-- ============================== Page Nav ============================== -->
+    <div class="page-nav">
+      <a href="polynomial-commitments.html">
+        <span class="nav-label">上一章</span>
+        <span class="nav-title">&larr; 3. 多項式承諾</span>
+      </a>
+      <a href="fft-domains.html">
+        <span class="nav-label">下一章</span>
+        <span class="nav-title">5. FFT 與求值域 &rarr;</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

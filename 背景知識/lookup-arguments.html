@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ch.9 查找論證 — ZK Handbook</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>ZK Handbook</h1>
+      <div class="subtitle">Zero-Knowledge Proof Systems</div>
+    </div>
+    <nav>
+      <div class="section-label">總覽</div>
+      <a href="index.html"><span class="page-num">0.</span> Home</a>
+      <div class="section-label">基礎</div>
+      <a href="foundations.html"><span class="page-num">1.</span> Mathematical Foundations</a>
+      <a href="zkp-basics.html"><span class="page-num">2.</span> ZKP: Basics &amp; Properties</a>
+      <div class="section-label">構建模組</div>
+      <a href="polynomial-commitments.html"><span class="page-num">3.</span> Polynomial Commitments</a>
+      <a href="arithmetization.html"><span class="page-num">4.</span> Arithmetization</a>
+      <a href="fft-domains.html"><span class="page-num">5.</span> FFT &amp; Evaluation Domains</a>
+      <div class="section-label">證明系統</div>
+      <a href="groth16.html"><span class="page-num">6.</span> Groth16</a>
+      <a href="plonk.html"><span class="page-num">7.</span> PLONK</a>
+      <a href="halo2.html"><span class="page-num">8.</span> Halo2</a>
+      <div class="section-label">進階主題</div>
+      <a href="lookup-arguments.html" class="active"><span class="page-num">9.</span> Lookup Arguments</a>
+      <a href="polynomial-method.html"><span class="page-num">10.</span> Polynomial Method</a>
+      <a href="security-proofs.html"><span class="page-num">11.</span> Security Proofs</a>
+
+      <div class="section-label">論文方法論</div>
+      <a href="fixed-point.html"><span class="page-num">12.</span> 有限域定點運算</a>
+      <a href="approximation-theory.html"><span class="page-num">13.</span> 多項式逼近理論</a>
+      <a href="horner-evaluation.html"><span class="page-num">14.</span> Horner 求值</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+      <h1>第九章：查找論證（Lookup Arguments）</h1>
+      <p class="page-subtitle">如何證明某一欄中的每個值皆屬於一張預先計算的表格 &mdash; 這是在零知識電路中實現高效範圍檢查、位元運算及非線性函數求值的關鍵原語。</p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DEFINITIONS SECTION                                           -->
+    <!-- ============================================================ -->
+    <div class="definitions-section">
+      <h2>關鍵定義</h2>
+
+      <!-- 1. Lookup Argument -->
+      <div class="def-item">
+        <div class="def-term">Lookup Argument <span class="zh">查找論證</span></div>
+        <div class="def-body">
+          <strong>查找論證</strong>是一種協議，用以證明「查詢」欄 $f$ 中的每個元素都包含在「表格」欄 $t$ 之中：$\forall\, i,\; f_i \in \{t_0, t_1, \ldots, t_{N-1}\}$。證明者無需在算術約束中直接計算函數，而是透過預先計算的合法輸入-輸出配對表格，證明該輸出確實來自表格查找。
+        </div>
+      </div>
+
+      <!-- 2. Lookup Table -->
+      <div class="def-item">
+        <div class="def-term">Lookup Table <span class="zh">查找表</span></div>
+        <div class="def-body">
+          <strong>查找表</strong>是一欄預先計算的固定值，作為查找論證的參考集合。例如：用於位元組級運算的 256 個條目表 ($\{0, 1, \ldots, 255\}$)、用於 16 位元範圍檢查的 $2^{16}$ 條目表，或是將 $(x, y) \mapsto x \oplus y$ 映射的多欄 XOR 表。
+        </div>
+      </div>
+
+      <!-- 3. Plookup -->
+      <div class="def-item">
+        <div class="def-term">Plookup <span class="zh">Plookup</span></div>
+        <div class="def-body">
+          <strong>Plookup</strong>（Gabizon 與 Williamson, 2020）是開創性的查找論證協議。它採用<em>排序合併</em>方法：將 $f \cup t$ 的聯集排序，然後透過大乘積論證檢查相鄰關係。其核心恆等式確保排序列表中的連續元素要麼重複，要麼對應表格中相鄰的有效條目。
+        </div>
+      </div>
+
+      <!-- 4. Halo2 Lookup -->
+      <div class="def-item">
+        <div class="def-term">Halo2 Lookup <span class="zh">Halo2 查找</span></div>
+        <div class="def-body">
+          <strong>Halo2 的內建查找</strong>機制。證明者將查詢值排列以匹配排序後的表格順序，並構造置換欄 $(A', S')$。大乘積論證驗證 $A'$ 和 $S'$ 分別是輸入與表格的有效置換，加上相鄰性檢查確保每個 $A'_i$ 等於 $S'_i$ 或 $A'_{i-1}$。
+        </div>
+      </div>
+
+      <!-- 5. LogUp -->
+      <div class="def-item">
+        <div class="def-term">LogUp <span class="zh">LogUp</span></div>
+        <div class="def-body">
+          <strong>LogUp</strong>（對數導數查找）以有理函數之和取代大乘積方法：$\sum_{j} \frac{1}{\gamma + f_j} = \sum_{i} \frac{m_i}{\gamma + t_i}$，其中 $m_i$ 是表格條目 $t_i$ 在查詢中出現的多重度。此方法無需排序，並支援跨子電路的表格共享。
+        </div>
+      </div>
+
+      <!-- 6. MVLookup -->
+      <div class="def-item">
+        <div class="def-term">MVLookup <span class="zh">MVLookup</span></div>
+        <div class="def-body">
+          <strong>MVLookup</strong>（多變量查找）將 LogUp 擴展到多欄查找。它不將多欄條目編碼為單一隨機線性組合，而是原生處理每一欄，使得表格具有多個輸入/輸出欄時，能產生更高效的證明。
+        </div>
+      </div>
+
+      <!-- 7. Multiplicity -->
+      <div class="def-item">
+        <div class="def-term">Multiplicity <span class="zh">多重度</span></div>
+        <div class="def-body">
+          表格條目 $t_i$ 的<strong>多重度</strong> $m_i$ 是 $t_i$ 在查詢欄 $f$ 中出現的次數。在 LogUp 中，多重度作為獨立的一欄被顯式追蹤：證明者對每個表格列承諾 $m_i$，協議驗證其一致性。在 Plookup 中，多重度隱含在排序合併之中。
+        </div>
+      </div>
+
+      <!-- 8. Sorted Concatenation -->
+      <div class="def-item">
+        <div class="def-term">Sorted Concatenation <span class="zh">排序合併</span></div>
+        <div class="def-body">
+          在 Plookup 中，<strong>排序合併</strong>是將查詢欄 $f$ 和表格欄 $t$ 合併為單一排序序列 $s$ 的過程。排序遵循表格順序：相等的值被分組在一起，連續的不同值對應表格中相鄰的條目。檢查 $s$ 是否具有此結構即可證明 $f \subseteq t$。
+        </div>
+      </div>
+
+      <!-- 9. Table Size Bottleneck -->
+      <div class="def-item">
+        <div class="def-term">Table Size Bottleneck <span class="zh">表大小瓶頸</span></div>
+        <div class="def-body">
+          <strong>表大小瓶頸</strong>是指傳統查找方案的根本限制：表格必須佔據電路中的固定欄位。一張 $2^{16}$ 條目的表格光是表格資料就需要 $2^{16}$ 行，無論實際執行多少次查找。當多個函數各自需要獨立的表格時，行數會急劇膨脹 &mdash; 這是查找密集型電路的主要可擴展性障礙。
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 9.1 WHY LOOKUP ARGUMENTS?                                     -->
+    <!-- ============================================================ -->
+    <h2 id="why-lookups">9.1 為何需要查找論證？</h2>
+
+    <h3>算術化的瓶頸</h3>
+    <p>
+      回顧第四章，算術化將計算轉換為有限域 $\mathbb{F}_r$ 上的多項式約束。約束系統使用加法門和乘法門。對於天然具有代數結構的運算 &mdash; 域算術、線性代數、多項式求值 &mdash; 這非常有效，但對於<em>非天然代數</em>的運算則變得極為昂貴。
+    </p>
+    <p>
+      考慮以下運算在算術約束下的表現：
+    </p>
+    <ul>
+      <li><strong>位元 AND</strong>（$a \wedge b$）：計算兩個 32 位元值的 AND 需要先將兩者分解為單獨的位元（每個需 32 個約束做位元分解，加上 32 個範圍檢查約束以驗證每個位元為 0 或 1），然後將對應位元相乘（32 個乘法門），最後重新組合結果（32 個帶冪次的加法）。總計：一個 32 位元 AND 約需 160 個以上的約束。</li>
+      <li><strong>範圍檢查</strong>（$x \in [0, 2^k)$）：標準方法將 $x$ 分解為 $k$ 個位元：$x = \sum_{i=0}^{k-1} b_i \cdot 2^i$，每個 $b_i \in \{0,1\}$ 由 $b_i \cdot (1 - b_i) = 0$ 強制。代價為 $k$ 個乘法約束加 $k$ 個加法約束。當 $k = 16$ 時，一次範圍檢查就需要 32 個約束。</li>
+      <li><strong>SHA-256</strong>：SHA-256 的一輪涉及 32 位元字上的位元運算（AND、XOR、NOT、旋轉）。每輪需要數百個約束。完整的 SHA-256（64 輪）大約需要 25,000&ndash;30,000 個約束。</li>
+      <li><strong>非線性函數</strong>（ReLU、sigmoid、$\exp$）：機器學習中的這些函數在域算術中沒有封閉形式的表達式。用多項式約束來近似它們需要高次多項式和大量的門。</li>
+    </ul>
+
+    <h3>查找的核心思想</h3>
+    <p>
+      查找論證背後的根本洞見很簡單：<strong>如果一個函數的定義域是有界的，就預先計算其所有輸出並存入表格</strong>。無需在電路內部計算 $f(x)$，只要證明 $(x, f(x))$ 這對值存在於預先計算的表格中即可。
+    </p>
+
+    <div class="callout example">
+      <div class="callout-title">具體範例：透過查找進行範圍檢查</div>
+      <p>
+        假設我們要證明 $x \in [0, 256)$（即 $x$ 是一個 8 位元值）。不使用查找時，需要將 $x$ 分解為 8 個位元並約束每個位元，代價為 16 個約束。使用查找：
+      </p>
+      <ol>
+        <li>預先計算一張表格 $t = (0, 1, 2, \ldots, 255)$，共 256 個條目。</li>
+        <li>使用一個查找論證證明 $x \in t$。</li>
+        <li>完成。一次查找取代了 16 個約束。</li>
+      </ol>
+      <p>
+        查找論證本身有一些開銷（下面會量化），但它在對同一表格的所有查找上是<em>攤銷</em>的。如果電路針對同一張 256 條目的表格執行 10,000 次範圍檢查，每次檢查的邊際成本基本上只是查詢欄中的一行。
+      </p>
+    </div>
+
+    <h3>成本比較</h3>
+    <p>
+      下表比較了幾種運算在直接實現與使用查找時的約束成本：
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>運算</th>
+          <th>直接約束數</th>
+          <th>使用查找</th>
+          <th>節省倍數</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>範圍檢查：$x \in [0, 2^8)$</td>
+          <td>16（8 個位元 + 8 個布林檢查）</td>
+          <td>1 次查找，256 條目表格</td>
+          <td>16x</td>
+        </tr>
+        <tr>
+          <td>範圍檢查：$x \in [0, 2^{16})$</td>
+          <td>32 個約束</td>
+          <td>1 次查找，$2^{16}$ 條目表格</td>
+          <td>32x</td>
+        </tr>
+        <tr>
+          <td>位元 XOR（8 位元）</td>
+          <td>~24 個約束（分解、逐位元 XOR、重組）</td>
+          <td>1 次查找，$(a, b, a \oplus b)$ 表格（65536 個條目）</td>
+          <td>24x</td>
+        </tr>
+        <tr>
+          <td>位元 AND（8 位元）</td>
+          <td>~24 個約束</td>
+          <td>1 次查找，$(a, b, a \wedge b)$ 表格</td>
+          <td>24x</td>
+        </tr>
+        <tr>
+          <td>位元組分解</td>
+          <td>每位元組 ~10 個約束</td>
+          <td>每位元組 1 次查找</td>
+          <td>10x</td>
+        </tr>
+        <tr>
+          <td>AES S-box</td>
+          <td>~200 個約束（GF($2^8$) 反元素）</td>
+          <td>1 次查找，256 條目 S-box 表格</td>
+          <td>200x</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">攤銷成本</div>
+      <p>
+        在傳統方案中，表格本身佔據電路的行數。一張 256 條目的表格消耗 256 行。但如果執行 $n$ 次查找，每次查找的邊際成本約為 $\approx 1$ 行。損益平衡點在於 $n \times \text{直接成本} > n + \text{表格大小}$。對於 256 條目的表格和 16 個約束的範圍檢查：$16n > n + 256 \implies n > 17$。僅需超過 17 次範圍檢查，查找方法就更為划算。
+      </p>
+    </div>
+
+    <h3>查找在實務中的應用場景</h3>
+    <ul>
+      <li><strong>範圍檢查</strong> &mdash; 最常見的用途。zkEVM 每個區塊執行數千次範圍檢查。</li>
+      <li><strong>位元運算</strong> &mdash; ZK 電路中 SHA-256、Keccak、AES 所需的 AND、OR、XOR。</li>
+      <li><strong>雜湊函數 S-box</strong> &mdash; AES、Poseidon（部分輪次）、Rescue 的 S-box 查找。</li>
+      <li><strong>指令碼調度</strong> &mdash; zkVM 使用查找來驗證指令操作碼的合法性並擷取其語義。</li>
+      <li><strong>記憶體一致性</strong> &mdash; zkVM 使用類似查找的論證來證明 RAM 讀寫的一致性。</li>
+      <li><strong>機器學習激活函數</strong> &mdash; ReLU、sigmoid 等透過量化精度的查找表來求值（見第 9.6 節）。</li>
+    </ul>
+
+    <!-- ============================================================ -->
+    <!-- 9.2 THE PLOOKUP PROTOCOL                                      -->
+    <!-- ============================================================ -->
+    <h2 id="plookup">9.2 Plookup 協議</h2>
+
+    <h3>設定與符號</h3>
+    <p>
+      令 $t = (t_1, t_2, \ldots, t_N)$ 為<strong>表格</strong> &mdash; 一個固定的、公開已知的域元素序列，代表所有合法值。令 $f = (f_1, f_2, \ldots, f_n)$ 為<strong>查詢</strong>（或「見證」）&mdash; 證明者聲稱全部包含在 $t$ 中的值。我們要證明：
+    </p>
+    $$\forall\, j \in [n], \quad f_j \in \{t_1, t_2, \ldots, t_N\}$$
+
+    <h3>核心思想：排序合併</h3>
+    <p>
+      Plookup 的核心洞見是<strong>包含關係可以透過排序來檢驗</strong>。考慮將 $f$ 和 $t$ 的合併結果按照 $t$ 定義的順序排序。如果每個 $f_j$ 確實在 $t$ 中，則排序後的序列具有特定結構：連續的元素要麼相等，要麼對應 $t$ 中相鄰的條目。
+    </p>
+    <p>
+      更精確地說，定義 $s = \text{sort}(f \cup t)$，其中「排序」指按 $t$ 中元素的順序排列（$f$ 中的重複值放置在其匹配的表格條目旁邊）。那麼 $f \subseteq t$ 成立，若且唯若對每對連續元素 $(s_i, s_{i+1})$：
+    </p>
+    <ul>
+      <li>$s_i = s_{i+1}$（來自查詢的重複值），或</li>
+      <li>$(s_i, s_{i+1})$ 是 $t$ 中連續條目的一對（「合法步進」）。</li>
+    </ul>
+
+    <div class="callout example">
+      <div class="callout-title">實例演練：排序合併</div>
+      <p>
+        令 $t = (1, 4, 7, 10)$（4 個條目的表格）。令 $f = (4, 1, 7, 4)$（查詢）。所有 $f_j \in t$，因此查找應該通過。
+      </p>
+      <p>
+        合併結果：$f \cup t = (4, 1, 7, 4, 1, 4, 7, 10)$。按表格順序排序：
+      </p>
+      <p>
+        $s = (1, 1, 4, 4, 4, 7, 7, 10)$
+      </p>
+      <p>
+        檢查連續對：$(1,1)$ 相等；$(1,4)$ 在 $t$ 中相鄰；$(4,4)$ 相等；$(4,4)$ 相等；$(4,7)$ 在 $t$ 中相鄰；$(7,7)$ 相等；$(7,10)$ 在 $t$ 中相鄰。全部有效。
+      </p>
+      <p>
+        現在假設 $f = (4, 1, 5, 4)$，其中 $5 \notin t$。排序後：$s = (1, 4, 4, 5, 7, 10, \ldots)$。$(4, 5)$ 這對既不相等也不是 $t$ 中的相鄰條目（$4$ 之後的下一個表格條目是 $7$，不是 $5$）。檢查失敗。
+      </p>
+    </div>
+
+    <h3>正式協議</h3>
+    <p>
+      Plookup 使用驗證者抽樣的隨機挑戰 $\beta, \gamma$（在非互動式設定中透過 Fiat-Shamir），將排序合併檢查轉換為多項式恆等式。協議步驟如下：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <strong>證明者承諾排序合併。</strong>
+        證明者計算 $s = \text{sort}(f \cup t)$（按表格順序排序，長度為 $n + N$），並將 $s$ 作為多項式進行承諾。
+      </div>
+      <div class="step">
+        <strong>驗證者發送隨機挑戰 $\beta, \gamma$。</strong>
+        （實務中透過 Fiat-Shamir 從通訊記錄中導出。）
+      </div>
+      <div class="step">
+        <strong>大乘積檢查。</strong>
+        證明者構造大乘積多項式 $Z(X)$ 並證明以下恆等式成立：
+        $$\prod_{i=1}^{n} \frac{(1+\beta)(\gamma + f_i)(\gamma(1+\beta) + t_i + \beta \cdot t_{i+1})}{\left(\gamma(1+\beta) + s_i + \beta \cdot s_{i+1}\right)\left(\gamma(1+\beta) + s_{n+i} + \beta \cdot s_{n+i+1}\right)} = 1$$
+      </div>
+      <div class="step">
+        <strong>驗證者檢查。</strong>
+        驗證者確認 $Z(\omega^0) = 1$（乘積從 1 開始）、遞推關係在定義域的每個點上成立，以及 $Z(\omega^{n}) = 1$（乘積在末尾回到 1）。
+      </div>
+    </div>
+
+    <div class="callout theorem">
+      <div class="callout-title">Plookup 健全性</div>
+      <p>
+        大乘積恆等式成立（在 $\beta, \gamma$ 隨機選擇下以壓倒性機率），若且唯若：
+      </p>
+      <ol>
+        <li>$s$ 是 $f \cup t$ 按表格順序的有效排序，且</li>
+        <li>每個 $f_j \in \{t_1, \ldots, t_N\}$。</li>
+      </ol>
+      <p>
+        健全性誤差至多為 $\frac{(n+N)^2}{|\mathbb{F}|}$，對於密碼學級別的域大小而言是可忽略的。
+      </p>
+    </div>
+
+    <h3>理解大乘積</h3>
+    <p>
+      大乘積公式看起來令人生畏，但直覺上很簡單。分子中的每個因子編碼一次「移動」&mdash; 查詢值 $f_i$ 與表格對 $(t_i, t_{i+1})$ 的配對。分母中的每個因子編碼排序序列中對應的「移動」。如果移動的多重集合相匹配，乘積為 1。
+    </p>
+    <p>
+      $\beta$ 的作用是將連續的配對「綁定」在一起：$\gamma(1+\beta) + s_i + \beta \cdot s_{i+1}$ 實質上將配對 $(s_i, s_{i+1})$ 編碼為單一域元素。因子 $(1+\beta)$ 用於正規化編碼。挑戰值 $\gamma$ 則是平移所有值以避免除以零。
+    </p>
+
+    <div class="callout warning">
+      <div class="callout-title">Plookup 的限制：表格在電路內</div>
+      <p>
+        在 Plookup 中，表格 $t$ 必須作為約束系統中的一欄存在。一張有 $N$ 個條目的表格佔據 $N$ 行。排序序列 $s$ 的長度為 $n + N$，需要一個額外的同等長度的欄。對於一張 $2^{16}$ 條目的表格，這意味著至少有 $2^{16} = 65{,}536$ 行專門用於表格 &mdash; 即使只執行一次查找也是如此。這就是後續方案所要解決的<strong>表大小瓶頸</strong>。
+      </p>
+    </div>
+
+    <h3>複雜度</h3>
+    <ul>
+      <li><strong>證明者時間：</strong>$O((n + N) \log(n + N))$，用於排序和基於 FFT 的多項式運算。</li>
+      <li><strong>證明大小：</strong>增加 $s$ 和 $Z$ 的承諾（2 個額外的多項式承諾）。</li>
+      <li><strong>驗證者時間：</strong>與基礎證明系統相同（固定數量的配對檢查或求值檢查）。</li>
+    </ul>
+
+    <!-- ============================================================ -->
+    <!-- 9.3 HALO2'S LOOKUP MECHANISM                                  -->
+    <!-- ============================================================ -->
+    <h2 id="halo2-lookup">9.3 Halo2 的查找機制</h2>
+
+    <h3>API 介面</h3>
+    <p>
+      Halo2 透過 <code>ConstraintSystem</code> 提供高階查找 API。在電路配置期間使用 <code>meta.lookup()</code> 來宣告查找：
+    </p>
+
+    <pre><code>meta.lookup("range_check", |meta| {
+    let value = meta.query_advice(value_col, Rotation::cur());
+    let table_val = meta.query_fixed(table_col, Rotation::cur());
+    vec![(value, table_val)]
+});</code></pre>
+
+    <p>
+      閉包回傳一個 <code>(input_expression, table_expression)</code> 配對的向量。每對宣告：在查找有效的每一行上，輸入表達式的值必須出現在表格表達式的欄中某處。多個配對可建立多欄查找（輸入值的元組必須匹配表格值的元組）。
+    </p>
+
+    <h3>輸入與表格表達式</h3>
+    <p>
+      輸入和表格表達式都可以是電路欄位上的<em>任意多項式表達式</em>，而不僅僅是原始的欄位引用。這非常強大：
+    </p>
+    <ul>
+      <li><strong>輸入表達式</strong>可以涉及 advice 欄、fixed 欄、instance 欄和選擇器，並透過加法和乘法進行組合。這讓你可以用選擇器「門控」查找，並在查找前轉換值。</li>
+      <li><strong>表格表達式</strong>通常引用包含預計算表格資料的 fixed 欄。但它們也可以是多項式表達式，從而實現動態表格建構。</li>
+    </ul>
+
+    <div class="callout example">
+      <div class="callout-title">多欄查找：XOR 表格</div>
+      <p>
+        要查找兩個 4 位元值的 XOR，你需定義一張具有三欄 $(a, b, a \oplus b)$ 和 256 行（所有 $16 \times 16$ 組合）的表格：
+      </p>
+      <pre><code>meta.lookup("xor", |meta| {
+    let a = meta.query_advice(a_col, Rotation::cur());
+    let b = meta.query_advice(b_col, Rotation::cur());
+    let c = meta.query_advice(result_col, Rotation::cur());
+    let ta = meta.query_fixed(table_a, Rotation::cur());
+    let tb = meta.query_fixed(table_b, Rotation::cur());
+    let tc = meta.query_fixed(table_c, Rotation::cur());
+    vec![(a, ta), (b, tb), (c, tc)]
+});</code></pre>
+      <p>
+        查找論證證明：對於每一有效行，三元組 $(a, b, c)$ 都作為行 $(t_a, t_b, t_c)$ 出現在表格中。這以單一 3 欄查找取代了約 24 個約束（位元分解、逐位元 XOR、重組）。
+      </p>
+    </div>
+
+    <h3>底層原理：置換方法</h3>
+    <p>
+      Halo2 的查找基於 Plookup 的一個變體，適配於 PLONK 風格的約束系統。其機制如下：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <strong>壓縮多欄查找。</strong>
+        若查找有多個欄位，驗證者提供隨機挑戰 $\theta$，證明者透過隨機線性組合將每個元組壓縮為單一域元素：$\text{input}_i = a_i + \theta \cdot b_i + \theta^2 \cdot c_i + \cdots$，表格側同理。
+      </div>
+      <div class="step">
+        <strong>構造置換欄 $A'$ 和 $S'$。</strong>
+        證明者建立兩個新欄：
+        <ul>
+          <li>$A'$ 是（壓縮後的）輸入值的一個置換，按表格順序排列。</li>
+          <li>$S'$ 是（壓縮後的）表格值的一個置換，條目按輸入中的多重度進行複製。</li>
+        </ul>
+        $A'$ 和 $S'$ 具有相同長度（填充至電路大小）。
+      </div>
+      <div class="step">
+        <strong>置換論證。</strong>
+        大乘積論證（類似於 PLONK 的複製約束）驗證 $A'$ 是輸入欄的置換，$S'$ 是表格欄的置換。
+      </div>
+      <div class="step">
+        <strong>相鄰性檢查。</strong>
+        額外的約束驗證對每一行 $i$：
+        $$A'_i = S'_i \quad \text{or} \quad A'_i = A'_{i-1}$$
+        這確保每個輸入值等於對應的排序表格值或前一個輸入值（處理重複）。結合置換論證，即可證明包含關係。
+      </div>
+    </div>
+
+    <h3>大乘積多項式</h3>
+    <p>
+      大乘積 $Z(X)$ 累積置換檢查。使用隨機挑戰 $\beta$ 和 $\gamma$：
+    </p>
+    $$Z(\omega^{i+1}) = Z(\omega^i) \cdot \frac{(\text{input}_i + \beta)(\text{table}_i + \gamma)}{(A'_i + \beta)(S'_i + \gamma)}$$
+    <p>
+      從 $Z(\omega^0) = 1$ 開始，若且唯若 $A'$ 是輸入的置換且 $S'$ 是表格的置換時，乘積應在 $Z(\omega^n) = 1$ 回到 1。結合相鄰性約束，即完成查找的證明。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">Halo2 查找 vs. 原始 Plookup</div>
+      <p>
+        關鍵差異在於 Halo2 將置換檢查與相鄰性檢查分開，這與 PLONK 約束系統的整合更為乾淨。原始 Plookup 使用單一大乘積覆蓋排序合併。Halo2 的方法增加了兩個輔助欄（$A'$、$S'$），但避免了單獨的排序合併欄的需求，使其在 Halo2 證明系統中更加模組化。
+      </p>
+    </div>
+
+    <h3>實務範例：Halo2 中的範圍檢查</h3>
+    <p>
+      一個完整的 Halo2 範圍檢查電路需要三個部分：
+    </p>
+
+    <pre><code>// 1. Define the table (in configure)
+let table_col = meta.fixed_column();
+meta.lookup("range", |meta| {
+    let value = meta.query_advice(value_col, Rotation::cur());
+    let sel = meta.query_selector(range_sel);
+    let table = meta.query_fixed(table_col, Rotation::cur());
+    // When selector is off, lookup input defaults to 0 (which is in the table)
+    vec![(sel * value, table)]
+});
+
+// 2. Fill the table (in synthesize)
+for i in 0..RANGE {
+    region.assign_fixed(|| "table", table_col, i, || Value::known(F::from(i as u64)))?;
+}
+
+// 3. Assign values to look up (in synthesize)
+region.assign_advice(|| "value", value_col, row, || Value::known(witness_value))?;
+range_sel.enable(&mut region, row)?;</code></pre>
+
+    <p>
+      選擇器 <code>range_sel</code> 門控查找：在選擇器未啟用的行上，輸入表達式求值為 $0$（該值在表格中），因此查找自動通過。這是 Halo2 中條件查找的標準模式。
+    </p>
+
+    <div class="callout warning">
+      <div class="callout-title">常見陷阱：遺漏選擇器</div>
+      <p>
+        如果省略選擇器而直接寫 <code>vec![(value, table)]</code>，查找將套用於電路中的<em>每一行</em>。在 <code>value</code> 包含不相關見證值（不在範圍表格中）的行上，證明將因晦澀的「lookup input not in table」錯誤而失敗。務必使用選擇器門控查找輸入，或使用一個保證存在於表格中的預設值。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 9.4 LOGUP: THE MODERN APPROACH                                -->
+    <!-- ============================================================ -->
+    <h2 id="logup">9.4 LogUp：現代方法</h2>
+
+    <h3>從乘積到求和</h3>
+    <p>
+      Plookup 和 Halo2 的查找都依賴<strong>大乘積</strong> &mdash; 跨所有行累積運行乘積的多項式 $Z(X)$。大乘積有一個眾所周知的數值問題：中間值對溢位很敏感，需要仔細管理定義域。更根本地，排序步驟施加了 $O(n \log n)$ 的成本，且難以輕易並行化。
+    </p>
+    <p>
+      <strong>LogUp</strong>（Habok, 2022）以<strong>對數導數之和</strong>取代大乘積。其關鍵數學洞見是：以乘積表達的多項式恆等式與以有理函數之和表達的恆等式之間存在等價性。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">對數導數恆等式</div>
+      <p>
+        $\mathbb{F}$ 上的兩個多重集合 $\{a_1, \ldots, a_n\}$ 和 $\{b_1, \ldots, b_n\}$ 相等，若且唯若：
+      </p>
+      $$\sum_{i=1}^{n} \frac{1}{X - a_i} = \sum_{j=1}^{n} \frac{1}{X - b_j}$$
+      <p>
+        作為 $X$ 的有理函數。這源自恆等式：$\frac{d}{dX} \ln \prod_i (X - a_i) = \sum_i \frac{1}{X - a_i}$。兩個多項式相等若且唯若它們的對數導數相等。
+      </p>
+    </div>
+
+    <h3>應用於查找</h3>
+    <p>
+      對於查找論證（證明 $f \subseteq t$），我們並非擁有相等的多重集合。每個表格條目 $t_i$ 可能在 $f$ 中出現零次或多次。令 $m_i$ 表示<strong>多重度</strong> &mdash; $t_i$ 在 $f$ 中出現的次數。那麼查找有效若且唯若：
+    </p>
+    $$\sum_{j=1}^{n} \frac{1}{\gamma + f_j} = \sum_{i=1}^{N} \frac{m_i}{\gamma + t_i}$$
+    <p>
+      對隨機挑戰 $\gamma$ 成立。左側對每個查詢求和 $1/(\gamma + f_j)$。右側對每個表格條目求和 $m_i/(\gamma + t_i)$，以其出現次數加權。
+    </p>
+
+    <div class="callout example">
+      <div class="callout-title">實例演練：LogUp 檢查</div>
+      <p>
+        表格 $t = (3, 5, 7, 9)$，查詢 $f = (5, 3, 5, 7, 5)$。多重度：$m = (1, 3, 1, 0)$（條目 $3$ 出現一次，$5$ 出現三次，$7$ 出現一次，$9$ 出現零次）。
+      </p>
+      <p>左側：$\frac{1}{\gamma+5} + \frac{1}{\gamma+3} + \frac{1}{\gamma+5} + \frac{1}{\gamma+7} + \frac{1}{\gamma+5}$</p>
+      <p>$= \frac{1}{\gamma+3} + \frac{3}{\gamma+5} + \frac{1}{\gamma+7}$</p>
+      <p>右側：$\frac{1}{\gamma+3} + \frac{3}{\gamma+5} + \frac{1}{\gamma+7} + \frac{0}{\gamma+9}$</p>
+      <p>$= \frac{1}{\gamma+3} + \frac{3}{\gamma+5} + \frac{1}{\gamma+7}$</p>
+      <p>兩側相等。查找有效。</p>
+    </div>
+
+    <h3>作為運行和的實現</h3>
+    <p>
+      在 PLONK 風格的約束系統中，求和恆等式透過<strong>運行和</strong>多項式（類似於大乘積，但為加法形式）來強制執行。定義：
+    </p>
+    $$\phi(\omega^{k+1}) = \phi(\omega^k) + \frac{1}{\gamma + f_{k+1}} - \sum_{\text{table rows } i \text{ at step } k} \frac{m_i}{\gamma + t_i}$$
+    <p>
+      協議要求 $\phi(\omega^0) = 0$ 且 $\phi(\omega^n) = 0$（運行和從零開始並回到零）。每一步加入查詢的貢獻並減去表格的貢獻。
+    </p>
+    <p>
+      在實務中，求和分散在電路的各行中。每行從查詢側貢獻一項。表格側可以用多種方式分配 &mdash; 每行一個表格條目（若表格可放入電路），或透過單獨的累加器欄。
+    </p>
+
+    <h3>LogUp 的優勢</h3>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>大乘積（Plookup / Halo2）</h4>
+        <ul>
+          <li>需要排序（$O(n \log n)$）</li>
+          <li>排序是順序的 &mdash; 難以並行化</li>
+          <li>每個查找論證一個乘積</li>
+          <li>表格必須作為單一電路中的一欄</li>
+          <li>多欄：透過隨機線性組合編碼</li>
+          <li>中間乘積值可能導致累加器溢位</li>
+        </ul>
+      </div>
+      <div class="comparison-card">
+        <h4>對數導數（LogUp）</h4>
+        <ul>
+          <li>無需排序（$O(n)$）</li>
+          <li>每項互相獨立 &mdash; 完全可並行化</li>
+          <li>對同一表格的所有查找使用一個總和</li>
+          <li>表格可在子電路間共享</li>
+          <li>多欄：透過 MVLookup 擴展原生支援</li>
+          <li>加法在數值上比乘法更穩定</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>表格共享</h3>
+    <p>
+      LogUp 最重要的實務優勢是<strong>表格共享</strong>。在 zkEVM 或 zkVM 中，許多子電路（每個操作碼或每個執行軌跡段各一個）需要在同一表格中查找值（例如位元組範圍檢查表或 Keccak S-box 表）。
+    </p>
+    <p>
+      使用 Plookup 風格的查找時，每個子電路需要自己的表格欄副本，浪費行數。使用 LogUp，單一表格可以服務所有子電路：
+    </p>
+    $$\underbrace{\sum_{j \in \text{sub-circuit 1}} \frac{1}{\gamma + f_j}}_{\text{來自子電路 1 的查詢}} + \underbrace{\sum_{j \in \text{sub-circuit 2}} \frac{1}{\gamma + f_j}}_{\text{來自子電路 2 的查詢}} + \cdots = \sum_{i=1}^{N} \frac{m_i}{\gamma + t_i}$$
+    <p>
+      每個子電路產生一個部分運行和。各部分運行和隨後被聚合。表格條目和多重度由中央統一處理。這是 Polygon zkEVM（Type 1 zkEVM）和 SP1（Succinct 的 zkVM）所使用的架構。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">Polygon zkEVM 中的 LogUp</div>
+      <p>
+        Polygon zkEVM 使用 LogUp 在 12 個以上的子電路間共享單一位元組範圍表（$\{0, \ldots, 255\}$）。在 LogUp 之前，每個子電路需要自己的 256 行表格欄。採用 LogUp 之後，表格僅存在一份，每個子電路向共享的運行和貢獻項。這將總電路大小減少了約 30%。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 9.5 THE TABLE SIZE PROBLEM                                    -->
+    <!-- ============================================================ -->
+    <h2 id="table-size">9.5 表大小問題</h2>
+
+    <h3>根本限制</h3>
+    <p>
+      在迄今討論的所有查找方案（Plookup、Halo2 查找，甚至基本的 LogUp）中，<strong>表格佔據電路的行</strong>。一張有 $N$ 個條目的表格在電路的固定欄佈局中至少需要 $N$ 行。這造成了嚴重的瓶頸：
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>表格用途</th>
+          <th>表格大小 $N$</th>
+          <th>消耗行數</th>
+          <th>是否成問題？</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>8 位元範圍檢查</td>
+          <td>$2^8 = 256$</td>
+          <td>256</td>
+          <td>沒問題</td>
+        </tr>
+        <tr>
+          <td>16 位元範圍檢查</td>
+          <td>$2^{16} = 65{,}536$</td>
+          <td>65,536</td>
+          <td>可接受</td>
+        </tr>
+        <tr>
+          <td>8 位元 XOR（3 欄）</td>
+          <td>$2^{16} = 65{,}536$</td>
+          <td>65,536</td>
+          <td>可接受</td>
+        </tr>
+        <tr>
+          <td>16 位元 XOR（3 欄）</td>
+          <td>$2^{32} \approx 4 \times 10^9$</td>
+          <td>$2^{32}$</td>
+          <td>不可行</td>
+        </tr>
+        <tr>
+          <td>ReLU（16 位元精度）</td>
+          <td>$2^{16}$</td>
+          <td>65,536</td>
+          <td>單獨可接受</td>
+        </tr>
+        <tr>
+          <td>Sigmoid（16 位元精度）</td>
+          <td>$2^{16}$</td>
+          <td>65,536</td>
+          <td>但合在一起...</td>
+        </tr>
+        <tr>
+          <td>GELU + Tanh + Exp + ...</td>
+          <td>每個函數 $k \times 2^{16}$</td>
+          <td>$k \times 65{,}536$</td>
+          <td>爆炸性增長</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      「爆炸性增長」的場景對<strong>ZKML</strong>（零知識機器學習）尤為相關，因為神經網路可能使用 5&ndash;10 種不同的非線性激活函數。如果每種函數需要自己的 $2^{16}$ 條目表格，電路僅表格就需要 $5 \times 65{,}536 = 327{,}680$ 行 &mdash; 尚未包含任何計算門。
+    </p>
+
+    <h3>為什麼不直接增大電路？</h3>
+    <p>
+      增大電路大小（行數 $n$）會帶來連鎖成本：
+    </p>
+    <ul>
+      <li><strong>證明者時間</strong>在基於 FFT 的系統中以 $O(n \log n)$ 增長。將 $n$ 加倍會使證明者時間超過兩倍。</li>
+      <li><strong>記憶體</strong>使用量為每欄 $O(n)$。一個有 $2^{20}$ 行和 50 欄的電路需要 $50 \times 2^{20} \times 32$ 位元組 $\approx$ 1.6 GB 的域元素。</li>
+      <li><strong>證明大小</strong>可能增加（取決於方案）。</li>
+      <li><strong>定義域限制</strong>：FFT 定義域必須是 2 的冪且整除 $r - 1$。對於 BN254，最大定義域為 $2^{28}$。</li>
+    </ul>
+
+    <h3>表大小問題的解決方案</h3>
+
+    <h4>方案 1：LogUp 搭配共享表格</h4>
+    <p>
+      如第 9.4 節所述，LogUp 允許單一表格服務多個子電路，消除重複的表格欄。這雖不會縮小表格本身的大小，但可防止 $k$ 個子電路都需要同一表格時的 $k$ 倍膨脹。
+    </p>
+
+    <h4>方案 2：表格分解（ByteTable 方法）</h4>
+    <p>
+      與其儲存大型表格，不如將其分解為小型表格並使用組合。例如，16 位元範圍檢查可以分解為兩個 8 位元範圍檢查：
+    </p>
+    $$x \in [0, 2^{16}) \quad \iff \quad x = 256 \cdot x_{\text{hi}} + x_{\text{lo}}, \quad x_{\text{hi}} \in [0, 256), \quad x_{\text{lo}} \in [0, 256)$$
+    <p>
+      這使用單一 256 條目的 ByteTable 和兩次查找，取代一張 $2^{16}$ 條目的表格。取捨：更多查找實例（2 次而非 1 次），但表格小得多（256 vs 65,536）。
+    </p>
+    <p>
+      此方法可推廣：任何 $b$ 位元的範圍檢查都可以用 $\lceil b/8 \rceil$ 次查找到 256 條目的表格中完成，加上 $\lceil b/8 \rceil - 1$ 個約束來驗證分解。
+    </p>
+
+    <h4>方案 3：電路外表格（cq、Baloo）</h4>
+    <p>
+      近期研究完全消除了表格必須作為電路欄位的要求。在 <strong>cq</strong>（Eagen, Fiore, Gabizon, 2023）和 <strong>Baloo</strong>（Zapico 等, 2022）方案中，表格獨立承諾（例如作為表格多項式的 KZG 承諾），查找論證直接針對該承諾工作，無需將表格具體化為電路行。
+    </p>
+    <p>
+      這意味著一張 $2^{32}$ 條目的表格在電路行數上零成本 &mdash; 僅需承諾設定的一次性 $O(N \log N)$ 成本以及每次查找的證明成本。
+    </p>
+
+    <h4>方案 4：結構化表格與 Lasso</h4>
+    <p>
+      <strong>Lasso</strong>（Setty, 2023）利用了一個觀察：許多表格具有<em>結構</em>。例如，範圍檢查表 $\{0, 1, \ldots, 2^{16}-1\}$ 不是任意的域元素集合 &mdash; 它是所有 16 位元可表示值的集合。位元 XOR 表具有結構 $t[a, b] = a \oplus b$。
+    </p>
+    <p>
+      Lasso 將結構化表格分解為透過簡單組合函數連接的<strong>子表格</strong>。以 XOR 為例：
+    </p>
+    $$\text{XOR}_{16}(a, b) = \text{XOR}_8(a_{\text{hi}}, b_{\text{hi}}) \cdot 2^8 + \text{XOR}_8(a_{\text{lo}}, b_{\text{lo}})$$
+    <p>
+      每個子表格（$\text{XOR}_8$）僅有 $256 \times 256 = 65{,}536$ 個條目，而非 $2^{32}$。證明者展示分解過程並對較小的子表格執行查找。Lasso 的關鍵洞見在於，證明者只需為實際被存取的表格條目「付費」&mdash; 未使用的子表格條目零成本。
+    </p>
+
+    <div class="callout definition">
+      <div class="callout-title">可分解表格（Lasso）</div>
+      <p>
+        一張表格 $T: \{0,1\}^c \to \mathbb{F}$ 是<strong>$(k, \alpha)$-可分解的</strong>，若存在子表格 $T_1, \ldots, T_k$，每個大小至多 $2^\alpha$，以及一個可用 $O(k)$ 次域運算計算的組合函數 $g$，使得：
+      </p>
+      $$T(x) = g(T_1(x_1), T_2(x_2), \ldots, T_k(x_k))$$
+      <p>其中 $x = (x_1, \ldots, x_k)$ 是將輸入分解為 $k$ 個各 $\alpha$ 位元的區塊。</p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 9.6 LOOKUP IN ZKML CONTEXT                                    -->
+    <!-- ============================================================ -->
+    <h2 id="zkml-context">9.6 ZKML 情境下的查找</h2>
+
+    <h3>非線性問題</h3>
+    <p>
+      機器學習模型由線性運算（矩陣乘法、卷積）和<strong>非線性激活函數</strong>（ReLU、sigmoid、GELU、tanh、softmax）交替的層組成。線性運算在算術電路中是天然的 &mdash; 矩陣乘法只是 $\mathbb{F}_r$ 中的加法和乘法。但非線性函數是瓶頸。
+    </p>
+    <p>
+      考慮神經網路中常用的函數：
+    </p>
+    <ul>
+      <li><strong>ReLU：</strong>$\text{ReLU}(x) = \max(0, x)$。需要比較運算（$x \geq 0$？），這在域算術中不是原生的。</li>
+      <li><strong>Sigmoid：</strong>$\sigma(x) = \frac{1}{1 + e^{-x}}$。涉及指數運算和除法 &mdash; 在電路中極為昂貴。</li>
+      <li><strong>GELU：</strong>$\text{GELU}(x) = x \cdot \Phi(x)$，其中 $\Phi$ 是高斯累積分佈函數。沒有封閉形式的域表達式。</li>
+      <li><strong>Softmax：</strong>$\text{softmax}(x_i) = \frac{e^{x_i}}{\sum_j e^{x_j}}$。多個指數運算加上一個除法。</li>
+    </ul>
+
+    <h3>ZKML 的查找方法</h3>
+    <p>
+      思路很直接：將輸入定義域<strong>量化</strong>為固定精度（例如 16 位元定點數），在每個量化輸入處預先計算激活函數，並將結果存入查找表。
+    </p>
+    <p>
+      例如，如果輸入是 $[-32768, 32767]$ 範圍內的 16 位元有號整數，以 8 個小數位元表示定點值，則 ReLU 表格有 $2^{16} = 65{,}536$ 個條目：
+    </p>
+    $$\text{ReLU\_table}[x] = \begin{cases} x & \text{if } x \geq 0 \\ 0 & \text{if } x < 0 \end{cases}$$
+    <p>
+      神經網路中的每個激活運算變為對此表格的單次查找。
+    </p>
+
+    <h3>規模化問題</h3>
+    <p>
+      單一激活函數表格（$2^{16}$ 個條目）是可管理的。但真實模型使用多種非線性函數，每種都需要自己的表格：
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>模型組件</th>
+          <th>激活函數</th>
+          <th>表格大小</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>隱藏層</td>
+          <td>ReLU / GELU</td>
+          <td>$2^{16}$</td>
+        </tr>
+        <tr>
+          <td>注意力機制（縮放）</td>
+          <td>$\exp$</td>
+          <td>$2^{16}$</td>
+        </tr>
+        <tr>
+          <td>正規化</td>
+          <td>$1/\sqrt{x}$</td>
+          <td>$2^{16}$</td>
+        </tr>
+        <tr>
+          <td>輸出層</td>
+          <td>Softmax（$\exp$ + 除法）</td>
+          <td>$2 \times 2^{16}$</td>
+        </tr>
+        <tr>
+          <td>嵌入層</td>
+          <td>LayerNorm（$\text{mean}$, $\text{var}$）</td>
+          <td>$2 \times 2^{16}$</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      總表格行數：$\approx 7 \times 65{,}536 = 458{,}752$ &mdash; 在任何實際計算<em>之前</em>就消耗了近五十萬行。對於一個典型的 Transformer 層有 100,000 次以上的激活呼叫，查找查詢行也佔據了主導地位。
+    </p>
+
+    <h3>多項式方法替代方案</h3>
+    <p>
+      第十章提出了一種根本不同的方法：與其使用每個函數各自的表格，不如使用<strong>單一共享 ByteTable</strong>（256 個條目）搭配<strong>多項式分解</strong>。核心洞見如下：
+    </p>
+    <ol>
+      <li>將輸入分解為位元組：$x = x_0 + 256 \cdot x_1$（兩次位元組查找）</li>
+      <li>用每個位元組上的多項式近似 $f(x) \approx P_0(x_0) + P_1(x_1)$ 或 $P_0(x_0) \cdot P_1(x_1)$</li>
+      <li>在電路中原生求值多項式（加法 + 乘法在算術電路中是免費的）</li>
+    </ol>
+    <p>
+      這以單一 256 條目的 ByteTable 取代了<em>所有</em>函數特定的表格，從而解決了表大小爆炸的問題。取捨在於多項式近似會引入微小誤差，必須界定並在模型精確度分析中加以考量。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">查找 vs. 多項式：何時使用哪種</div>
+      <p>
+        <strong>使用查找</strong>的情況：函數沒有代數結構（例如 AES S-box）、表格很小（8 位元），或需要精確值（密碼學雜湊內部）。
+      </p>
+      <p>
+        <strong>使用多項式方法</strong>的情況：函數是平滑的（例如 sigmoid、GELU）、輸入精度較高（16 位元以上），或多個函數共享相同的定義域分解。完整討論見第十章。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 9.7 COMPARISON OF LOOKUP SCHEMES                              -->
+    <!-- ============================================================ -->
+    <h2 id="comparison">9.7 查找方案比較</h2>
+
+    <h3>發展時間線</h3>
+    <p>
+      自 2020 年以來，在 zkEVM 和 zkVM 的需求驅動下，查找論證發展迅速。每一代都解決了前一代的局限性：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <strong>2020 年：Plookup</strong>（Gabizon, Williamson）。第一個實用的查找論證。使用排序合併 + 大乘積。透過單一多項式恆等式證明包含關係。限制：表格必須在電路內；排序為 $O(n \log n)$ 且是順序的。
+      </div>
+      <div class="step">
+        <strong>2021 年：Halo2 Lookup</strong>（Electric Coin Company / ZCash）。將 Plookup 適配於 PLONK 約束系統。使用置換欄 + 相鄰性檢查取代顯式排序合併。隨 Halo2 發佈並成為基於 Halo2 的電路（Scroll、Axiom 等）的事實標準。
+      </div>
+      <div class="step">
+        <strong>2022 年：LogUp</strong>（Habok）。以對數導數求和取代大乘積。消除排序（$O(n)$ 證明者）。支援跨電路表格共享。被 Polygon zkEVM 和 SP1 採用。透過 MVLookup 擴展至多欄表格。
+      </div>
+      <div class="step">
+        <strong>2023 年：cq / Baloo</strong>（Eagen, Fiore, Gabizon / Zapico 等）。電路外表格 &mdash; 表格獨立承諾，不具體化為電路行。證明者成本 $O(N \log N)$（表格大小為 $N$），但電路成本與表格大小無關。
+      </div>
+      <div class="step">
+        <strong>2023 年：Lasso</strong>（Setty）。透過分解利用表格結構。對可分解表格，證明者成本為 $O(n \cdot c)$，其中 $c$ 是子表格查找次數，與完整表格大小無關。證明者僅涉及被存取的子表格條目。用於 Jolt zkVM。
+      </div>
+    </div>
+
+    <h3>功能比較表</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>方案</th>
+          <th>年份</th>
+          <th>證明者成本</th>
+          <th>表格限制</th>
+          <th>多欄支援</th>
+          <th>應用於</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Plookup</td>
+          <td>2020</td>
+          <td>$O(n \log n)$</td>
+          <td>電路內</td>
+          <td>透過元組編碼</td>
+          <td>PLONK 變體</td>
+        </tr>
+        <tr>
+          <td>Halo2 lookup</td>
+          <td>2021</td>
+          <td>$O(n \log n)$</td>
+          <td>電路內</td>
+          <td>獨立論證</td>
+          <td>Halo2, Scroll, Axiom</td>
+        </tr>
+        <tr>
+          <td>LogUp</td>
+          <td>2022</td>
+          <td>$O(n)$</td>
+          <td>靈活（共享）</td>
+          <td>原生（MVLookup）</td>
+          <td>Polygon zkEVM, SP1</td>
+        </tr>
+        <tr>
+          <td>cq</td>
+          <td>2023</td>
+          <td>$O(N \log N)$</td>
+          <td>電路外</td>
+          <td>支援</td>
+          <td>研究階段</td>
+        </tr>
+        <tr>
+          <td>Lasso</td>
+          <td>2023</td>
+          <td>$O(n \cdot c)$</td>
+          <td>結構化子表格</td>
+          <td>可分解</td>
+          <td>Jolt</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      其中 $n$ = 查找次數，$N$ = 表格大小，$c$ = Lasso 分解中的子表格區塊數。
+    </p>
+
+    <h3>詳細取捨分析</h3>
+
+    <h4>證明者成本</h4>
+    <p>
+      主要的成本差異在於基於排序的方案（$O(n \log n)$）與基於求和的方案（$O(n)$）之間。對於 $n = 2^{20}$（約一百萬次查找），$\log n$ 因子為 20，意味著基於排序的方案每次查找多做約 $20 \times$ 的工作。以絕對值而言，在現代硬體上，Plookup 風格證明者的排序步驟對 $n = 2^{20}$ 需要 2&ndash;5 秒，而 LogUp 的運行和需要 0.1&ndash;0.3 秒。
+    </p>
+
+    <h4>輔助欄</h4>
+    <p>
+      每種方案需要不同數量的輔助欄（除輸入和表格欄之外），影響電路寬度和記憶體：
+    </p>
+    <ul>
+      <li><strong>Plookup：</strong>1 個排序合併欄（$n + N$ 個條目）+ 1 個大乘積欄。</li>
+      <li><strong>Halo2 lookup：</strong>2 個置換欄（$A'$、$S'$）+ 1 個大乘積欄。</li>
+      <li><strong>LogUp：</strong>1 個多重度欄 + 1 個運行和欄。無排序欄。</li>
+      <li><strong>Lasso：</strong>$c$ 個子表格查找欄 + $c$ 個多重度欄 + 運行和。</li>
+    </ul>
+
+    <h4>驗證者成本</h4>
+    <p>
+      所有方案都為驗證者增加固定數量的求值檢查。方案間的驗證者成本差異可忽略 &mdash; 主要取決於基礎證明系統的驗證成本（例如 KZG 配對檢查或 IPA 內積檢查）。在所有情況下，驗證者每個查找論證執行 $O(1)$ 的額外工作。
+    </p>
+
+    <div class="callout warning">
+      <div class="callout-title">天下沒有白吃的午餐</div>
+      <p>
+        每種方案針對不同的瓶頸進行最佳化。LogUp 消除了排序但要求證明者知道多重度。cq 將表格從電路中移除但有更高的設定成本。Lasso 利用結構但僅適用於可分解的表格。根據應用場景選擇方案：
+      </p>
+      <ul>
+        <li>具有中等大小表格的通用 ZK 電路：<strong>Halo2 lookup</strong> 或 <strong>LogUp</strong></li>
+        <li>具有共享表格的 zkEVM / zkVM：<strong>LogUp</strong></li>
+        <li>巨大的無結構表格：<strong>cq</strong></li>
+        <li>結構化表格（範圍、XOR、位移）：<strong>Lasso</strong></li>
+      </ul>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 9.8 PRACTICAL CONSIDERATIONS                                  -->
+    <!-- ============================================================ -->
+    <h2 id="practical">9.8 實務考量</h2>
+
+    <h3>選擇適當的表格粒度</h3>
+    <p>
+      表格大小的選擇涉及表格開銷與查找次數之間的根本取捨：
+    </p>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>大型表格（例如 $2^{16}$ 條目）</h4>
+        <ul>
+          <li>每個 16 位元運算一次查找</li>
+          <li>表格開銷高（65,536 行）</li>
+          <li>最適合：對同一表格有大量查找</li>
+          <li>損益平衡：~4000 次查找</li>
+        </ul>
+      </div>
+      <div class="comparison-card">
+        <h4>小型表格 + 分解（例如 $2^8$ 條目）</h4>
+        <ul>
+          <li>每個 16 位元運算兩次查找 + 1 個組合約束</li>
+          <li>表格開銷低（256 行）</li>
+          <li>最適合：查找次數較少或有多種函數類型</li>
+          <li>對混合工作負載始終高效</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout example">
+      <div class="callout-title">定量比較</div>
+      <p>
+        假設我們需要對 16 位元值進行 $n$ 次範圍檢查。比較兩種方法：
+      </p>
+      <p>
+        <strong>方法 A：</strong>一張 $2^{16}$ 條目的表格。總行數：$65{,}536 + n$（表格 + 查詢）。
+      </p>
+      <p>
+        <strong>方法 B：</strong>一張 $2^8$ 條目的表格，每次檢查兩次查找。總行數：$256 + 2n$（表格 + 每次檢查 2 個查詢，加上 $n$ 個分解約束）。
+      </p>
+      <p>
+        損益平衡：$65{,}536 + n = 256 + 3n \implies n \approx 32{,}640$。低於約 32,640 次檢查時，小型表格方法更高效。超過該數則大型表格勝出。
+      </p>
+      <p>
+        在實務中，小型表格方法往往勝出，因為：(1) 256 條目的表格可與其他運算共享（位元組範圍檢查、XOR 位元組等），因此 256 行的開銷已經支付；(2) 電路通常有多種<em>類型</em>的查找，單一共享 ByteTable 優於多張大型表格。
+      </p>
+    </div>
+
+    <h3>選擇器門控查找</h3>
+    <p>
+      在 Halo2 中，查找套用於電路的每一行（因為約束是在整個定義域上的多項式恆等式）。要使查找有條件，你必須用選擇器門控輸入表達式：
+    </p>
+    <pre><code>// WRONG: applies to every row
+vec![(value, table)]
+
+// CORRECT: applies only where selector is active
+// When sel = 0, input expression = 0, which must be in the table
+vec![(sel * value, table)]
+
+// ALSO CORRECT: use Expression::Constant as default
+// sel * value + (1 - sel) * default_table_value
+let default = Expression::Constant(F::ZERO);
+vec![(sel.clone() * value + (Expression::Constant(F::ONE) - sel) * default, table)]</code></pre>
+
+    <p>
+      第二種方法更安全，因為它顯式控制非活動行上的預設值，而不是依賴 $0$ 存在於表格中。
+    </p>
+
+    <h3>處理「找不到」錯誤</h3>
+    <p>
+      當查找證明在開發過程中失敗時，錯誤訊息通常會顯示「lookup input not in table」及行索引。常見原因包括：
+    </p>
+    <ul>
+      <li><strong>遺漏選擇器：</strong>查找在不應觸發的行上觸發了（見上文）。</li>
+      <li><strong>表格未填充：</strong>包含表格的 fixed 欄在 <code>synthesize</code> 期間未被填入。</li>
+      <li><strong>表格範圍的差一錯誤：</strong>表格有 $\{0, \ldots, N-1\}$ 的條目，但查詢值為 $N$。</li>
+      <li><strong>錯誤的欄位：</strong>輸入表達式引用了錯誤的 advice 欄。</li>
+      <li><strong>旋轉錯誤：</strong>使用 <code>Rotation::next()</code> 而非 <code>Rotation::cur()</code>，導致查找讀取了錯誤行的資料。</li>
+      <li><strong>表達式求值為非預期值：</strong>涉及多個欄位的多項式表達式因邏輯錯誤而求值為不在表格中的值。</li>
+    </ul>
+
+    <h3>效能調校</h3>
+    <p>
+      對於具有大量查找的生產電路，考慮以下最佳化：
+    </p>
+    <ul>
+      <li><strong>批次查找：</strong>將共享同一表格的多個查找論證分組。在 Halo2 中，每個查找論證增加一個大乘積欄。合併相關查找可減少輔助欄數量。</li>
+      <li><strong>表格重用：</strong>如果多個運算可以使用同一表格（例如範圍檢查和位元組分解都使用位元組表），則定義一次表格並共享。</li>
+      <li><strong>表格欄打包：</strong>如果電路的行數多於表格所需，未使用的表格行就被浪費。考慮使用「表格 ID」欄將多個小型表格打包到同一 fixed 欄中加以區分。</li>
+      <li><strong>動態表格：</strong>在某些應用中，表格條目取決於見證（例如 zkVM 中的記憶體表）。Halo2 透過「動態查找」支援這種方式，其中表格表達式引用 advice 欄。成本較高（證明者必須將兩側都視為非固定），但支援重要的使用場景。</li>
+    </ul>
+
+    <div class="callout note">
+      <div class="callout-title">與置換論證的關聯</div>
+      <p>
+        查找論證和置換論證（第七章，PLONK 複製約束）密切相關。置換論證證明兩欄是彼此的重排列。查找論證證明一欄的值是另一欄的<em>子集</em>（允許重複）。事實上，兩者都可以統一在「多重集合檢查」的框架下 &mdash; 置換論證是多重集合具有相同大小和相同多重度分佈的特例。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 9.9 ADVANCED TOPICS                                           -->
+    <!-- ============================================================ -->
+    <h2 id="advanced">9.9 進階：向量查找與 RAM</h2>
+
+    <h3>向量查找</h3>
+    <p>
+      <strong>向量查找</strong>（或多欄查找）證明一個值的<em>元組</em> $(a, b, c)$ 作為多欄表格中的一行存在，而非僅僅單一值。這對於編碼多變量函數至關重要：
+    </p>
+    $$\forall\, i, \quad (a_i, b_i, c_i) \in \{(t_1^{(1)}, t_1^{(2)}, t_1^{(3)}), \ldots, (t_N^{(1)}, t_N^{(2)}, t_N^{(3)})\}$$
+    <p>
+      在 Plookup 和 Halo2 中，向量查找透過隨機線性組合壓縮元組來實現：使用挑戰 $\theta$，將 $(a, b, c)$ 編碼為 $a + \theta b + \theta^2 c$，然後對編碼值執行單欄查找。Schwartz-Zippel 引理保證，如果元組不匹配，壓縮後的值將以壓倒性機率不同。
+    </p>
+    <p>
+      在 LogUp / MVLookup 中，向量查找可以原生處理而無需壓縮，透過擴展對數導數公式以操作欄值的隨機線性組合。
+    </p>
+
+    <h3>記憶體檢查作為查找</h3>
+    <p>
+      zkVM 需要證明記憶體讀取返回正確的值 &mdash; 即最近寫入該地址的值。這是查找的一種形式：「讀取」操作在「記憶體狀態」表格中查找一個 (address, value) 配對。
+    </p>
+    <p>
+      標準方法使用基於多重集合相等的<strong>讀/寫記憶體檢查</strong>論證。核心恆等式為：
+    </p>
+    $$\text{init\_memory} \cup \text{writes} = \text{reads} \cup \text{final\_memory}$$
+    <p>
+      作為多重集合。這表明：初始記憶體狀態加上所有寫入等於所有讀取加上最終記憶體狀態。這正是多重集合相等檢查，可透過 LogUp 風格的求和或大乘積來實現。
+    </p>
+    <p>
+      記憶體檢查與查找論證之間的這種關聯，解釋了為何相同的代數機制（大乘積、對數導數）同時出現在兩個場景中。SP1 和 Jolt 等系統將兩者統一在單一的 LogUp / Lasso 框架下。
+    </p>
+
+    <div class="callout definition">
+      <div class="callout-title">離線記憶體檢查（Blum 等人）</div>
+      <p>
+        證明者維護兩個多重集合：$W$（寫入集合：所有寫入的 $(addr, val, timestamp)$ 三元組）和 $R$（讀取集合：所有讀取的 $(addr, val, timestamp)$ 三元組）。記憶體一致性成立若且唯若，對每個讀取 $(addr, v, t_r)$，存在一個寫入 $(addr, v, t_w)$，滿足 $t_w \leq t_r$ 且 $addr$ 在此期間沒有被插入寫入。這透過涉及時間戳的多重集合恆等式來驗證。
+      </p>
+    </div>
+
+    <h3>查找奇異點</h3>
+    <p>
+      LogUp 中一個微妙的問題是分母 $\gamma + f_j$ 的處理。如果對某個查詢值 $\gamma = -f_j$，項 $1/(\gamma + f_j)$ 就是未定義的（除以零）。由於 $\gamma$ 是在證明者承諾 $f$ 之後隨機選取的，$\gamma = -f_j$ 對任何特定 $j$ 的機率為 $1/|\mathbb{F}| \approx 2^{-254}$ &mdash; 可忽略不計。
+    </p>
+    <p>
+      然而，實現必須處理這種邊界情況。標準方法是檢查所有 $j$ 的 $\gamma + f_j \neq 0$（以壓倒性機率成立），若檢查失敗則中止。在實務中，這永遠不會觸發。
+    </p>
+
+    <h3>展望未來</h3>
+    <p>
+      查找論證持續是零知識證明研究中最活躍的領域之一。關鍵的開放方向包括：
+    </p>
+    <ul>
+      <li><strong>批次攤銷：</strong>當數千次查找共享同一表格時，降低每次查找的成本。</li>
+      <li><strong>遞迴查找：</strong>在遞迴證明組合中使用查找論證，其中表格是外部電路的一部分。</li>
+      <li><strong>硬體加速：</strong>排序（Plookup）和多重度計數（LogUp）是受益於 GPU / FPGA 加速的瓶頸。</li>
+      <li><strong>最優查找：</strong>尋找查找論證的資訊理論最優成本 &mdash; 對任意表格是否可以實現 $O(n)$ 且不依賴表格大小？</li>
+    </ul>
+
+    <h2>對本研究的意義</h2>
+    <div class="callout theorem">
+      <div class="callout-title">查找表：論文要解決的核心問題</div>
+      <p>
+        查找論證是論文技術的關鍵組件，同時也是論文要克服的瓶頸：
+      </p>
+      <ul>
+        <li><strong>ByteTable 依賴查找</strong>：我們的 range check（截斷驗證中的 $0 \leq r &lt; S^d$）通過 byte decomposition 實現——每個 byte 需要一次 lookup 到 256 行的 ByteTable。</li>
+        <li><strong>表大小瓶頸是核心問題</strong>：傳統方法用 $O(S)$ 行的大型查找表直接存儲函數值。當 $S = 2^{16} = 65536$ 時，查找表本身就佔用了 65536 行——這對多數實際電路來說太大了。</li>
+        <li><strong>多項式方法的突破</strong>：我們用 degree-$d$ 的 Minimax 多項式<em>計算</em>函數值，而非<em>查找</em>。查找表只用於 byte-level 的 range check（256 行，與精度無關）。</li>
+      </ul>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>方法</th><th>查找表大小</th><th>精度提升時</th><th>函數無關？</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>直接查找表</strong></td>
+          <td>$O(S) = O(2^{pp})$ 行</td>
+          <td style="color: red;">表指數增長（$pp: 16 \to 20$ 意味著 $65536 \to 1048576$ 行）</td>
+          <td style="color: red;">✗ 每個函數一張表</td>
+        </tr>
+        <tr>
+          <td><strong>多項式方法 + ByteTable</strong></td>
+          <td>256 行（固定）</td>
+          <td style="color: green;">不變——精度由多項式次數控制</td>
+          <td style="color: green;">✓ 同一電路適用所有函數</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">這就是「精度可擴展性」</div>
+      <p>
+        傳統查找方法中，精度（$pp$）和電路大小強耦合——提高精度必然增加表大小。
+        多項式方法將兩者解耦：精度由多項式次數 $d$ 和 $pp$ 共同控制，而查找表大小恆為 256。
+        這種<strong>精度可擴展性</strong>（Precision Scalability）是論文的核心貢獻之一。
+      </p>
+    </div>
+
+    <!-- PAGE NAV at bottom -->
+    <div class="page-nav">
+      <a href="halo2.html">
+        <span class="nav-label">上一章</span>
+        <span class="nav-title">&larr; 8. Halo2</span>
+      </a>
+      <a href="polynomial-method.html">
+        <span class="nav-label">下一章</span>
+        <span class="nav-title">10. Polynomial Method &rarr;</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

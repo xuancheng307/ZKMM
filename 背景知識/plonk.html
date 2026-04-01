@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ch.7 PLONK — ZK Handbook</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>ZK Handbook</h1>
+      <div class="subtitle">零知識證明系統</div>
+    </div>
+    <nav>
+      <div class="section-label">總覽</div>
+      <a href="index.html"><span class="page-num">0.</span> 首頁</a>
+
+      <div class="section-label">基礎</div>
+      <a href="foundations.html"><span class="page-num">1.</span> 數學基礎</a>
+      <a href="zkp-basics.html"><span class="page-num">2.</span> ZKP：基礎與性質</a>
+
+      <div class="section-label">構建模組</div>
+      <a href="polynomial-commitments.html"><span class="page-num">3.</span> 多項式承諾</a>
+      <a href="arithmetization.html"><span class="page-num">4.</span> 算術化</a>
+      <a href="fft-domains.html"><span class="page-num">5.</span> FFT 與求值域</a>
+
+      <div class="section-label">證明系統</div>
+      <a href="groth16.html"><span class="page-num">6.</span> Groth16</a>
+      <a href="plonk.html" class="active"><span class="page-num">7.</span> PLONK</a>
+      <a href="halo2.html"><span class="page-num">8.</span> Halo2</a>
+
+      <div class="section-label">進階主題</div>
+      <a href="lookup-arguments.html"><span class="page-num">9.</span> 查找論證</a>
+      <a href="polynomial-method.html"><span class="page-num">10.</span> 多項式方法</a>
+      <a href="security-proofs.html"><span class="page-num">11.</span> 安全性證明</a>
+
+      <div class="section-label">論文方法論</div>
+      <a href="fixed-point.html"><span class="page-num">12.</span> 有限域定點運算</a>
+      <a href="approximation-theory.html"><span class="page-num">13.</span> 多項式逼近理論</a>
+      <a href="horner-evaluation.html"><span class="page-num">14.</span> Horner 求值</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>第七章：PLONK</h1>
+      <p class="page-subtitle">
+        <strong>P</strong>ermutations over <strong>L</strong>agrange-bases for
+        <strong>O</strong>ecumenical <strong>N</strong>oninteractive arguments of <strong>K</strong>nowledge。
+        一種具有可更新結構化參考字串（SRS）的通用 zkSNARK，
+        使單次可信設置儀式即可支援任何不超過固定大小的電路。
+        由 Gabizon、Williamson 和 Ciobotaru 於 2019 年發表。
+      </p>
+    </div>
+
+    <!-- ============================================================
+         DEFINITIONS SECTION
+         ============================================================ -->
+    <div class="definitions-section">
+      <h2>關鍵定義</h2>
+
+      <div class="def-item">
+        <div class="def-term">PLONK <span class="zh">PLONK</span></div>
+        <div class="def-body">
+          <strong>P</strong>ermutations over <strong>L</strong>agrange-bases for
+          <strong>O</strong>ecumenical <strong>N</strong>oninteractive arguments of <strong>K</strong>nowledge。
+          一種具有可更新 SRS 的通用 zkSNARK。由 Ariel Gabizon、Zachary J. Williamson
+          和 Oana Ciobotaru 於 2019 年發表。「通用」意指同一組可信設置可用於<em>任何</em>
+          大小不超過 $n$ 的電路；「可更新」意指任何一方皆可擴展儀式以強化
+          信任假設。PLONK 使用 PLONKish 算術化（具有選擇器多項式的閘方程式）而非 R1CS，
+          並依賴 KZG 多項式承諾來達到簡潔性。
+          證明大小為常數（使用 BN254 約 $400$ 位元組），驗證僅需 2 次配對運算。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">PLONK Base Field <span class="zh">PLONK 基底域</span></div>
+        <div class="def-body">
+          橢圓曲線群定義於其上的有限域 $\mathbb{F}_p$。
+          曲線點的坐標為滿足曲線方程式的數對 $(x, y) \in \mathbb{F}_p^2$。
+          對於 BN254：
+          $$p = 21888242871839275222246405745257275088696311157297823662689037894645226208583$$
+          這是一個 254 位元的質數。基底域掌管曲線點的<em>幾何</em>表示，
+          但<strong>並非</strong>電路見證值所使用的域。
+          配對運算將曲線點的數對映射到目標群 $\mathbb{G}_T \subset \mathbb{F}_{p^{12}}^*$。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">PLONK Scalar Field <span class="zh">PLONK 標量域</span></div>
+        <div class="def-body">
+          階為 $r = |E(\mathbb{F}_p)|$（橢圓曲線上有理點的數量，即曲線群的階）的域 $\mathbb{F}_r$。對於 BN254：
+          $$r = 21888242871839275222246405745257275088548364400416034343698204186575808495617$$
+          <strong>所有電路運算都在 $\mathbb{F}_r$ 中進行。</strong>見證值、選擇器多項式求值、挑戰值、商多項式係數
+          &mdash; PLONK 協議內部的一切都是 $\mathbb{F}_r$ 的元素。區分基底域 $\mathbb{F}_p$
+          和標量域 $\mathbb{F}_r$ 至關重要：混淆兩者會導致微妙的錯誤，在小域測試時能通過但在
+          生產曲線上會失敗。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Universal SRS <span class="zh">通用結構化參考字串</span></div>
+        <div class="def-body">
+          一組適用於大小不超過 $n$ 的<strong>所有</strong>電路的單次可信設置：
+          $$\text{SRS} = \bigl\{[s^i]_1\bigr\}_{i=0}^{n},\; [s]_2$$
+          其中 $s$ 是毒廢料（秘密陷門），必須在儀式結束後銷毀。
+          SRS 是<em>與電路無關的</em>：無論你要證明什麼計算，
+          同一組 SRS 就足夠了。這與 Groth16 形成對比，後者需要為每個電路進行新的
+          設置。SRS 是<em>可更新的</em>：任何一方皆可透過
+          $s' = s \cdot r$（其中 $r$ 是他們的秘密）來貢獻隨機性，只要
+          <em>至少一位</em>參與者是誠實的，所得到的 SRS 就是安全的。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Selector Polynomials <span class="zh">選擇器多項式</span></div>
+        <div class="def-body">
+          五個多項式 $q_L(X), q_R(X), q_M(X), q_O(X), q_C(X)$，定義電路中每一行閘的<em>類型</em>。
+          在 $\omega^i$（第 $i$ 個單位根）處求值即可得到第 $i$ 個閘的選擇器值。例如：
+          <ul>
+            <li><strong>加法閘</strong>：$q_L = 1, q_R = 1, q_M = 0, q_O = -1, q_C = 0$ &mdash; 編碼 $a + b - c = 0$</li>
+            <li><strong>乘法閘</strong>：$q_L = 0, q_R = 0, q_M = 1, q_O = -1, q_C = 0$ &mdash; 編碼 $a \cdot b - c = 0$</li>
+            <li><strong>常數閘</strong>：$q_L = 0, q_R = 0, q_M = 0, q_O = -1, q_C = k$ &mdash; 編碼 $c = k$</li>
+            <li><strong>布林閘</strong>：$q_L = 0, q_R = 0, q_M = 1, q_O = -1, q_C = 0$ 且 $a = b$ 連線 &mdash; 編碼 $a^2 = c$，結合 $a - c = 0$ 可約束 $a \in \{0,1\}$</li>
+          </ul>
+          選擇器多項式在<em>預處理</em>階段一次性承諾，之後不再改變。
+          它們構成驗證金鑰的一部分。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Witness Polynomials <span class="zh">見證多項式</span></div>
+        <div class="def-body">
+          三個多項式 $a(X), b(X), c(X)$，編碼證明者的私有賦值：
+          $a(\omega^i)$ 是第 $i$ 個閘的<em>左輸入</em>，$b(\omega^i)$ 是<em>右輸入</em>，
+          $c(\omega^i)$ 是<em>輸出</em>。它們透過在求值域
+          $H = \{1, \omega, \omega^2, \ldots, \omega^{n-1}\}$
+          上對見證值進行內插（反 FFT）來構建。證明者添加隨機致盲項（高次係數）以
+          確保零知識性：例如 $a(X) \leftarrow a(X) + (b_1 X^n + b_2 X^{n+1}) \cdot Z_H(X)$，
+          其中 $b_1, b_2$ 是隨機域元素。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Gate Constraint <span class="zh">閘約束</span></div>
+        <div class="def-body">
+          在每個閘 $i \in \{0, \ldots, n-1\}$ 處執行的核心算術約束：
+          $$q_L(\omega^i) \cdot a(\omega^i) + q_R(\omega^i) \cdot b(\omega^i) + q_M(\omega^i) \cdot a(\omega^i) b(\omega^i) + q_O(\omega^i) \cdot c(\omega^i) + q_C(\omega^i) = 0$$
+          作為 $H$ 上的多項式恆等式，可寫為：
+          $$q_L(X) \cdot a(X) + q_R(X) \cdot b(X) + q_M(X) \cdot a(X) b(X) + q_O(X) \cdot c(X) + q_C(X) \equiv 0 \pmod{Z_H(X)}$$
+          閘約束是<em>必要但不充分的</em>：它確保每個閘獨立地正確計算，但對閘之間如何連線不做任何陳述。
+          那是複製約束的職責。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Copy Constraint / Permutation Argument <span class="zh">複製約束/排列論證</span></div>
+        <div class="def-body">
+          確保值在閘之間一致連線。若第 3 個閘的輸出必須等於第 7 個閘的左輸入，
+          則必須滿足 $c(\omega^3) = a(\omega^7)$。PLONK 將所有此類
+          連線約束編碼為所有線位置集合
+          $\{(a,0), (b,0), (c,0), (a,1), \ldots, (c,n-1)\}$
+          上的一個<em>排列</em> $\sigma$，然後使用累積乘積論證
+          來證明見證值與 $\sigma$ 一致。排列透過三個排列多項式
+          $\sigma_1(X), \sigma_2(X), \sigma_3(X)$ 編碼，在預處理階段承諾。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Grand Product Polynomial <span class="zh">累積乘積多項式</span></div>
+        <div class="def-body">
+          多項式 $Z(X)$，以連續乘積的方式累積排列檢查。
+          遞迴定義：
+          $$Z(\omega^0) = 1$$
+          $$Z(\omega^{i+1}) = Z(\omega^i) \cdot \prod_{j \in \{a,b,c\}} \frac{w_j(\omega^i) + \beta \cdot \text{id}_j(\omega^i) + \gamma}{w_j(\omega^i) + \beta \cdot \sigma_j(\omega^i) + \gamma}$$
+          其中 $w_a = a, w_b = b, w_c = c$ 是見證多項式，$\text{id}_j$ 編碼
+          「恆等排列」（原始位置），$\sigma_j$ 編碼實際的連線排列。
+          若複製約束被滿足，乘積會逐項消去，使得 $Z(\omega^n) = Z(\omega^0) = 1$。
+          若任何線不一致，$Z$ 在 $\omega^n$ 處的求值將不為 $1$，驗證者將拒絕。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Quotient Polynomial <span class="zh">商多項式</span></div>
+        <div class="def-body">
+          多項式 $t(X) = \frac{p(X)}{Z_H(X)}$，其中 $p(X)$ 將<em>所有</em>約束
+          （閘約束、排列約束、邊界約束）收集為單一多項式。
+          商 $t(X)$ <strong>作為多項式存在</strong>（即除法是整除的）
+          當且僅當所有約束在 $H$ 上被滿足。由於 $\deg(p) \approx 3n$ 且 $\deg(Z_H) = n$，
+          商的次數 $\approx 2n$。為了適應 SRS 的次數上界，$t(X)$ 被分割為三部分：
+          $$t(X) = t_{\text{lo}}(X) + X^n \cdot t_{\text{mid}}(X) + X^{2n} \cdot t_{\text{hi}}(X)$$
+          每部分的次數 $< n$，可以分別承諾。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Linearization <span class="zh">線性化</span></div>
+        <div class="def-body">
+          一種將多個多項式求值合併為單一多項式求值的技巧，
+          從而減少所需的 KZG 開啟證明數量。與其要求驗證者檢查
+          $f(\zeta) \cdot g(\zeta) = h(\zeta)$（需要分別開啟 $f$、$g$ 和 $h$），
+          證明者改為提供 $\bar{f} = f(\zeta)$ 作為域元素，並構建一個「線性化」
+          多項式 $r(X) = \bar{f} \cdot g(X) - h(X)$。然後只需 $r(X)$ 在 $\zeta$ 處的
+          一個開啟證明即可。這將總開啟數從約 $9$ 次求值減少到約 $6$ 次求值加 2 個開啟證明。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Verifier Challenges <span class="zh">驗證者挑戰</span></div>
+        <div class="def-body">
+          透過 Fiat-Shamir 啟發式方法（對目前的筆錄進行雜湊）生成的隨機域元素。
+          PLONK 在其五個輪次中使用五個挑戰值：
+          <ul>
+            <li>$\beta, \gamma$ &mdash; <strong>排列挑戰</strong>（第 2 輪）：隨機化累積乘積，使排列論證具有約束力。</li>
+            <li>$\alpha$ &mdash; <strong>約束聚合</strong>（第 3 輪）：將閘約束和排列約束合併為單一多項式。$\alpha$ 的冪次 $\alpha, \alpha^2$ 用以區分不同約束類型。</li>
+            <li>$\zeta$ &mdash; <strong>求值點</strong>（第 4 輪）：$H$ 之外的隨機點，所有多項式在此求值。必須在 $H$ 之外，以避免 $Z_H(\zeta)$ 除以零。</li>
+            <li>$v$ &mdash; <strong>開啟聚合</strong>（第 5 輪）：使用隨機線性組合將同一點處的多個多項式開啟批次合併為單一 KZG 證明。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         7.1 PLONK ARCHITECTURE OVERVIEW
+         ============================================================ -->
+    <h2>7.1 PLONK 架構概述</h2>
+
+    <p>
+      PLONK 遵循三階段架構：<strong>預處理</strong>（每個電路執行一次）、
+      <strong>證明</strong>（每個陳述執行一次）和<strong>驗證</strong>（任何人皆可執行）。
+      使 PLONK 成為「通用」系統的關鍵洞見在於，SRS 與電路無關 &mdash;
+      只有預處理階段是電路特定的。
+    </p>
+
+    <div class="diagram">
+<pre>
+  可信設置（一次性，通用）                預處理（每個電路一次）
+ +--------------------------+            +-------------------------------+
+ |  生成 SRS：               |            |  電路描述                      |
+ |  {[s^i]_1}_{i=0}^{n}    | ---------> |    |                           |
+ |  [s]_2                   |            |    v                           |
+ |  （銷毀秘密 s）           |            |  選擇器多項式：qL,qR,qM,      |
+ +--------------------------+            |    qO,qC                      |
+                                         |  排列多項式：s1,s2,s3          |
+                                         |    |                           |
+                                         |    v                           |
+                                         |  全部承諾 -> 驗證金鑰（VK）    |
+                                         +-------------------------------+
+                                                    |
+                                                    v
+  證明（每個陳述）                        驗證（每個證明）
+ +------------------------------+      +-------------------------------+
+ |  第 1 輪：見證承諾            |      |  輸入：VK + 證明 + 公開值      |
+ |  第 2 輪：排列 Z(X)          | ---> |  重建線性化承諾                 |
+ |  第 3 輪：商多項式 t(X)      |      |  檢查配對方程式                 |
+ |  第 4 輪：求值               |      |  接受 / 拒絕                   |
+ |  第 5 輪：開啟證明            |      +-------------------------------+
+ +------------------------------+
+</pre>
+    </div>
+
+    <p>
+      證明者的工作量以多項式運算（FFT/iFFT、多標量乘法）為主，
+      耗時 $O(n \log n)$。驗證者的工作量以常數次配對檢查為主，
+      耗時 $O(1)$（忽略公開輸入處理）。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">注意：為何是「Oecumenical」？</div>
+      <p>
+        PLONK 中的「O」代表「Oecumenical」（普世的），意指該協議旨在與
+        <em>任何</em>多項式承諾方案（KZG、IPA、FRI 等）相容。雖然原始
+        論文使用 KZG，但核心 PLONK 協議可以用不同的後端實例化，
+        從而衍生出 Halo2（IPA）和 Plonky2（FRI）等變體。
+      </p>
+    </div>
+
+    <!-- ============================================================
+         7.2 PREPROCESSING PHASE
+         ============================================================ -->
+    <h2>7.2 預處理階段</h2>
+
+    <p>
+      預處理階段將電路描述轉換為已承諾的多項式，供驗證者在證明檢查時使用。
+      此步驟<em>每個電路只執行一次</em>，並產生<strong>證明金鑰</strong>和<strong>驗證金鑰</strong>。
+    </p>
+
+    <h3>7.2.1 從電路到選擇器多項式</h3>
+
+    <p>
+      給定一個具有 $n$ 個閘的電路，定義求值域 $H = \{1, \omega, \omega^2, \ldots, \omega^{n-1}\}$，
+      其中 $\omega$ 是 $\mathbb{F}_r$ 中的原始 $n$ 次單位根。對於每個閘 $i$，
+      我們透過選擇器值指定其類型：
+    </p>
+
+    <table>
+      <thead>
+        <tr><th>閘類型</th><th>$q_L$</th><th>$q_R$</th><th>$q_M$</th><th>$q_O$</th><th>$q_C$</th><th>約束</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>加法</td><td>$1$</td><td>$1$</td><td>$0$</td><td>$-1$</td><td>$0$</td><td>$a + b = c$</td></tr>
+        <tr><td>乘法</td><td>$0$</td><td>$0$</td><td>$1$</td><td>$-1$</td><td>$0$</td><td>$a \cdot b = c$</td></tr>
+        <tr><td>常數（$k$）</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$-1$</td><td>$k$</td><td>$c = k$</td></tr>
+        <tr><td>左通過</td><td>$1$</td><td>$0$</td><td>$0$</td><td>$-1$</td><td>$0$</td><td>$c = a$</td></tr>
+        <tr><td>公開輸入（$\text{PI}$）</td><td>$1$</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$-\text{PI}$</td><td>$a = \text{PI}$</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      選擇器的每一行定義了一個透過在 $H$ 上進行 Lagrange 內插所得的多項式：
+    </p>
+
+    $$q_L(X) = \sum_{i=0}^{n-1} q_{L,i} \cdot L_i(X), \qquad L_i(X) = \prod_{j \neq i} \frac{X - \omega^j}{\omega^i - \omega^j}$$
+
+    <p>
+      實作上，此內插透過反 FFT（iNTT）完成，耗時 $O(n \log n)$。
+    </p>
+
+    <h3>7.2.2 排列多項式</h3>
+
+    <p>
+      閘之間的連線被編碼為 $3n$ 個線位置上的排列 $\sigma$。我們使用餘集生成元 $k_1, k_2$
+      將這些位置分為三「行」：
+    </p>
+
+    <ul>
+      <li><strong>行 $a$</strong>：位置 $\{1, \omega, \omega^2, \ldots, \omega^{n-1}\}$</li>
+      <li><strong>行 $b$</strong>：位置 $\{k_1, k_1\omega, k_1\omega^2, \ldots, k_1\omega^{n-1}\}$</li>
+      <li><strong>行 $c$</strong>：位置 $\{k_2, k_2\omega, k_2\omega^2, \ldots, k_2\omega^{n-1}\}$</li>
+    </ul>
+
+    <p>
+      餘集生成元 $k_1, k_2$ 的選擇必須使三個餘集 $H$、$k_1 H$、$k_2 H$
+      互不相交。常見的選擇是 $k_1 = 2, k_2 = 3$（或任何二次非剩餘及其與另一個非剩餘的乘積）。
+    </p>
+
+    <p>
+      排列 $\sigma$ 將每個線位置映射到與其連接的位置。若第 3 個閘的輸出
+      （$c$，位置 $k_2\omega^3$）必須等於第 7 個閘的左輸入（$a$，位置 $\omega^7$），
+      則 $\sigma(k_2\omega^3) = \omega^7$ 且 $\sigma(\omega^7) = k_2\omega^3$。
+    </p>
+
+    <p>
+      此排列被編碼為三個多項式 $\sigma_1(X), \sigma_2(X), \sigma_3(X)$，
+      每個都在 $H$ 上內插：
+    </p>
+
+    $$\sigma_1(\omega^i) = \sigma(\omega^i), \quad \sigma_2(\omega^i) = \sigma(k_1 \omega^i), \quad \sigma_3(\omega^i) = \sigma(k_2 \omega^i)$$
+
+    <h3>7.2.3 承諾與驗證金鑰</h3>
+
+    <p>
+      所有預處理多項式都使用 KZG 承諾：
+    </p>
+
+    $$\text{VK} = \Bigl( [q_L(s)]_1,\; [q_R(s)]_1,\; [q_M(s)]_1,\; [q_O(s)]_1,\; [q_C(s)]_1,\; [\sigma_1(s)]_1,\; [\sigma_2(s)]_1,\; [\sigma_3(s)]_1 \Bigr)$$
+
+    <p>
+      證明金鑰額外包含 SRS 和 Lagrange 基底 SRS 元素
+      $\{[L_i(s)]_1\}_{i=0}^{n-1}$，用於在 Lagrange 基底中高效地承諾見證。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理：通用性</div>
+      <p>
+        給定次數為 $n$ 的 SRS，<em>任何</em>閘數不超過 $n$ 的電路都可以被證明。
+        SRS 無需重新生成。只有預處理（選擇器和排列的承諾）
+        需要為每個新電路重新計算。這使 PLONK 適用於部署多種不同電路的系統
+        （例如智能合約平台）。
+      </p>
+    </div>
+
+    <div class="callout warning">
+      <div class="callout-title">警告：SRS 大小必須匹配電路</div>
+      <p>
+        SRS 的次數至少須為 $n + 5$（考慮到致盲和商多項式分割）。
+        若你的電路有 $2^{20}$ 個閘，你需要次數至少為 $2^{20} + 5$ 的 SRS。
+        使用過小的 SRS 會導致證明者靜默失敗或產生無效證明。
+        部署前務必驗證 $|\text{SRS}| \geq n + \text{max\_blinding\_factors}$。
+      </p>
+    </div>
+
+    <!-- ============================================================
+         7.3 THE FIVE PROVING ROUNDS
+         ============================================================ -->
+    <h2>7.3 證明的五個輪次</h2>
+
+    <p>
+      PLONK 證明者依序執行五個輪次，每輪產生承諾或求值，
+      並附加到 Fiat-Shamir 筆錄中。驗證者的挑戰值透過在每輪之後對筆錄進行雜湊而導出。
+    </p>
+
+    <div class="steps">
+
+      <!-- Round 1 -->
+      <div class="step">
+        <h4>第 1 輪：見證承諾</h4>
+        <p>
+          證明者持有每個閘 $i \in \{0, \ldots, n-1\}$ 的有效賦值 $(a_i, b_i, c_i)$。
+          這些值滿足所有閘約束和複製約束。
+        </p>
+        <p><strong>步驟 1a：內插。</strong>透過在 $H$ 上內插來構建多項式：</p>
+        $$a(X) = \sum_{i=0}^{n-1} a_i \cdot L_i(X), \quad b(X) = \sum_{i=0}^{n-1} b_i \cdot L_i(X), \quad c(X) = \sum_{i=0}^{n-1} c_i \cdot L_i(X)$$
+        <p>
+          實作上使用反 FFT：給定值 $(a_0, \ldots, a_{n-1})$，
+          透過 $\text{iFFT}$ 計算係數。
+        </p>
+        <p><strong>步驟 1b：致盲以實現零知識。</strong>添加隨機項以隱藏見證：</p>
+        $$\tilde{a}(X) = a(X) + (b_1 + b_2 X) \cdot Z_H(X)$$
+        <p>
+          其中 $b_1, b_2 \xleftarrow{\$} \mathbb{F}_r$。這增加了 2 個自由度，足以供
+          零知識模擬器使用。$\tilde{b}(X)$ 和 $\tilde{c}(X)$ 類似處理，使用全新的
+          隨機致盲因子。
+        </p>
+        <p><strong>步驟 1c：承諾。</strong>使用 KZG 承諾（對 SRS 進行多標量乘法）：</p>
+        $$[\tilde{a}]_1 = \text{KZG.Commit}(\text{SRS}, \tilde{a}), \quad [\tilde{b}]_1, \quad [\tilde{c}]_1$$
+        <p><strong>筆錄更新：</strong>將 $[\tilde{a}]_1, [\tilde{b}]_1, [\tilde{c}]_1$ 附加到 Fiat-Shamir 筆錄。</p>
+      </div>
+
+      <!-- Round 2 -->
+      <div class="step">
+        <h4>第 2 輪：排列累積乘積</h4>
+        <p>
+          <strong>挑戰值：</strong>從筆錄導出 $\beta, \gamma \xleftarrow{\text{FS}} \mathbb{F}_r$。
+          這些值隨機化排列論證。
+        </p>
+        <p><strong>步驟 2a：計算累積器值。</strong>對每個 $i \in \{0, \ldots, n-1\}$，計算：</p>
+        $$Z(\omega^{i+1}) = Z(\omega^i) \cdot \frac{(a_i + \beta\omega^i + \gamma)(b_i + \beta k_1\omega^i + \gamma)(c_i + \beta k_2\omega^i + \gamma)}{(a_i + \beta\sigma_1(\omega^i) + \gamma)(b_i + \beta\sigma_2(\omega^i) + \gamma)(c_i + \beta\sigma_3(\omega^i) + \gamma)}$$
+        <p>初始值為 $Z(\omega^0) = 1$。</p>
+        <p>
+          <strong>直覺：</strong>分子將每條線視為在其「恆等」位置
+          （行 $\times$ 列）。分母使用<em>實際的</em>排列位置。若
+          見證尊重該排列，則每個分子因子在乘積中的某處都有對應的分母因子相匹配，
+          整體乘積會逐項消去為 $1$。
+        </p>
+        <p><strong>步驟 2b：內插並致盲。</strong></p>
+        $$\tilde{Z}(X) = Z(X) + (b_7 + b_8 X + b_9 X^2) \cdot Z_H(X)$$
+        <p>需要三個致盲因子，因為 $Z(X)$ 會在兩個點（$\zeta$ 和 $\zeta\omega$）處被開啟。</p>
+        <p><strong>步驟 2c：承諾：</strong>$[\tilde{Z}]_1 = \text{KZG.Commit}(\text{SRS}, \tilde{Z})$。</p>
+        <p><strong>筆錄更新：</strong>附加 $[\tilde{Z}]_1$。</p>
+
+        <div class="callout warning">
+          <div class="callout-title">警告：$Z(\omega^n)$ 必須等於 1</div>
+          <p>
+            若最終累積器值 $Z(\omega^n) \neq 1$，則排列論證不可滿足，
+            證明者無法產生有效證明。這通常表示電路編譯器的連線存在錯誤。
+            在繼續之前，務必斷言 $Z(\omega^n) = 1$ 作為健全性檢查。
+          </p>
+        </div>
+      </div>
+
+      <!-- Round 3 -->
+      <div class="step">
+        <h4>第 3 輪：商多項式</h4>
+        <p>
+          <strong>挑戰值：</strong>從筆錄導出 $\alpha \xleftarrow{\text{FS}} \mathbb{F}_r$。
+          此挑戰值用於聚合不同的約束。
+        </p>
+        <p><strong>步驟 3a：構建聚合約束多項式 $p(X)$。</strong></p>
+        <p>使用 $\alpha$ 的冪次合併三類約束：</p>
+        <p><em>閘約束：</em></p>
+        $$\text{gate}(X) = q_L(X) a(X) + q_R(X) b(X) + q_M(X) a(X) b(X) + q_O(X) c(X) + q_C(X)$$
+        <p><em>排列約束（累積器轉移）：</em></p>
+        $$\text{perm}_1(X) = \bigl(a(X) + \beta X + \gamma\bigr)\bigl(b(X) + \beta k_1 X + \gamma\bigr)\bigl(c(X) + \beta k_2 X + \gamma\bigr) Z(X)$$
+        $$\quad - \bigl(a(X) + \beta \sigma_1(X) + \gamma\bigr)\bigl(b(X) + \beta \sigma_2(X) + \gamma\bigr)\bigl(c(X) + \beta \sigma_3(X) + \gamma\bigr) Z(\omega X)$$
+        <p><em>排列邊界約束：</em></p>
+        $$\text{perm}_2(X) = \bigl(Z(X) - 1\bigr) \cdot L_0(X)$$
+        <p>其中 $L_0(X) = \frac{X^n - 1}{n(X - 1)}$ 是第一個 Lagrange 基底多項式（確保 $Z(1) = 1$）。</p>
+        <p><strong>聚合：</strong></p>
+        $$p(X) = \text{gate}(X) + \alpha \cdot \text{perm}_1(X) + \alpha^2 \cdot \text{perm}_2(X)$$
+
+        <p><strong>步驟 3b：計算商。</strong></p>
+        $$t(X) = \frac{p(X)}{Z_H(X)}$$
+        <p>
+          此除法是整除的（餘數為零）當且僅當所有約束在 $H$ 上成立。
+          證明者透過在 $H$ 的餘集上求值 $p(X)$（以避免除以零），
+          逐點除以餘集上的 $Z_H$ 值，然後應用 iFFT 來計算此商。
+        </p>
+
+        <p><strong>步驟 3c：分割商。</strong>由於 $\deg(t) \leq 3n + 5$：</p>
+        $$t(X) = t_{\text{lo}}(X) + X^{n+2} \cdot t_{\text{mid}}(X) + X^{2(n+2)} \cdot t_{\text{hi}}(X)$$
+        <p>（確切的分割點取決於實作；$n+2$ 考慮了致盲。）</p>
+
+        <p><strong>步驟 3d：承諾：</strong></p>
+        $$[t_{\text{lo}}]_1,\; [t_{\text{mid}}]_1,\; [t_{\text{hi}}]_1$$
+        <p><strong>筆錄更新：</strong>附加全部三個承諾。</p>
+      </div>
+
+      <!-- Round 4 -->
+      <div class="step">
+        <h4>第 4 輪：開啟求值</h4>
+        <p>
+          <strong>挑戰值：</strong>從筆錄導出 $\zeta \xleftarrow{\text{FS}} \mathbb{F}_r$。
+          這是隨機求值點。
+        </p>
+        <p><strong>步驟 4a：在 $\zeta$ 處求值多項式。</strong></p>
+        $$\bar{a} = a(\zeta), \quad \bar{b} = b(\zeta), \quad \bar{c} = c(\zeta)$$
+        $$\bar{\sigma}_1 = \sigma_1(\zeta), \quad \bar{\sigma}_2 = \sigma_2(\zeta)$$
+        $$\bar{t} = t_{\text{lo}}(\zeta) + \zeta^{n+2} \cdot t_{\text{mid}}(\zeta) + \zeta^{2(n+2)} \cdot t_{\text{hi}}(\zeta)$$
+
+        <p><strong>步驟 4b：在 $\zeta\omega$（位移點）處求值 $Z$：</strong></p>
+        $$\bar{Z}_\omega = Z(\zeta\omega)$$
+        <p>
+          需要位移求值 $Z(\zeta\omega)$，因為排列約束將 $Z(X)$ 與 $Z(\omega X)$ 關聯：
+          我們需要 $Z$ 在兩個連續域點處的值。
+        </p>
+
+        <p><strong>步驟 4c：發送求值。</strong>證明者發送：</p>
+        $$\bar{a},\; \bar{b},\; \bar{c},\; \bar{\sigma}_1,\; \bar{\sigma}_2,\; \bar{Z}_\omega$$
+        <p>作為域元素（非曲線點）。每個約 32 位元組。</p>
+        <p><strong>筆錄更新：</strong>附加所有求值。</p>
+
+        <div class="callout note">
+          <div class="callout-title">注意：為何不傳送 $\bar{\sigma}_3$？</div>
+          <p>
+            求值 $\sigma_3(\zeta)$ <em>不會</em>被傳送。相反地，第 5 輪中的線性化技巧
+            將 $\sigma_3(X)$ 吸收進線性化多項式，從而避免需要此求值。
+            這節省了證明中的一個域元素和一次開啟檢查。
+          </p>
+        </div>
+      </div>
+
+      <!-- Round 5 -->
+      <div class="step">
+        <h4>第 5 輪：開啟證明</h4>
+        <p>
+          <strong>挑戰值：</strong>從筆錄導出 $v \xleftarrow{\text{FS}} \mathbb{F}_r$。
+          此值用於批次合併多個開啟。
+        </p>
+
+        <p><strong>步驟 5a：計算線性化多項式 $r(X)$。</strong></p>
+        <p>
+          利用已知的求值 $\bar{a}, \bar{b}, \bar{c}, \bar{\sigma}_1, \bar{\sigma}_2, \bar{Z}_\omega$，
+          構建一個在點 $\zeta$ 處合併所有約束的多項式：
+        </p>
+        $$r(X) = \bar{a}\bar{b} \cdot q_M(X) + \bar{a} \cdot q_L(X) + \bar{b} \cdot q_R(X) + \bar{c} \cdot q_O(X) + q_C(X)$$
+        $$+ \alpha \cdot \Bigl[ (\bar{a} + \beta\zeta + \gamma)(\bar{b} + \beta k_1\zeta + \gamma)(\bar{c} + \beta k_2\zeta + \gamma) \cdot Z(X)$$
+        $$\quad - (\bar{a} + \beta\bar{\sigma}_1 + \gamma)(\bar{b} + \beta\bar{\sigma}_2 + \gamma) \cdot \beta \bar{Z}_\omega \cdot \sigma_3(X) \Bigr]$$
+        $$+ \alpha^2 \cdot L_0(\zeta) \cdot Z(X)$$
+        $$- Z_H(\zeta) \cdot \bigl( t_{\text{lo}}(X) + \zeta^{n+2} t_{\text{mid}}(X) + \zeta^{2(n+2)} t_{\text{hi}}(X) \bigr)$$
+
+        <p>
+          注意：$r(X)$ 是一個<em>以 $X$ 為變數的多項式</em> &mdash; 求值 $\bar{a}, \bar{b}, \ldots$
+          被用作<strong>純量係數</strong>，而非多項式變數。這就是線性化的精髓：
+          我們用已知純量與未知多項式的乘積替代了未知量的乘積。
+        </p>
+
+        <p><strong>步驟 5b：在 $\zeta$ 處的批次開啟證明。</strong></p>
+        <p>
+          證明者必須證明求值與已承諾的多項式一致。
+          使用 $v$ 的冪次進行隨機線性組合：
+        </p>
+        $$W_\zeta(X) = \frac{1}{X - \zeta} \Bigl( r(X) - r(\zeta) + v(a(X) - \bar{a}) + v^2(b(X) - \bar{b}) + v^3(c(X) - \bar{c}) + v^4(\sigma_1(X) - \bar{\sigma}_1) + v^5(\sigma_2(X) - \bar{\sigma}_2) \Bigr)$$
+
+        <p><strong>步驟 5c：在 $\zeta\omega$ 處的開啟證明。</strong></p>
+        $$W_{\zeta\omega}(X) = \frac{Z(X) - \bar{Z}_\omega}{X - \zeta\omega}$$
+
+        <p><strong>步驟 5d：承諾：</strong>$[W_\zeta]_1,\; [W_{\zeta\omega}]_1$。</p>
+        <p>這兩個 KZG 開啟證明是最終的證明元素。</p>
+      </div>
+
+    </div>
+
+    <h3>完整證明</h3>
+    <p>PLONK 證明 $\pi$ 由以下元素組成：</p>
+
+    <table>
+      <thead>
+        <tr><th>元素</th><th>類型</th><th>大小（BN254）</th><th>來源</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>$[\tilde{a}]_1, [\tilde{b}]_1, [\tilde{c}]_1$</td><td>$\mathbb{G}_1$ 點</td><td>3 &times; 64B</td><td>第 1 輪</td></tr>
+        <tr><td>$[\tilde{Z}]_1$</td><td>$\mathbb{G}_1$ 點</td><td>64B</td><td>第 2 輪</td></tr>
+        <tr><td>$[t_\text{lo}]_1, [t_\text{mid}]_1, [t_\text{hi}]_1$</td><td>$\mathbb{G}_1$ 點</td><td>3 &times; 64B</td><td>第 3 輪</td></tr>
+        <tr><td>$\bar{a}, \bar{b}, \bar{c}, \bar{\sigma}_1, \bar{\sigma}_2, \bar{Z}_\omega$</td><td>$\mathbb{F}_r$ 元素</td><td>6 &times; 32B</td><td>第 4 輪</td></tr>
+        <tr><td>$[W_\zeta]_1, [W_{\zeta\omega}]_1$</td><td>$\mathbb{G}_1$ 點</td><td>2 &times; 64B</td><td>第 5 輪</td></tr>
+        <tr><td colspan="2"><strong>合計</strong></td><td><strong>~768 位元組</strong></td><td></td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      使用點壓縮（僅儲存 $x$ 坐標加上符號位元），$\mathbb{G}_1$ 點可縮小至
+      33 位元組，使總證明大小約為 $500$ 位元組。
+    </p>
+
+    <!-- ============================================================
+         7.4 VERIFICATION
+         ============================================================ -->
+    <h2>7.4 驗證</h2>
+
+    <p>
+      驗證者接收證明 $\pi$、驗證金鑰 VK 和公開輸入。
+      驗證過程如下：
+    </p>
+
+    <h3>7.4.1 重新計算挑戰值</h3>
+    <p>
+      驗證者使用與證明者相同的 Fiat-Shamir 筆錄構造，從證明元素中重新計算
+      $\beta, \gamma, \alpha, \zeta, v$。這確保挑戰值是確定性的且具有約束力。
+    </p>
+
+    <h3>7.4.2 求值消失多項式與 Lagrange 多項式</h3>
+    $$Z_H(\zeta) = \zeta^n - 1$$
+    $$L_0(\zeta) = \frac{\zeta^n - 1}{n(\zeta - 1)}$$
+
+    <h3>7.4.3 計算線性化承諾</h3>
+    <p>
+      驗證者從驗證金鑰的承諾和證明求值中計算 $[r]_1$：
+    </p>
+    $$[r]_1 = \bar{a}\bar{b} \cdot [q_M]_1 + \bar{a} \cdot [q_L]_1 + \bar{b} \cdot [q_R]_1 + \bar{c} \cdot [q_O]_1 + [q_C]_1$$
+    $$+ \alpha \Bigl[ (\bar{a} + \beta\zeta + \gamma)(\bar{b} + \beta k_1\zeta + \gamma)(\bar{c} + \beta k_2\zeta + \gamma) \cdot [\tilde{Z}]_1$$
+    $$\quad - (\bar{a} + \beta\bar{\sigma}_1 + \gamma)(\bar{b} + \beta\bar{\sigma}_2 + \gamma) \beta \bar{Z}_\omega \cdot [\sigma_3]_1 \Bigr]$$
+    $$+ \alpha^2 L_0(\zeta) \cdot [\tilde{Z}]_1$$
+
+    <p>
+      這是一個約 10 項的多標量乘法（MSM），比證明者的 MSM 便宜得多。
+    </p>
+
+    <h3>7.4.4 批次驗證（配對檢查）</h3>
+    <p>
+      驗證者構建批次承諾：
+    </p>
+    $$[D]_1 = [r]_1 - Z_H(\zeta) \cdot \bigl([t_\text{lo}]_1 + \zeta^{n+2}[t_\text{mid}]_1 + \zeta^{2(n+2)}[t_\text{hi}]_1\bigr)$$
+    $$[F]_1 = [D]_1 + v \cdot [\tilde{a}]_1 + v^2 \cdot [\tilde{b}]_1 + v^3 \cdot [\tilde{c}]_1 + v^4 \cdot [\sigma_1]_1 + v^5 \cdot [\sigma_2]_1$$
+    $$[E]_1 = \bigl(-r(\zeta) + v\bar{a} + v^2\bar{b} + v^3\bar{c} + v^4\bar{\sigma}_1 + v^5\bar{\sigma}_2\bigr) \cdot [1]_1$$
+
+    <p>
+      其中 $r(\zeta)$ 是預期的線性化求值。最終的配對檢查為：
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理：PLONK 驗證方程式</div>
+      <p>驗證者接受當且僅當：</p>
+      $$e\bigl([W_\zeta]_1 + u \cdot [W_{\zeta\omega}]_1,\; [s]_2\bigr) = e\bigl(\zeta \cdot [W_\zeta]_1 + u\zeta\omega \cdot [W_{\zeta\omega}]_1 + [F]_1 - [E]_1,\; [1]_2\bigr)$$
+      <p>
+        其中 $u$ 是最終的隨機挑戰值（從筆錄導出），將兩個開啟檢查批次合併為
+        單一配對方程式。這恰好需要<strong>一次多重配對</strong>
+        （等價地，2 次 Miller 迴路 + 1 次最終指數運算）。
+      </p>
+    </div>
+
+    <h3>7.4.5 驗證成本</h3>
+    <table>
+      <thead>
+        <tr><th>運算</th><th>次數</th><th>成本（BN254）</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Fiat-Shamir 雜湊</td><td>5 輪</td><td>可忽略</td></tr>
+        <tr><td>域運算（$Z_H, L_0$ 等）</td><td>約 20 次</td><td>可忽略</td></tr>
+        <tr><td>多標量乘法（MSM）</td><td>約 12 個點</td><td>約 2ms</td></tr>
+        <tr><td>配對（多重配對）</td><td>2 對</td><td>約 4ms</td></tr>
+        <tr><td><strong>總驗證時間</strong></td><td></td><td><strong>約 6ms</strong></td></tr>
+      </tbody>
+    </table>
+
+    <!-- ============================================================
+         7.5 SECURITY ANALYSIS
+         ============================================================ -->
+    <h2>7.5 安全性分析</h2>
+
+    <h3>7.5.1 完備性</h3>
+    <p>
+      若證明者持有有效見證（滿足所有閘約束和複製約束），則五輪證明過程
+      將產生通過驗證方程式的證明。這源於代數恆等式：當所有約束在 $H$ 上成立時，
+      約束多項式 $p(X)$ 在 $H$ 上消失，因此 $t(X) = p(X)/Z_H(X)$ 是一個
+      定義良好的多項式，且所有求值都是一致的。
+    </p>
+
+    <h3>7.5.2 健全性</h3>
+    <p>
+      健全性依賴兩大支柱：
+    </p>
+    <ul>
+      <li>
+        <strong>KZG 約束力：</strong>在 $d$-SDH 假設（或 AGM）下，PPT 對手無法
+        產生一個承諾 $[f(s)]_1$ 和一個對值 $y \neq f(\zeta)$ 的開啟證明。
+        這確保求值 $\bar{a}, \bar{b}, \ldots$ 是誠實計算的。
+      </li>
+      <li>
+        <strong>Schwartz-Zippel 引理：</strong>$\mathbb{F}_r$ 上次數為 $d$ 的非零多項式
+        至多有 $d$ 個根。由於 $d \ll |\mathbb{F}_r|$，隨機挑戰 $\zeta$
+        命中某個根的機率可忽略不計。這確保在單一隨機點 $\zeta$ 處檢查約束
+        與在所有點檢查同樣有效。
+      </li>
+    </ul>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理：知識健全性</div>
+      <p>
+        在代數群模型（AGM）和隨機預言模型（ROM）中，對於任何產生被接受證明的 PPT 對手 $\mathcal{A}$，
+        存在一個提取器 $\mathcal{E}$，能從 $\mathcal{A}$ 的代數表示中提取有效見證。
+        提取失敗的機率為：
+      </p>
+      $$\Pr[\text{extraction fails}] \leq \frac{4n + 6}{|\mathbb{F}_r|} \approx 2^{-250}$$
+    </div>
+
+    <h3>7.5.3 零知識性</h3>
+    <p>
+      零知識性透過第 1 輪和第 2 輪中添加的致盲多項式來實現。
+      致盲項的形式為 $b \cdot Z_H(X)$，它在 $H$ 上消失（因此不影響正確性），
+      但在 $H$ 之外的點（如 $\zeta$）處為求值添加隨機「噪聲」。
+    </p>
+
+    <p>
+      模擬器的操作如下：選擇隨機求值 $\bar{a}, \bar{b}, \bar{c}$
+      和隨機承諾，然後使用底層 KZG 方案的模擬器來產生一致的開啟證明。
+      關鍵性質在於致盲因子提供了足夠的熵，使模擬的筆錄與真實筆錄
+      在計算上不可區分。
+    </p>
+
+    <h3>7.5.4 為何挑戰值必須是隨機的</h3>
+
+    <div class="callout warning">
+      <div class="callout-title">警告：挑戰值操縱攻擊</div>
+      <p>
+        若對手能預測或影響挑戰值，協議將被破壞：
+      </p>
+      <ul>
+        <li><strong>可預測的 $\beta, \gamma$</strong>：對手可以構建一個儘管連線不正確
+        但仍能通過排列論證的見證。累積乘積「意外地」求值為 1，因為對手選擇了
+        在已知 $\beta, \gamma$ 處恰好消去的線值。</li>
+        <li><strong>可預測的 $\zeta$</strong>：對手可以構建除了在 $\zeta$ 處以外
+        到處不一致的多項式，從而通過 Schwartz-Zippel 檢查。</li>
+        <li><strong>$\zeta \in H$</strong>：若求值點是一個單位根，則
+        $Z_H(\zeta) = 0$，商多項式檢查變為 $0 = 0$，
+        無論約束是否滿足都自動成立。</li>
+      </ul>
+      <p>
+        Fiat-Shamir 啟發式方法確保挑戰值從筆錄導出，使其對證明者不可預測
+        （在隨機預言模型中）。
+      </p>
+    </div>
+
+    <!-- ============================================================
+         7.6 PLONK VARIANTS
+         ============================================================ -->
+    <h2>7.6 PLONK 變體</h2>
+
+    <p>
+      PLONK 框架衍生出一系列變體，每個都在基礎協議上擴展了額外功能。
+      下表比較了主要變體：
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>變體</th>
+          <th>關鍵特性</th>
+          <th>自訂閘</th>
+          <th>查找</th>
+          <th>PCS 後端</th>
+          <th>知名使用者</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Vanilla PLONK</strong></td>
+          <td>原始協議</td>
+          <td>否（固定 $q_L, q_R, q_M, q_O, q_C$）</td>
+          <td>否</td>
+          <td>KZG</td>
+          <td>參考實作</td>
+        </tr>
+        <tr>
+          <td><strong>TurboPLONK</strong></td>
+          <td>自訂閘</td>
+          <td>是（額外的選擇器行）</td>
+          <td>否</td>
+          <td>KZG</td>
+          <td>Aztec（早期）</td>
+        </tr>
+        <tr>
+          <td><strong>UltraPLONK</strong></td>
+          <td>自訂閘 + 查找</td>
+          <td>是</td>
+          <td>是（Plookup）</td>
+          <td>KZG</td>
+          <td>Aztec、Noir</td>
+        </tr>
+        <tr>
+          <td><strong>PLONKup</strong></td>
+          <td>PLONK + Plookup（整合式）</td>
+          <td>可選</td>
+          <td>是（原生）</td>
+          <td>KZG</td>
+          <td>研究用</td>
+        </tr>
+        <tr>
+          <td><strong>Halo2</strong></td>
+          <td>IPA 後端，無需可信設置</td>
+          <td>是（PLONKish）</td>
+          <td>是</td>
+          <td>IPA</td>
+          <td>Zcash、Scroll</td>
+        </tr>
+        <tr>
+          <td><strong>Plonky2</strong></td>
+          <td>FRI 後端，快速遞迴</td>
+          <td>是</td>
+          <td>是</td>
+          <td>FRI</td>
+          <td>Polygon</td>
+        </tr>
+        <tr>
+          <td><strong>Plonky3</strong></td>
+          <td>泛化 AIR + 查找</td>
+          <td>是</td>
+          <td>是（LogUp）</td>
+          <td>FRI / 多種</td>
+          <td>Polygon</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>7.6.1 TurboPLONK：自訂閘</h3>
+    <p>
+      Vanilla PLONK 使用具有 5 個選擇器的固定閘方程式。TurboPLONK 允許<strong>額外的
+      選擇器行</strong>和<strong>更寬的閘</strong>（每閘超過 3 條線）。例如，
+      「範圍檢查」閘可以在單一閘中約束一個值在 $[0, 2^k)$ 範圍內，
+      而非將其分解為 $k$ 個布林約束。
+    </p>
+    <p>
+      閘方程式推廣為：
+    </p>
+    $$\sum_{j} q_j(\omega^i) \cdot \text{monomial}_j(a, b, c, d, \ldots) = 0$$
+    <p>
+      其中每個單項式是線值的乘積，每個 $q_j$ 是選擇器多項式。
+      自訂閘減少了所需的行數，直接提升效能。
+    </p>
+
+    <h3>7.6.2 UltraPLONK 與查找論證</h3>
+    <p>
+      UltraPLONK 在 TurboPLONK 的基礎上擴展了<strong>查找論證</strong>（具體為 Plookup）。
+      查找論證可證明某個見證值出現在預計算表 $T$ 中，而無需透過算術閘顯式約束。
+      這對以下場景至關重要：
+    </p>
+    <ul>
+      <li><strong>範圍檢查</strong>：$x \in [0, 2^{16})$？在 $2^{16}$ 個值的表中查找即可。</li>
+      <li><strong>位元運算</strong>：8 位元區塊的 XOR、AND 表。</li>
+      <li><strong>雜湊函數</strong>：AES 的 S-box 查找、Poseidon 部分輪的查找。</li>
+    </ul>
+
+    <div class="callout example">
+      <div class="callout-title">範例：使用查找的 SHA-256</div>
+      <p>
+        不使用查找時，證明 SHA-256 需要約 27,000 個乘法閘（將每個 32 位元運算分解為二進位）。
+        使用 UltraPLONK 查找搭配 16 位元 XOR 表，同一電路僅需約 5,000 個閘 + 查找論證，
+        減少了約 5 倍。
+      </p>
+    </div>
+
+    <h3>7.6.3 不同的 PCS 後端</h3>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>KZG（基於配對）</h4>
+        <ul>
+          <li>常數大小的證明（$O(1)$）</li>
+          <li>常數時間驗證（$O(1)$）</li>
+          <li>需要可信設置（可更新）</li>
+          <li>依賴配對友好曲線</li>
+          <li>非後量子安全</li>
+          <li>使用者：vanilla PLONK、Aztec、zkSync</li>
+        </ul>
+      </div>
+      <div class="comparison-card">
+        <h4>IPA（內積論證）</h4>
+        <ul>
+          <li>對數大小的證明（$O(\log n)$）</li>
+          <li>線性驗證時間（$O(n)$）</li>
+          <li>無需可信設置（透明）</li>
+          <li>適用於任何質數階群</li>
+          <li>非後量子安全</li>
+          <li>使用者：Halo2（Zcash、Scroll）</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>FRI（快速 Reed-Solomon IOP）</h4>
+        <ul>
+          <li>多對數大小的證明</li>
+          <li>多對數驗證</li>
+          <li>無需可信設置（透明）</li>
+          <li>基於雜湊（可能具後量子安全性）</li>
+          <li>證明比 KZG 更大（約 50-200 KB）</li>
+          <li>使用者：Plonky2、Plonky3、StarkWare</li>
+        </ul>
+      </div>
+      <div class="comparison-card">
+        <h4>選擇後端</h4>
+        <ul>
+          <li>鏈上驗證（gas 成本）&rarr; KZG</li>
+          <li>不需信任假設 &rarr; IPA 或 FRI</li>
+          <li>遞迴證明組合 &rarr; FRI 或 IPA</li>
+          <li>後量子對沖 &rarr; FRI</li>
+          <li>最小證明大小 &rarr; KZG</li>
+          <li>最快證明者 &rarr; FRI（搭配 Goldilocks）</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         7.7 WORKED EXAMPLE
+         ============================================================ -->
+    <h2>7.7 詳解範例</h2>
+
+    <p>
+      我們逐步演示一個完整的 PLONK 證明過程，使用一個微型電路：證明知道 $x, y$
+      使得 $x \times y = z$，其中 $z = 6$ 為公開值，$x = 2$ 和 $y = 3$ 為私有值。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">注意：玩具域</div>
+      <p>
+        為了可讀性，我們在小域 $\mathbb{F}_{17}$（質數 $p = 17$）上工作。
+        在生產環境中，$p \approx 2^{254}$，但代數運算完全相同。
+        我們使用 $n = 4$（電路填充至 2 的冪次）。$\mathbb{F}_{17}$ 中的
+        原始 4 次單位根為 $\omega = 4$（因為 $4^4 = 256 \equiv 1 \pmod{17}$）。
+      </p>
+    </div>
+
+    <h3>7.7.1 電路佈局</h3>
+
+    <p>
+      我們的電路有 2 個有意義的閘（一個公開輸入閘和一個乘法閘），
+      填充至 $n = 4$ 並使用虛擬閘：
+    </p>
+
+    <table>
+      <thead>
+        <tr><th>閘 $i$</th><th>$\omega^i$</th><th>類型</th><th>$a_i$</th><th>$b_i$</th><th>$c_i$</th><th>$q_L$</th><th>$q_R$</th><th>$q_M$</th><th>$q_O$</th><th>$q_C$</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0</td><td>$1$</td><td>乘法</td><td>$2$</td><td>$3$</td><td>$6$</td><td>$0$</td><td>$0$</td><td>$1$</td><td>$-1$</td><td>$0$</td></tr>
+        <tr><td>1</td><td>$4$</td><td>公開輸出</td><td>$6$</td><td>$0$</td><td>$0$</td><td>$1$</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$-6$</td></tr>
+        <tr><td>2</td><td>$16$</td><td>虛擬</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$0$</td></tr>
+        <tr><td>3</td><td>$13$</td><td>虛擬</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$0$</td><td>$0$</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      注意：$\omega^0 = 1$，$\omega^1 = 4$，$\omega^2 = 4^2 = 16$，$\omega^3 = 4^3 = 64 \equiv 13 \pmod{17}$。
+    </p>
+
+    <p>
+      驗算：閘 0 檢查 $q_M \cdot a_0 \cdot b_0 + q_O \cdot c_0 = 1 \cdot 2 \cdot 3 + (-1) \cdot 6 = 0$。正確。
+      閘 1 檢查 $q_L \cdot a_1 + q_C = 1 \cdot 6 + (-6) = 0$。正確。
+    </p>
+
+    <h3>7.7.2 選擇器多項式</h3>
+
+    <p>
+      我們在 $H = \{1, 4, 16, 13\}$ 上用值 $(1, 0, 0, 0)$ 內插 $q_M(X)$。
+      這就是第一個 Lagrange 基底多項式：
+    </p>
+
+    $$q_M(X) = L_0(X) = \frac{X^4 - 1}{4(X - 1)}$$
+
+    <p>
+      類似地，$q_L(X) = L_1(X)$（僅在 $\omega^1 = 4$ 處值為 $1$），
+      $q_O(X) = -L_0(X)$（在 $\omega^0 = 1$ 處值為 $-1$），
+      $q_C(X) = -6 \cdot L_1(X)$（在 $\omega^1 = 4$ 處值為 $-6$），
+      而 $q_R(X) = 0$。
+    </p>
+
+    <h3>7.7.3 複製約束（連線）</h3>
+
+    <p>
+      關鍵的連線約束：閘 0 的輸出（$c_0 = 6$）必須等於閘 1 的左輸入（$a_1 = 6$）。
+      使用 $k_1 = 2, k_2 = 3$ 的餘集：
+    </p>
+
+    <table>
+      <thead>
+        <tr><th>位置</th><th>線</th><th>ID（恆等）</th><th>$\sigma$（排列後）</th><th>值</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>$a_0$</td><td>$a(\omega^0)$</td><td>$1$</td><td>$1$（自身）</td><td>$2$</td></tr>
+        <tr><td>$a_1$</td><td>$a(\omega^1)$</td><td>$4$</td><td>$3 \cdot 1 = 3$ <em>（與 $c_0$ 交換）</em></td><td>$6$</td></tr>
+        <tr><td>$b_0$</td><td>$b(\omega^0)$</td><td>$2 \cdot 1 = 2$</td><td>$2$（自身）</td><td>$3$</td></tr>
+        <tr><td>$b_1$</td><td>$b(\omega^1)$</td><td>$2 \cdot 4 = 8$</td><td>$8$（自身）</td><td>$0$</td></tr>
+        <tr><td>$c_0$</td><td>$c(\omega^0)$</td><td>$3 \cdot 1 = 3$</td><td>$4$ <em>（與 $a_1$ 交換）</em></td><td>$6$</td></tr>
+        <tr><td>$c_1$</td><td>$c(\omega^1)$</td><td>$3 \cdot 4 = 12$</td><td>$12$（自身）</td><td>$0$</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      關鍵的交換：位置 $a_1$（恆等 $4$）映射到 $\sigma = 3$（即 $c_0$ 的恆等），
+      而位置 $c_0$（恆等 $3$）映射到 $\sigma = 4$（即 $a_1$ 的恆等）。
+      其餘位置（包括閘 2-3）映射到自身。
+    </p>
+
+    <h3>7.7.4 第 1 輪：見證多項式</h3>
+
+    <p>
+      在 $H = \{1, 4, 16, 13\}$ 上用值 $(2, 6, 0, 0)$ 內插 $a(X)$：
+    </p>
+    $$a(X) = 2 L_0(X) + 6 L_1(X) + 0 \cdot L_2(X) + 0 \cdot L_3(X)$$
+
+    <p>
+      $b(X)$ 類似處理，值為 $(3, 0, 0, 0) = 3 L_0(X)$；$c(X)$ 值為 $(6, 0, 0, 0) = 6 L_0(X)$。
+    </p>
+
+    <p>
+      （在此玩具範例中為清晰起見省略致盲。在生產環境中，致盲是必不可少的。）
+    </p>
+
+    <p>使用 KZG 承諾：$[a]_1, [b]_1, [c]_1$。</p>
+
+    <h3>7.7.5 第 2 輪：累積乘積</h3>
+
+    <p>
+      假設 Fiat-Shamir 給出 $\beta = 7, \gamma = 5$（在 $\mathbb{F}_{17}$ 中）。
+      迭代計算 $Z(\omega^i)$。從 $Z(1) = 1$ 開始：
+    </p>
+
+    <p>
+      對於 $i = 0$（在 $\omega^0 = 1$ 處）：分子因子 =
+      $(a_0 + \beta \cdot 1 + \gamma)(b_0 + \beta \cdot k_1 \cdot 1 + \gamma)(c_0 + \beta \cdot k_2 \cdot 1 + \gamma)$
+    </p>
+    $$= (2 + 7 + 5)(3 + 14 + 5)(6 + 21 + 5) \pmod{17}$$
+    $$= (14)(22)(32) \pmod{17} = (14)(5)(15) = 1050 \equiv 1050 - 61 \cdot 17 = 1050 - 1037 = 13 \pmod{17}$$
+
+    <p>
+      分母使用 $\sigma$ 值而非恆等值。完整計算在 $i = 1, 2, 3$ 時類似進行，
+      最終得到 $Z(\omega^4) = Z(1) = 1$（若連線正確則必須成立）。
+    </p>
+
+    <p>承諾：$[Z]_1$。</p>
+
+    <h3>7.7.6 第 3-5 輪：商多項式與開啟</h3>
+
+    <p>
+      假設 $\alpha = 11$（由 Fiat-Shamir 給出）。聚合約束多項式為：
+    </p>
+    $$p(X) = \text{gate}(X) + 11 \cdot \text{perm}_1(X) + 11^2 \cdot \text{perm}_2(X)$$
+
+    <p>
+      證明者除以 $Z_H(X) = X^4 - 1$ 得到 $t(X)$。由於 $n = 4$ 很小，
+      $t(X)$ 的次數 $\leq 8$，分割為 $t_\text{lo}$（次數 $< 4$）和 $t_\text{hi}$（次數 $< 4$）。
+    </p>
+
+    <p>
+      假設 $\zeta = 10$（由 Fiat-Shamir 給出；注意 $10 \notin H = \{1, 4, 16, 13\}$，如要求）。
+      證明者在 $\zeta = 10$ 和 $\zeta\omega = 10 \cdot 4 = 40 \equiv 6 \pmod{17}$ 處
+      求值所有多項式，構建線性化，並產生 KZG 開啟證明 $[W_\zeta]_1, [W_{\zeta\omega}]_1$。
+    </p>
+
+    <div class="callout example">
+      <div class="callout-title">範例：驗證檢查</div>
+      <p>
+        驗證者從筆錄重新計算 $\beta, \gamma, \alpha, \zeta$，求值
+        $Z_H(10) = 10^4 - 1 = 10000 - 1 = 9999 \equiv 9999 \bmod 17 = 9999 - 588 \cdot 17 = 9999 - 9996 = 3$，
+        以及 $L_0(10) = \frac{10^4 - 1}{4(10 - 1)} = \frac{9999}{36} \equiv 3 \cdot 36^{-1} \pmod{17}$。
+        由於 $36 \equiv 2 \pmod{17}$ 且 $2^{-1} = 9$（在 $\mathbb{F}_{17}$ 中），
+        我們得到 $L_0(10) = 3 \cdot 9 = 27 \equiv 10 \pmod{17}$。
+      </p>
+      <p>
+        驗證者接著執行 MSM 以重建 $[r]_1$，構建 $[F]_1$ 和 $[E]_1$，
+        並檢查配對方程式。若通過，則證明有效：證明者知道 $x, y$
+        使得 $x \times y = 6$。
+      </p>
+    </div>
+
+    <h3>7.7.7 詳解範例總結</h3>
+
+    <div class="diagram">
+<pre>
+  電路：x * y = z  （z = 6 公開，x = 2，y = 3 私有）
+
+  佈局（n=4，F_17，w=4）：
+  +-------+------+------+------+------+------+------+------+------+
+  | 閘    | 類型 | a    | b    | c    | qL   | qR   | qM   | qO   |
+  +-------+------+------+------+------+------+------+------+------+
+  | 0     | 乘法 | 2    | 3    | 6    | 0    | 0    | 1    | -1   |
+  | 1     | 公開 | 6    | 0    | 0    | 1    | 0    | 0    | 0    |
+  | 2     | 填充 | 0    | 0    | 0    | 0    | 0    | 0    | 0    |
+  | 3     | 填充 | 0    | 0    | 0    | 0    | 0    | 0    | 0    |
+  +-------+------+------+------+------+------+------+------+------+
+
+  複製約束：c_0 = a_1（皆 = 6）
+
+  證明大小：[a]_1, [b]_1, [c]_1, [Z]_1, [t_lo]_1, [t_hi]_1,
+              a_bar, b_bar, c_bar, s1_bar, s2_bar, Zw_bar,
+              [W_z]_1, [W_zw]_1
+
+  驗證：1 次多重配對檢查  -->  接受 / 拒絕
+</pre>
+    </div>
+
+    <!-- ============================================================
+         7.8 PRACTICAL CONSIDERATIONS
+         ============================================================ -->
+    <h2>7.8 實務考量</h2>
+
+    <h3>7.8.1 域大小與填充</h3>
+    <p>
+      求值域 $H$ 的大小必須為 $n = 2^k$（2 的冪次），以便高效執行 FFT。
+      若電路有 1000 個閘，$n$ 會填充至 $1024 = 2^{10}$。多出的 24 行以
+      「虛擬」閘填充（所有選擇器為零，所有見證值為零）。此填充浪費了
+      部分證明者時間，但簡化了 FFT 實作。
+    </p>
+
+    <div class="callout warning">
+      <div class="callout-title">警告：填充洩漏閘數量</div>
+      <p>
+        證明大小是常數，但<em>證明時間</em>和<em>驗證金鑰</em>
+        會揭示填充後的電路大小 $n$。觀察者可從驗證金鑰推導出 $n$
+        並推斷大約的閘數量。若這涉及隱私問題（例如隱藏執行了哪個程式），
+        請考慮填充到固定的最大大小。
+      </p>
+    </div>
+
+    <h3>7.8.2 Fiat-Shamir 筆錄</h3>
+    <p>
+      PLONK 的安全性關鍵取決於 Fiat-Shamir 筆錄的約束力和完整性。
+      常見的陷阱包括：
+    </p>
+    <ul>
+      <li><strong>缺少域分隔符：</strong>使用相同 SRS 的不同電路必須具有不同的
+      筆錄前綴。否則，電路 $A$ 的證明可能對電路 $B$ 也通過驗證。</li>
+      <li><strong>不完整的筆錄：</strong>在導出下一個挑戰值之前，必須對每個證明元素進行雜湊。
+      遺漏一個承諾會削弱健全性。</li>
+      <li><strong>位元組順序錯誤：</strong>序列化曲線點和域元素必須使用規範的、確定性的編碼。
+      非規範編碼可能導致筆錄碰撞。</li>
+    </ul>
+
+    <h3>7.8.3 公開輸入</h3>
+    <p>
+      PLONK 中的公開輸入透過選擇器多項式編碼（使用第 7.2.1 節所示的 $q_L$ 和 $q_C$ 閘）。
+      然而，此方法有一個微妙之處：驗證者必須
+      重新計算公開輸入多項式 $\text{PI}(X) = \sum_{i \in \text{pub}} v_i \cdot L_i(X)$
+      並將其納入驗證。當公開輸入數量很多時，這可能主導驗證成本
+      （與公開輸入數量呈線性關係）。解決方案包括：
+    </p>
+    <ul>
+      <li><strong>雜湊公開輸入：</strong>在電路內部透過雜湊承諾所有公開輸入，
+      然後僅暴露雜湊值作為單一公開輸入。</li>
+      <li><strong>分離的公開輸入多項式：</strong>某些實作（例如 gnark）透過
+      專用多項式處理公開輸入，以避免重新計算 Lagrange 求值。</li>
+    </ul>
+
+    <h3>7.8.4 效能基準</h3>
+
+    <table>
+      <thead>
+        <tr><th>運算</th><th>$2^{16}$ 閘</th><th>$2^{20}$ 閘</th><th>$2^{24}$ 閘</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>證明時間</td><td>約 0.5s</td><td>約 8s</td><td>約 120s</td></tr>
+        <tr><td>證明大小</td><td>768 B</td><td>768 B</td><td>768 B</td></tr>
+        <tr><td>驗證時間</td><td>約 6ms</td><td>約 6ms</td><td>約 6ms</td></tr>
+        <tr><td>SRS 大小</td><td>約 4 MB</td><td>約 64 MB</td><td>約 1 GB</td></tr>
+        <tr><td>證明者峰值記憶體</td><td>約 50 MB</td><td>約 800 MB</td><td>約 12 GB</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      由於 FFT/iFFT 和 MSM 運算，證明時間以 $O(n \log n)$ 規模增長。
+      驗證時間與電路大小無關，為常數（以配對成本為主）。
+      證明大小同樣為常數（使用 BN254 約 768 位元組未壓縮）。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理：PLONK 複雜度</div>
+      <p>
+        對於具有 $n$ 個閘的電路：
+      </p>
+      <ul>
+        <li><strong>證明者</strong>：$O(n \log n)$ 域運算（FFT 主導）+ $O(n)$ 群運算（MSM）</li>
+        <li><strong>驗證者</strong>：$O(1)$ 群運算 + $O(\ell)$ 域運算（其中 $\ell$ = 公開輸入數量）</li>
+        <li><strong>證明大小</strong>：$O(1)$ &mdash; 9 個 $\mathbb{G}_1$ 元素 + 6 個 $\mathbb{F}_r$ 元素</li>
+        <li><strong>SRS 大小</strong>：$O(n)$ &mdash; $(n+5)$ 個 $\mathbb{G}_1$ 元素 + 1 個 $\mathbb{G}_2$ 元素</li>
+      </ul>
+    </div>
+
+    <!-- ============================================================
+         7.9 PLONK vs GROTH16
+         ============================================================ -->
+    <h2>7.9 PLONK 與 Groth16 比較</h2>
+
+    <p>
+      PLONK 和 Groth16 是兩個部署最廣泛的基於配對的 zkSNARK 系統。
+      它們的取捨驅動著實際的工程決策：
+    </p>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>Groth16 的優勢</h4>
+        <ul>
+          <li>最小的證明：3 個群元素（約 128 位元組）</li>
+          <li>最快的驗證：3 次配對</li>
+          <li>在 Ethereum 上最節省 gas（約 200k gas）</li>
+          <li>q 類型假設經歷數十年密碼分析</li>
+        </ul>
+      </div>
+      <div class="comparison-card">
+        <h4>PLONK 的優勢</h4>
+        <ul>
+          <li>通用 SRS：一次設置適用所有電路</li>
+          <li>可更新設置：較弱的信任假設</li>
+          <li>自訂閘和查找（UltraPLONK）</li>
+          <li>靈活的 PCS 後端（KZG、IPA、FRI）</li>
+        </ul>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>屬性</th><th>Groth16</th><th>PLONK（KZG）</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>設置</td><td>每電路可信設置</td><td>通用、可更新</td></tr>
+        <tr><td>證明大小</td><td>3 個 $\mathbb{G}$ 元素（約 128B）</td><td>9 個 $\mathbb{G}_1$ + 6 個 $\mathbb{F}_r$（約 768B）</td></tr>
+        <tr><td>驗證</td><td>3 次配對</td><td>2 次配對 + MSM</td></tr>
+        <tr><td>Ethereum gas</td><td>約 200k</td><td>約 300k</td></tr>
+        <tr><td>證明者時間</td><td>$O(n \log n)$</td><td>$O(n \log n)$（常數較大）</td></tr>
+        <tr><td>自訂閘</td><td>否（僅 R1CS）</td><td>是（TurboPLONK、UltraPLONK）</td></tr>
+        <tr><td>查找</td><td>否</td><td>是（Plookup、LogUp）</td></tr>
+        <tr><td>遞迴</td><td>困難（配對循環）</td><td>較容易（IPA/FRI 變體）</td></tr>
+        <tr><td>假設</td><td>q 類型（知識假設）</td><td>AGM + ROM</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">注意：何時選擇哪個</div>
+      <p>
+        <strong>選擇 Groth16</strong>：當證明大小和驗證 gas 至關重要時（例如
+        在 L1 Ethereum 上的鏈上驗證），且電路穩定（很少變動）。
+      </p>
+      <p>
+        <strong>選擇 PLONK</strong>：當電路頻繁演進時（通用設置避免了
+        重新儀式）、自訂閘能提升效能時（例如橢圓曲線運算、雜湊函數），
+        或需要查找論證時。
+      </p>
+    </div>
+
+    <h2>對本研究的意義</h2>
+    <div class="callout theorem">
+      <div class="callout-title">PLONK：Halo2 的理論基礎</div>
+      <p>
+        PLONK 是 Halo2 證明系統的理論基礎。理解 PLONK 的五輪協議和排列論證，是理解我們電路如何被驗證的前提。
+      </p>
+      <ul>
+        <li><strong>五輪協議</strong>：我們的 Horner 電路在 Round 1 承諾見證多項式（包含輸入 $R$、中間值 $H_i$、截斷結果 $w$），Round 2 承諾排列累積乘積（驗證 Horner 鏈的接線），Round 3-5 完成商多項式和求值證明。</li>
+        <li><strong>選擇器多項式</strong>：不同的閘類型（Horner 乘加閘、截斷閘、查找閘）通過選擇器多項式在不同行啟用。</li>
+        <li><strong>自定義閘（TurboPLONK）</strong>：Halo2 繼承了 TurboPLONK 的自定義閘擴展。我們為 Horner 乘加步驟設計了專用閘：$s_{\text{horner}}(X) \cdot (a(X) \cdot b(X) + c(X) - d(X)) = 0$。</li>
+        <li><strong>查找論證（UltraPLONK）</strong>：ByteTable 的 256 行查找使用 UltraPLONK 擴展的查找機制。</li>
+      </ul>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>PLONK 組件</th><th>在論文電路中的具體體現</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>見證多項式 $a(X), b(X), c(X)$</td><td>輸入 $R$、Horner 中間值 $H_i$、截斷商 $w$</td></tr>
+        <tr><td>選擇器 $q_M, q_L, q_R, q_O, q_C$</td><td>Horner 閘、截斷閘、範圍檢查閘的開關</td></tr>
+        <tr><td>排列 $\sigma(i)$</td><td>確保 $H_i$ 正確傳遞到下一步</td></tr>
+        <tr><td>商多項式 $t(X)$</td><td>編碼「所有約束在 $H$ 上都被滿足」</td></tr>
+        <tr><td>線性化</td><td>減少驗證者需要的配對運算次數</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">PLONK Base Field vs Scalar Field</div>
+      <p>
+        在實作中，我們的定點運算（$R$、$D_i$、$H_i$、$w$）全部在 PLONK Scalar Field 上計算——
+        對 Halo2 (Pallas) 來說，這是 $\mathbb{F}_r$，$r \approx 2^{254}$。
+        PLONK Base Field（$\mathbb{F}_p$，Pallas 的基底域 = Vesta 的標量域）則用於 IPA 承諾的群運算。
+        論文中的 overflow 分析（$(d+1) \cdot pp < 254$）正是基於此標量域的位數。
+      </p>
+    </div>
+
+    <!-- ============================================================
+         PAGE NAVIGATION
+         ============================================================ -->
+    <div class="page-nav">
+      <a href="groth16.html">
+        <span class="nav-label">上一章</span>
+        <span class="nav-title">&larr; 6. Groth16</span>
+      </a>
+      <a href="halo2.html">
+        <span class="nav-label">下一章</span>
+        <span class="nav-title">8. Halo2 &rarr;</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

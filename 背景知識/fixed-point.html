@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ch 12: 有限域定點運算 &mdash; ZK 手冊</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>ZK 手冊</h1>
+      <div class="subtitle">零知識證明系統</div>
+    </div>
+    <nav>
+      <div class="section-label">總覽</div>
+      <a href="index.html"><span class="page-num">0.</span> 首頁</a>
+      <div class="section-label">基礎</div>
+      <a href="foundations.html"><span class="page-num">1.</span> 數學基礎</a>
+      <a href="zkp-basics.html"><span class="page-num">2.</span> ZKP：基本概念與性質</a>
+      <div class="section-label">構建模組</div>
+      <a href="polynomial-commitments.html"><span class="page-num">3.</span> 多項式承諾</a>
+      <a href="arithmetization.html"><span class="page-num">4.</span> 算術化</a>
+      <a href="fft-domains.html"><span class="page-num">5.</span> FFT 與求值域</a>
+      <div class="section-label">證明系統</div>
+      <a href="groth16.html"><span class="page-num">6.</span> Groth16</a>
+      <a href="plonk.html"><span class="page-num">7.</span> PLONK</a>
+      <a href="halo2.html"><span class="page-num">8.</span> Halo2</a>
+      <div class="section-label">進階主題</div>
+      <a href="lookup-arguments.html"><span class="page-num">9.</span> Lookup Arguments</a>
+      <a href="polynomial-method.html"><span class="page-num">10.</span> 多項式方法</a>
+      <a href="security-proofs.html"><span class="page-num">11.</span> 安全性證明</a>
+      <div class="section-label">論文方法論</div>
+      <a href="fixed-point.html" class="active"><span class="page-num">12.</span> 有限域定點運算</a>
+      <a href="approximation-theory.html"><span class="page-num">13.</span> 多項式逼近理論</a>
+      <a href="horner-evaluation.html"><span class="page-num">14.</span> Horner 求值</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+
+    <!-- ============================================================
+         PAGE HEADER
+         ============================================================ -->
+    <div class="page-header">
+      <h1>12. 有限域定點運算</h1>
+      <p class="page-subtitle">
+        ZK 電路只會算整數 mod $p$。要計算超越函數，需要把實數轉換為定點整數表示。
+        本章介紹定點運算的原理、電路成本，以及精度度量 ULP &mdash;
+        這是論文四步方法的第零步基礎。
+      </p>
+    </div>
+
+    <!-- ============================================================
+         DEFINITIONS SECTION
+         ============================================================ -->
+    <div class="definitions-section">
+      <h2>關鍵定義</h2>
+
+      <!-- 1. Fixed-Point Representation -->
+      <div class="def-item">
+        <div class="def-term">Fixed-Point Representation <span class="zh">定點表示法</span></div>
+        <div class="def-body">
+          將實數 $r$ 轉換為有限域中的整數的方法：選定精度參數 $\mathsf{pp}$，
+          定義縮放因子 $S = 2^{\mathsf{pp}}$，
+          然後令 $R = \mathrm{round}(r \cdot S)$。
+          這樣 $R$ 就是一個普通整數，可以在有限域 $\mathbb{F}_p$ 中進行運算，
+          而 $r \approx R / S$ 可以還原原始實數值。
+          定點表示法將「實數運算」轉化為「整數運算 + 縮放管理」，
+          是在 ZK 電路中處理超越函數的核心基礎。
+        </div>
+      </div>
+
+      <!-- 2. Precision Parameter pp -->
+      <div class="def-item">
+        <div class="def-term">Precision Parameter $\mathsf{pp}$ <span class="zh">精度參數</span></div>
+        <div class="def-body">
+          決定定點表示精度的參數。$\mathsf{pp}$ 的值直接決定縮放因子 $S = 2^{\mathsf{pp}}$，
+          從而決定了可表示的最小刻度為 $2^{-\mathsf{pp}}$。
+          例如 $\mathsf{pp} = 16$ 時，$S = 65536$，最小刻度約為 $1.5 \times 10^{-5}$，
+          相當於約 4.8 位十進制精度。$\mathsf{pp}$ 越大，精度越高，
+          但截斷操作的電路成本也越高（需要分解更多的位元組）。
+        </div>
+      </div>
+
+      <!-- 3. Scaling Factor S -->
+      <div class="def-item">
+        <div class="def-term">Scaling Factor $S$ <span class="zh">縮放因子</span></div>
+        <div class="def-body">
+          $S = 2^{\mathsf{pp}}$，是將實數「放大」為整數的比例因子。
+          所有定點運算都在 $S$ 的尺度上進行：加法結果的尺度仍為 $S$（不需調整），
+          但乘法結果的尺度會變為 $S^2$（需要除以 $S$ 來截斷回正確尺度）。
+          選擇 2 的冪次作為 $S$ 的好處是：二進制下的乘除 $S$ 只是位移操作，
+          位元組分解自然對齊。
+        </div>
+      </div>
+
+      <!-- 4. Truncation -->
+      <div class="def-item">
+        <div class="def-term">Truncation <span class="zh">截斷</span></div>
+        <div class="def-body">
+          計算 $\lfloor x / S \rfloor$ 的操作，用於在乘法後將結果從 $S^2$ 尺度
+          恢復到 $S$ 尺度。在普通 CPU 上這是一條移位指令，幾乎免費；
+          但在 ZK 電路中，由於沒有原生除法運算，截斷必須由 Prover
+          提供商 $w$ 和餘數 $r$，再用約束驗證 $w \cdot S + r = x$ 且 $0 \le r < S$。
+          每次截斷約需 2&ndash;3 行電路 + 多次 byte lookup，
+          是定點算術在電路中的<strong>主要成本來源</strong>。
+        </div>
+      </div>
+
+      <!-- 5. ULP -->
+      <div class="def-item">
+        <div class="def-term">ULP (Unit in the Last Place) <span class="zh">最小精度單位</span></div>
+        <div class="def-body">
+          衡量定點計算精度的度量指標。定義為：
+          $$\mathrm{ULP}(R) = \bigl|\,\mathrm{round}\bigl(f(r) \cdot S\bigr) - \hat{P}(R)\,\bigr|$$
+          其中 $f(r)$ 是理想函數值，$\hat{P}(R)$ 是電路中多項式的實際輸出。
+          ULP = 0 表示完全精確，ULP = 1 表示差一個最小刻度（通常是最佳可達精度）。
+          $\mathrm{ULP}_{\max}$ 是所有合法輸入中 ULP 的最大值，
+          是論文中報告精度的主要指標。
+        </div>
+      </div>
+
+      <!-- 6. Range Check -->
+      <div class="def-item">
+        <div class="def-term">Range Check <span class="zh">範圍檢查</span></div>
+        <div class="def-body">
+          在 ZK 電路中證明一個值 $x$ 滿足 $0 \le x < B$ 的方法。
+          標準做法是<strong>位元組分解</strong>：將 $x$ 表示為
+          $x = b_0 + b_1 \cdot 256 + b_2 \cdot 256^2 + \cdots$，
+          然後對每個 $b_i$ 使用 lookup argument 驗證 $b_i \in \{0, 1, \ldots, 255\}$。
+          位元組分解的項數為 $\lceil \log_2 B / 8 \rceil$，
+          每項需要一次 byte lookup。
+          範圍檢查是截斷操作中驗證餘數和商的核心子程序。
+        </div>
+      </div>
+
+      <!-- 7. Byte Decomposition -->
+      <div class="def-item">
+        <div class="def-term">Byte Decomposition <span class="zh">位元組分解</span></div>
+        <div class="def-body">
+          將一個整數值 $x$ 分拆為位元組序列的技術：
+          $$x = \sum_{i=0}^{k-1} b_i \cdot 256^i, \quad b_i \in [0, 255]$$
+          每個位元組 $b_i$ 透過查找 ByteTable（$\{0, 1, \ldots, 255\}$）來驗證合法性。
+          位元組分解是範圍檢查的基礎操作，也是截斷電路中最消耗資源的部分。
+          對於 $\mathsf{pp}$ 位元的值，需要 $k = \lceil \mathsf{pp} / 8 \rceil$ 個位元組。
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         12.1 問題：電路裡沒有浮點數
+         ============================================================ -->
+    <h2 id="no-floats">12.1 問題：電路裡沒有浮點數</h2>
+
+    <p>
+      ZK 電路的原生運算是有限域 $\mathbb{F}_p$ 上的加法和乘法 &mdash;
+      本質上就是<strong>整數 mod $p$</strong>。電路中不存在浮點數、不存在小數點、
+      不存在 IEEE 754 格式。每一個值都是 $\{0, 1, 2, \ldots, p-1\}$ 中的一個元素。
+    </p>
+
+    <p>
+      然而，我們要在電路中計算的超越函數 &mdash; $\exp$、$\ln$、$\sin$、$\tanh$ &mdash;
+      它們的定義域和值域都是<em>實數</em>。
+      例如 $\exp(0.5) = 1.64872\ldots$，這個結果既不是整數，也無法直接在 $\mathbb{F}_p$ 中表示。
+    </p>
+
+    <div class="callout warning">
+      <div class="callout-title">核心矛盾</div>
+      <p>
+        <strong>需求</strong>：計算 $f(x)$，其中 $f$ 是定義在實數上的超越函數。<br>
+        <strong>工具</strong>：只有整數 mod $p$ 的加法和乘法。<br>
+        <strong>問題</strong>：如何用整數運算來「模擬」實數計算？
+      </p>
+    </div>
+
+    <p>
+      一般計算機使用 <strong>IEEE 754 浮點數</strong>來處理這個問題：
+      一個浮點數由符號位、指數部分和尾數部分組成，
+      硬體 FPU 負責在每次運算中自動管理指數對齊和精度截斷。
+      但在 ZK 電路中，浮點運算是極度昂貴的 &mdash;
+      原因是指數部分的操作需要位元級的比較和移位，
+      這些在算術電路中需要大量的 bit decomposition 和 range check。
+    </p>
+
+    <p>
+      我們需要一種<strong>更簡單</strong>的表示法 &mdash;
+      一種只需要整數運算加上偶爾的截斷就能處理的方法。
+      這就是<strong>定點運算</strong>。
+    </p>
+
+    <!-- ============================================================
+         12.2 定點表示法
+         ============================================================ -->
+    <h2 id="fixed-point-repr">12.2 定點表示法</h2>
+
+    <h3>基本定義</h3>
+
+    <div class="callout definition">
+      <div class="callout-title">定義 12.1 &mdash; 定點表示</div>
+      <p>
+        給定精度參數 $\mathsf{pp} \in \mathbb{N}$，定義：
+      </p>
+      $$S = 2^{\mathsf{pp}} \quad \text{（縮放因子）}$$
+      <p>
+        一個實數 $r$ 的<strong>定點表示</strong>為：
+      </p>
+      $$R = \mathrm{round}(r \cdot S) \in \mathbb{Z}$$
+      <p>
+        反向還原：$r \approx R / S$。量化誤差 $|r - R/S| \le 1/(2S)$。
+      </p>
+    </div>
+
+    <p>
+      直覺上，定點表示就是「把小數點向右移 $\mathsf{pp}$ 位」。
+      我們不去追蹤小數點在哪裡，而是約定<strong>所有的值都已經乘以 $S$</strong>，
+      在最後需要結果時再除以 $S$ 還原。
+    </p>
+
+    <h3>具體範例（$\mathsf{pp} = 16$，$S = 65536$）</h3>
+
+    <div class="callout example">
+      <div class="callout-title">範例 &mdash; 常見實數的定點表示</div>
+      <table>
+        <thead>
+          <tr>
+            <th>實數 $r$</th>
+            <th>計算 $r \times 65536$</th>
+            <th>$R = \mathrm{round}(\cdot)$</th>
+            <th>還原 $R / S$</th>
+            <th>誤差</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>$0.5$</td>
+            <td>$32768.0$</td>
+            <td>$32768$</td>
+            <td>$0.5$</td>
+            <td>$0$（精確）</td>
+          </tr>
+          <tr>
+            <td>$0.69315$（$\approx \ln 2$）</td>
+            <td>$45425.87$</td>
+            <td>$45426$</td>
+            <td>$0.693161$</td>
+            <td>$\approx 1.1 \times 10^{-5}$</td>
+          </tr>
+          <tr>
+            <td>$0.1$</td>
+            <td>$6553.6$</td>
+            <td>$6554$</td>
+            <td>$0.100006$</td>
+            <td>$\approx 6.1 \times 10^{-6}$</td>
+          </tr>
+          <tr>
+            <td>$\pi \approx 3.14159$</td>
+            <td>$205887.4$</td>
+            <td>$205887$</td>
+            <td>$3.14158$</td>
+            <td>$\approx 6.1 \times 10^{-6}$</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      可以看到，$\mathsf{pp} = 16$ 提供了約 4&ndash;5 位十進制的精度。
+      對於多數超越函數的近似計算而言，這已經相當實用。
+    </p>
+
+    <h3>精度與範圍</h3>
+
+    <p>
+      定點表示法有兩個基本限制：
+    </p>
+
+    <ol>
+      <li>
+        <strong>精度（Resolution）</strong>：可表示的最小間距為 $1/S = 2^{-\mathsf{pp}}$。
+        任何兩個相鄰的可表示值之間的差距恰好為 $1/S$。
+        十進制精度約為 $\mathsf{pp} \times \log_{10} 2 \approx \mathsf{pp} \times 0.301$ 位。
+      </li>
+      <li>
+        <strong>範圍（Range）</strong>：定點值 $R$ 是有限域元素，理論上可以到 $p - 1$。
+        但為了避免 mod $p$ 的回繞（wraparound），實際使用中必須確保所有中間結果
+        $R < p$。對於典型的素數域（如 BN254 的 $p \approx 2^{254}$），
+        只要 $R$ 保持在合理範圍內（例如 $< 2^{128}$），就不會有回繞問題。
+      </li>
+    </ol>
+
+    <div class="callout note">
+      <div class="callout-title">註 &mdash; 為何選 2 的冪次？</div>
+      <p>
+        選擇 $S = 2^{\mathsf{pp}}$（而不是 $10^k$ 或其他底數）有兩個原因：
+      </p>
+      <ol>
+        <li>
+          <strong>位元組分解對齊</strong>：$2^{\mathsf{pp}}$ 的值在二進制下恰好佔 $\mathsf{pp}$ 位，
+          位元組分解時切割整齊（每 8 位一個位元組），不會出現跨位元組的尷尬情況。
+        </li>
+        <li>
+          <strong>截斷等價於丟棄低位</strong>：$\lfloor x / 2^{\mathsf{pp}} \rfloor$
+          在二進制下就是丟掉最低的 $\mathsf{pp}$ 位，概念清晰。
+        </li>
+      </ol>
+    </div>
+
+    <!-- ============================================================
+         12.3 定點算術
+         ============================================================ -->
+    <h2 id="fixed-point-arith">12.3 定點算術</h2>
+
+    <h3>加法 &mdash; 免費</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">命題 12.1 &mdash; 定點加法保持尺度</div>
+      <p>
+        若 $R_1 = \mathrm{round}(r_1 \cdot S)$ 且 $R_2 = \mathrm{round}(r_2 \cdot S)$，則：
+      </p>
+      $$R_1 + R_2 \approx (r_1 + r_2) \cdot S$$
+      <p>
+        結果的尺度仍為 $S$，<strong>不需要任何截斷</strong>。
+      </p>
+    </div>
+
+    <p>
+      在 Halo2 電路中，加法是<strong>線性組合</strong>（linear combination）&mdash;
+      它只是 wire 之間的係數約束，不需要消耗任何乘法 gate。
+      換句話說，定點加法在電路中是「零成本」的。
+    </p>
+
+    <div class="callout example">
+      <div class="callout-title">範例 &mdash; 加法不需截斷</div>
+      <p>以 $\mathsf{pp} = 16$，$S = 65536$ 為例：</p>
+      <table>
+        <thead>
+          <tr>
+            <th>運算</th>
+            <th>實數值</th>
+            <th>定點值</th>
+            <th>結果尺度</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>$r_1 = 0.5$</td>
+            <td>&mdash;</td>
+            <td>$R_1 = 32768$</td>
+            <td>$S$</td>
+          </tr>
+          <tr>
+            <td>$r_2 = 0.25$</td>
+            <td>&mdash;</td>
+            <td>$R_2 = 16384$</td>
+            <td>$S$</td>
+          </tr>
+          <tr>
+            <td>$r_1 + r_2 = 0.75$</td>
+            <td>$0.75$</td>
+            <td>$R_1 + R_2 = 49152$</td>
+            <td>$S$ &check;</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>$49152 / 65536 = 0.75$，完全正確。不需要做任何額外操作。</p>
+    </div>
+
+    <h3>乘法 &mdash; 尺度膨脹問題</h3>
+
+    <p>
+      乘法就不一樣了。考慮兩個定點值相乘：
+    </p>
+
+    $$R_1 \cdot R_2 = \mathrm{round}(r_1 \cdot S) \cdot \mathrm{round}(r_2 \cdot S) \approx r_1 \cdot r_2 \cdot S^2$$
+
+    <p>
+      結果的尺度是 $S^2$ 而不是 $S$。如果不進行修正，這個值代表的實數就不是 $r_1 \cdot r_2$，
+      而是 $r_1 \cdot r_2 \cdot S$ &mdash; 放大了 $S$ 倍。
+    </p>
+
+    <div class="callout warning">
+      <div class="callout-title">乘法的尺度問題</div>
+      <p>
+        每次乘法都會使尺度翻倍。如果連續做 $d$ 次乘法（例如 Horner 求值中的 $d$ 步），
+        不做截斷的話，尺度會變成 $S^{d+1}$。
+      </p>
+      <p>
+        <strong>解決方案</strong>：乘法後必須<strong>截斷</strong> &mdash; 即除以 $S$，使結果回到尺度 $S$。
+      </p>
+      $$\mathrm{result} = \left\lfloor \frac{R_1 \cdot R_2}{S} \right\rfloor$$
+    </div>
+
+    <div class="callout example">
+      <div class="callout-title">範例 &mdash; 乘法需要截斷</div>
+      <p>以 $\mathsf{pp} = 16$，$S = 65536$ 為例：</p>
+      <table>
+        <thead>
+          <tr>
+            <th>步驟</th>
+            <th>實數</th>
+            <th>定點值</th>
+            <th>尺度</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>$r_1 = 0.5$</td>
+            <td>&mdash;</td>
+            <td>$R_1 = 32768$</td>
+            <td>$S$</td>
+          </tr>
+          <tr>
+            <td>$r_2 = 0.3$</td>
+            <td>&mdash;</td>
+            <td>$R_2 = 19661$</td>
+            <td>$S$</td>
+          </tr>
+          <tr>
+            <td>相乘（未截斷）</td>
+            <td>$0.15$</td>
+            <td>$R_1 \cdot R_2 = 644,268,548$</td>
+            <td>$S^2$</td>
+          </tr>
+          <tr>
+            <td>截斷</td>
+            <td>$0.15$</td>
+            <td>$\lfloor 644{,}268{,}548 / 65536 \rfloor = 9830$</td>
+            <td>$S$ &check;</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        $9830 / 65536 = 0.14999$，接近真實值 $0.15$。
+        微小的誤差來自四捨五入。
+      </p>
+    </div>
+
+    <p>
+      截斷在普通 CPU 上是一條右移指令，幾乎不花時間。
+      但在 ZK 電路中，截斷是一個<strong>昂貴的操作</strong> &mdash; 下一節會詳細說明原因。
+    </p>
+
+    <!-- ============================================================
+         12.4 截斷的電路實現
+         ============================================================ -->
+    <h2 id="truncation-circuit">12.4 截斷的電路實現</h2>
+
+    <p>
+      在 Halo2 電路中，我們無法直接計算 $\lfloor x / S \rfloor$，
+      因為有限域 $\mathbb{F}_p$ 中的「除法」是乘以模反元素（$x \cdot S^{-1} \bmod p$），
+      這和整數除法的結果完全不同。我們需要的是<strong>整數除法</strong>，
+      而電路中只有域算術。
+    </p>
+
+    <h3>截斷的約束設計</h3>
+
+    <p>
+      解決方案是讓 Prover 提供截斷的結果，然後用約束驗證結果的正確性。
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <h4>Prover 提供商和餘數</h4>
+        <p>
+          Prover 在電路外部（witness generation 階段）計算：
+        </p>
+        $$w = \left\lfloor \frac{x}{S} \right\rfloor, \quad r = x - w \cdot S = x \bmod S$$
+        <p>
+          然後將 $w$（商）和 $r$（餘數）作為 witness 填入電路。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>電路驗證乘法關係</h4>
+        <p>
+          電路檢查以下約束：
+        </p>
+        $$w \cdot S + r = x$$
+        <p>
+          這是一個乘法門（$w \cdot S$）加一個加法（$+ r$），
+          確保 $w$ 和 $r$ 確實是 $x$ 除以 $S$ 的商和餘數。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>範圍檢查餘數</h4>
+        <p>
+          驗證 $0 \le r < S$。如果不做這個檢查，
+          惡意 Prover 可以提供錯誤的 $(w, r)$ 對
+          &mdash; 例如 $w' = w + 1, r' = r - S$ 也滿足 $w' \cdot S + r' = x$，
+          但 $r'$ 是負數。
+        </p>
+        <p>
+          範圍檢查透過<strong>位元組分解</strong>實現：
+          將 $r$ 拆成 $\lceil \mathsf{pp} / 8 \rceil$ 個位元組，
+          每個位元組透過 ByteTable lookup 驗證在 $[0, 255]$ 中。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>範圍檢查商</h4>
+        <p>
+          驗證 $w$ 在合理範圍內（不會因為 mod $p$ 回繞而產生假正例）。
+          同樣使用位元組分解 + byte lookup。
+        </p>
+      </div>
+    </div>
+
+    <div class="callout definition">
+      <div class="callout-title">定義 12.2 &mdash; 截斷約束</div>
+      <p>
+        對於輸入 $x$ 和縮放因子 $S = 2^{\mathsf{pp}}$，截斷 $\lfloor x / S \rfloor$ 由以下約束系統定義：
+      </p>
+      $$\begin{cases}
+      w \cdot S + r = x & \text{（除法關係）} \\
+      0 \le r < S & \text{（餘數範圍）} \\
+      0 \le w < W_{\max} & \text{（商範圍）}
+      \end{cases}$$
+      <p>
+        其中 $W_{\max}$ 取決於應用中 $x$ 的最大可能值。
+      </p>
+    </div>
+
+    <h3>電路成本分析</h3>
+
+    <p>
+      每次截斷操作的具體成本如下：
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>組件</th>
+          <th>電路行數</th>
+          <th>Byte Lookup 次數</th>
+          <th>說明</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>$w \cdot S + r = x$</td>
+          <td>1 行</td>
+          <td>0</td>
+          <td>一個乘法約束</td>
+        </tr>
+        <tr>
+          <td>餘數 $r$ 的範圍檢查</td>
+          <td>1 行</td>
+          <td>$\lceil \mathsf{pp} / 8 \rceil$</td>
+          <td>位元組分解 + lookup</td>
+        </tr>
+        <tr>
+          <td>商 $w$ 的範圍檢查</td>
+          <td>1 行</td>
+          <td>$\lceil \log_2 W_{\max} / 8 \rceil$</td>
+          <td>位元組分解 + lookup</td>
+        </tr>
+        <tr>
+          <td><strong>合計</strong></td>
+          <td><strong>2&ndash;3 行</strong></td>
+          <td><strong>4&ndash;8 次</strong>（典型值）</td>
+          <td>&mdash;</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout example">
+      <div class="callout-title">範例 &mdash; $\mathsf{pp} = 16$ 的截斷成本</div>
+      <p>
+        $S = 2^{16} = 65536$，餘數 $r \in [0, 65535]$，需要 2 個位元組來分解。
+        假設 $w < 2^{32}$，商需要 4 個位元組。
+      </p>
+      <ul>
+        <li>乘法約束：1 行</li>
+        <li>餘數範圍檢查：1 行 + 2 次 byte lookup</li>
+        <li>商範圍檢查：1 行 + 4 次 byte lookup</li>
+        <li><strong>合計</strong>：3 行 + 6 次 byte lookup</li>
+      </ul>
+    </div>
+
+    <div class="callout warning">
+      <div class="callout-title">截斷是累積成本</div>
+      <p>
+        如果一個 $d$ 次多項式使用 Horner 法求值（第 14 章），
+        每一步都包含一次乘法和一次加法。
+        <strong>樸素做法</strong>是每步乘法後立即截斷，共需 $d$ 次截斷。
+      </p>
+      <p>
+        對於 $d = 7$（7 次多項式），樸素方法需要 7 次截斷 = $7 \times 3 = 21$ 行 + $7 \times 6 = 42$ 次 byte lookup。
+        這往往比 Horner 求值本身的成本（$d$ 個乘法 + $d$ 個加法 = 7 行）還要高！
+      </p>
+      <p>
+        <strong>這正是第 14 章 Deferred Truncation 技術的動機</strong> &mdash;
+        將 $d$ 次截斷減少為僅 1 次。
+      </p>
+    </div>
+
+    <!-- ============================================================
+         12.5 ULP 誤差度量
+         ============================================================ -->
+    <h2 id="ulp-metric">12.5 ULP 誤差度量</h2>
+
+    <h3>定義</h3>
+
+    <div class="callout definition">
+      <div class="callout-title">定義 12.3 &mdash; ULP（Unit in the Last Place）</div>
+      <p>
+        給定目標函數 $f$、精度參數 $\mathsf{pp}$（縮放因子 $S = 2^{\mathsf{pp}}$），
+        以及電路中的多項式近似 $\hat{P}$，在輸入 $R$（對應實數 $r = R/S$）處的 <strong>ULP</strong> 定義為：
+      </p>
+      $$\mathrm{ULP}(R) = \bigl|\,\mathrm{round}\bigl(f(r) \cdot S\bigr) - \hat{P}(R)\,\bigr|$$
+      <p>
+        <strong>$\mathrm{ULP}_{\max}$</strong> 是所有合法輸入中的最大 ULP：
+      </p>
+      $$\mathrm{ULP}_{\max} = \max_{R \in [0, R_{\max}]} \mathrm{ULP}(R)$$
+    </div>
+
+    <p>
+      ULP 的直覺意義是：在定點表示的「刻度尺」上，
+      計算結果和理想結果之間差了幾格。每一格的寬度是 $1/S$（以實數計）。
+    </p>
+
+    <h3>ULP 的含義</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>$\mathrm{ULP}_{\max}$</th>
+          <th>含義</th>
+          <th>品質</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>$0$</td>
+          <td>每個輸入都與理想值完全一致</td>
+          <td>完美（通常不可能）</td>
+        </tr>
+        <tr>
+          <td>$1$</td>
+          <td>最多差一個最小刻度</td>
+          <td>最佳可達（faithfully rounded）</td>
+        </tr>
+        <tr>
+          <td>$2 \sim 5$</td>
+          <td>差幾個刻度</td>
+          <td>實用（多數應用可接受）</td>
+        </tr>
+        <tr>
+          <td>$> 10$</td>
+          <td>誤差已明顯</td>
+          <td>需要更高精度或更好的近似</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>ULP 與絕對誤差</h3>
+
+    <p>
+      ULP 和絕對誤差的關係很簡單：
+    </p>
+
+    $$\text{絕對誤差} = \frac{\mathrm{ULP}(R)}{S}$$
+
+    <p>
+      例如 $\mathrm{ULP} = 3$ 且 $\mathsf{pp} = 16$（$S = 65536$），
+      則絕對誤差 $= 3 / 65536 \approx 4.6 \times 10^{-5}$。
+    </p>
+
+    <h3>ULP 與 $L_\infty$ 範數的關係</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">命題 12.2 &mdash; ULP 與 $L_\infty$ 範數</div>
+      <p>
+        設 $p^*(x)$ 是對 $f(x)$ 的 Minimax 多項式近似（第 13 章），
+        $\hat{P}(R)$ 是其在定點域中的實現。則：
+      </p>
+      $$\mathrm{ULP}_{\max} \approx \|f - p^*\|_\infty \cdot S + \text{量化誤差}$$
+      <p>
+        其中 $\|f - p^*\|_\infty$ 是 Minimax 逼近的 $L_\infty$ 誤差。
+        粗略地說：
+      </p>
+      $$\mathrm{ULP}_{\max} \approx \|f - p^*\|_\infty \cdot S$$
+      <p>
+        這告訴我們：<strong>Minimax 多項式最小化 $L_\infty$ 誤差，
+        就等同於最小化 $\mathrm{ULP}_{\max}$ 的主要成分</strong>。
+        這是我們在第 13 章選擇 Minimax 逼近的根本原因。
+      </p>
+    </div>
+
+    <div class="callout example">
+      <div class="callout-title">範例 &mdash; 從 $L_\infty$ 到 ULP</div>
+      <p>
+        假設我們用 7 次 Minimax 多項式近似 $\exp(x)$ 在 $[0, \ln 2)$ 上，
+        得到 $\|f - p^*\|_\infty \approx 2.2 \times 10^{-7}$。
+      </p>
+      <ul>
+        <li>
+          $\mathsf{pp} = 16$：$\mathrm{ULP}_{\max} \approx 2.2 \times 10^{-7} \times 65536 \approx 0.014$ &rArr; $\mathrm{ULP}_{\max} = 1$（四捨五入後）。極佳。
+        </li>
+        <li>
+          $\mathsf{pp} = 24$：$\mathrm{ULP}_{\max} \approx 2.2 \times 10^{-7} \times 16{,}777{,}216 \approx 3.7$ &rArr; $\mathrm{ULP}_{\max} \approx 4$。仍可接受。
+        </li>
+      </ul>
+      <p>
+        相同的近似多項式，在更高精度下 ULP 會更大，
+        因為「刻度尺更細了」。若要維持低 ULP，需要更高次的多項式。
+      </p>
+    </div>
+
+    <h3>為什麼用 ULP 而不是絕對誤差？</h3>
+
+    <p>
+      ULP 的優勢在於它是<strong>精度無關的</strong>度量。
+      不論 $\mathsf{pp}$ 是多少，ULP $\le 1$ 都表示「在當前精度下的最佳近似」。
+      這使得我們可以跨不同精度配置比較結果：
+    </p>
+
+    <ul>
+      <li>「$\mathsf{pp} = 16$，$\mathrm{ULP}_{\max} = 1$」和「$\mathsf{pp} = 24$，$\mathrm{ULP}_{\max} = 1$」
+        都表示最佳精度，儘管絕對誤差相差 $2^8 = 256$ 倍。</li>
+      <li>ULP 也是 IEEE 754 浮點標準中用來衡量數學函數庫品質的標準指標，
+        借用這個概念可以和主流文獻對接。</li>
+    </ul>
+
+    <!-- ============================================================
+         12.6 精度參數選擇
+         ============================================================ -->
+    <h2 id="precision-choice">12.6 精度參數選擇</h2>
+
+    <h3>精度參數總覽</h3>
+
+    <p>
+      下表列出常用的精度參數 $\mathsf{pp}$ 值及其相關數據。
+      $R_{\max}$ 是區間 $[0, \ln 2)$ 的定點上界
+      &mdash; 這個區間在 $\exp$ 的 range reduction 後是最常用的計算域。
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>$\mathsf{pp}$</th>
+          <th>$S = 2^{\mathsf{pp}}$</th>
+          <th>十進制精度</th>
+          <th>$R_{\max}$（$[0, \ln 2)$）</th>
+          <th>典型應用場景</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>$8$</td>
+          <td>$256$</td>
+          <td>$\sim 2.4$ 位</td>
+          <td>$177$</td>
+          <td>低精度量化（INT8 推論）</td>
+        </tr>
+        <tr>
+          <td>$12$</td>
+          <td>$4{,}096$</td>
+          <td>$\sim 3.6$ 位</td>
+          <td>$2{,}839$</td>
+          <td>快速原型、低精度 ZKML</td>
+        </tr>
+        <tr>
+          <td>$16$</td>
+          <td>$65{,}536$</td>
+          <td>$\sim 4.8$ 位</td>
+          <td>$45{,}426$</td>
+          <td><strong>ZKML 推論</strong>（最常用）</td>
+        </tr>
+        <tr>
+          <td>$20$</td>
+          <td>$1{,}048{,}576$</td>
+          <td>$\sim 6.0$ 位</td>
+          <td>$726{,}817$</td>
+          <td>高精度 ZKML、科學計算</td>
+        </tr>
+        <tr>
+          <td>$24$</td>
+          <td>$16{,}777{,}216$</td>
+          <td>$\sim 7.2$ 位</td>
+          <td>$11{,}629{,}080$</td>
+          <td><strong>金融計算</strong>、高精度需求</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>精度 vs 成本取捨</h3>
+
+    <p>
+      增加 $\mathsf{pp}$ 可以提高精度，但也會增加電路成本。
+      這是因為：
+    </p>
+
+    <ol>
+      <li>
+        <strong>截斷成本增加</strong>：更高的 $\mathsf{pp}$ 意味著
+        餘數 $r$ 和商 $w$ 都需要更多位元組來分解，每個位元組都需要一次 byte lookup。
+      </li>
+      <li>
+        <strong>中間值更大</strong>：Horner 求值中的中間結果
+        會更大（因為 $S$ 更大），需要更多位元組的範圍檢查。
+      </li>
+      <li>
+        <strong>可能需要更高次多項式</strong>：如果要維持低 ULP，
+        更高的 $\mathsf{pp}$（更細的刻度尺）需要更高次的近似多項式，
+        而更高次意味著更多 Horner 步驟、更多截斷。
+      </li>
+    </ol>
+
+    <h3>溢位約束</h3>
+
+    <div class="callout warning">
+      <div class="callout-title">溢位約束 &mdash; $(d+1) \cdot \mathsf{pp} < \text{field bits}$</div>
+      <p>
+        在 Deferred Truncation（第 14 章）中，$d$ 次多項式的 Horner 求值會累積尺度至 $S^{d+1}$。
+        為了避免有限域的回繞，必須確保：
+      </p>
+      $$\underbrace{(d + 1) \cdot \mathsf{pp}}_{\text{累積位元數}} < \log_2 p$$
+      <p>
+        對於 BN254 和 Pallas 曲線（$\log_2 p \approx 254$）：
+      </p>
+      <ul>
+        <li>$\mathsf{pp} = 16, d = 7$：$(7+1) \times 16 = 128 < 254$ &check;</li>
+        <li>$\mathsf{pp} = 16, d = 15$：$(15+1) \times 16 = 256 > 254$ &cross;（溢位！）</li>
+        <li>$\mathsf{pp} = 24, d = 7$：$(7+1) \times 24 = 192 < 254$ &check;</li>
+        <li>$\mathsf{pp} = 24, d = 10$：$(10+1) \times 24 = 264 > 254$ &cross;（溢位！）</li>
+      </ul>
+      <p>
+        <strong>實務規則</strong>：$\mathsf{pp}$ 越大，可用的多項式次數 $d$ 就越受限。
+        必須同時考慮精度需求和多項式次數。
+      </p>
+    </div>
+
+    <div class="callout example">
+      <div class="callout-title">範例 &mdash; 最大多項式次數</div>
+      <p>
+        在 BN254 域（$\approx 254$ 位元）上，各 $\mathsf{pp}$ 的最大多項式次數：
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>$\mathsf{pp}$</th>
+            <th>$d_{\max} = \lfloor 254 / \mathsf{pp} \rfloor - 1$</th>
+            <th>足夠計算？</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>$8$</td>
+            <td>$30$</td>
+            <td>綽綽有餘</td>
+          </tr>
+          <tr>
+            <td>$12$</td>
+            <td>$20$</td>
+            <td>充足</td>
+          </tr>
+          <tr>
+            <td>$16$</td>
+            <td>$14$</td>
+            <td>足夠（$\exp$ 用 $d=7$ 即可）</td>
+          </tr>
+          <tr>
+            <td>$20$</td>
+            <td>$11$</td>
+            <td>足夠但留給高次函數的空間有限</td>
+          </tr>
+          <tr>
+            <td>$24$</td>
+            <td>$9$</td>
+            <td>可行但緊湊</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>如何選擇 $\mathsf{pp}$？</h3>
+
+    <p>
+      選擇 $\mathsf{pp}$ 時需要平衡三個因素：
+    </p>
+
+    <ol>
+      <li><strong>應用的精度需求</strong>：ZKML 推論通常 $\mathsf{pp} = 16$ 即可，
+        金融計算可能需要 $\mathsf{pp} = 24$。</li>
+      <li><strong>多項式次數的限制</strong>：$(d+1) \cdot \mathsf{pp} < 254$ 必須成立。</li>
+      <li><strong>電路成本預算</strong>：更高的 $\mathsf{pp}$ 意味著每次截斷更多 byte lookup。</li>
+    </ol>
+
+    <div class="callout note">
+      <div class="callout-title">註 &mdash; 實務中的甜蜜點</div>
+      <p>
+        對於本論文研究的超越函數（$\exp$、$\ln$、$\sin$、$\tanh$），
+        <strong>$\mathsf{pp} = 16$ 配合 $d = 7$</strong> 是一個很好的起點：
+      </p>
+      <ul>
+        <li>$4.8$ 位十進制精度，對 ZKML 推論足夠</li>
+        <li>$(7+1) \times 16 = 128$ 位，遠低於域大小 254 位</li>
+        <li>截斷成本適中（每次 $\sim 3$ 行 + $6$ 次 lookup）</li>
+        <li>7 次多項式提供足夠的近似精度（$\exp$ 在 $[0, \ln 2)$ 上可達 ULP $\le 1$）</li>
+      </ul>
+    </div>
+
+    <!-- ============================================================
+         12.7 為什麼不用浮點數？
+         ============================================================ -->
+    <h2 id="why-not-float">12.7 為什麼不用浮點數？</h2>
+
+    <p>
+      一個自然的問題是：為什麼不直接在 ZK 電路中實現 IEEE 754 浮點運算？
+      畢竟浮點數可以同時處理很大和很小的數值，精度也會自動適配。
+    </p>
+
+    <h3>浮點數的結構</h3>
+
+    <p>
+      IEEE 754 單精度浮點數（32 位元）由三部分組成：
+    </p>
+
+    $$\text{value} = (-1)^s \times 2^{e - 127} \times (1 + m)$$
+
+    <ul>
+      <li><strong>符號位 $s$</strong>：1 位元</li>
+      <li><strong>指數 $e$</strong>：8 位元（偏移量 127）</li>
+      <li><strong>尾數 $m$</strong>：23 位元（隱含前導 1）</li>
+    </ul>
+
+    <h3>為何浮點在電路中極度昂貴</h3>
+
+    <p>
+      浮點運算在 ZK 電路中的成本來自<strong>指數部分的處理</strong>：
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>操作</th>
+          <th>浮點所需</th>
+          <th>定點所需</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>加法</td>
+          <td>指數比較 + 對齊尾數 + 加法 + 重正規化</td>
+          <td>直接加法（免費）</td>
+        </tr>
+        <tr>
+          <td>乘法</td>
+          <td>指數加法 + 尾數乘法 + 重正規化</td>
+          <td>乘法 + 一次截斷</td>
+        </tr>
+        <tr>
+          <td>比較</td>
+          <td>符號比較 &rarr; 指數比較 &rarr; 尾數比較</td>
+          <td>一次範圍檢查</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      問題的關鍵是：指數比較和對齊需要<strong>位元級操作</strong>
+      &mdash; 提取位元、移位、條件選擇。這些在算術電路中都需要 bit decomposition，
+      每次 bit decomposition 需要 $k$ 個布林約束（$b_i \cdot (1 - b_i) = 0$）
+      加上 $k$ 個加法約束來重組。
+    </p>
+
+    <div class="callout warning">
+      <div class="callout-title">成本估算</div>
+      <p>
+        一次 32 位元浮點加法在 ZK 電路中的大致成本：
+      </p>
+      <ul>
+        <li>兩個指數的 bit decomposition：$2 \times 8 = 16$ 個布林約束</li>
+        <li>指數比較（哪個更大？）：$\sim 10$ 個約束</li>
+        <li>尾數對齊（移位）：$\sim 30$ 個約束（條件移位器）</li>
+        <li>尾數加法 + 進位處理：$\sim 25$ 個約束</li>
+        <li>重正規化（找前導 1 的位置）：$\sim 30$ 個約束</li>
+        <li><strong>合計</strong>：$\sim 100+$ 個約束，僅一次加法</li>
+      </ul>
+      <p>
+        相比之下，定點加法需要 <strong>0 個約束</strong>。
+      </p>
+    </div>
+
+    <h3>定點 vs 浮點：總結</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>面向</th>
+          <th>浮點</th>
+          <th>定點</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>動態範圍</td>
+          <td>大（指數自動調節）</td>
+          <td>固定（需預知數值範圍）</td>
+        </tr>
+        <tr>
+          <td>加法成本</td>
+          <td>$\sim 100$ 個約束</td>
+          <td>$0$（免費）</td>
+        </tr>
+        <tr>
+          <td>乘法成本</td>
+          <td>$\sim 80$ 個約束</td>
+          <td>$1$ 個乘法門 + 截斷（$\sim 3$ 行）</td>
+        </tr>
+        <tr>
+          <td>精度管理</td>
+          <td>自動（硬體處理）</td>
+          <td>手動（需追蹤尺度）</td>
+        </tr>
+        <tr>
+          <td>電路複雜度</td>
+          <td>極高</td>
+          <td>低</td>
+        </tr>
+        <tr>
+          <td>適合 ZK 電路？</td>
+          <td>否</td>
+          <td><strong>是</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      結論很明確：<strong>在 ZK 電路中，定點運算是唯一務實的選擇</strong>。
+      只要我們能預知數值範圍（超越函數經過 range reduction 後範圍已知），
+      定點表示法的簡單性和低成本遠勝於浮點數的便利性。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">延伸 &mdash; 為什麼截斷昂貴但仍可接受？</div>
+      <p>
+        截斷每次 $\sim 3$ 行 + 數次 byte lookup，看起來不便宜。
+        但和浮點運算的 $\sim 100$ 個約束相比，截斷的成本是可控的。
+        更重要的是，透過 Deferred Truncation（第 14 章），
+        多次截斷可以合併為一次，進一步降低成本。
+      </p>
+      <p>
+        從工程角度看，定點運算的成本模型是<strong>可預測</strong>的：
+        加法免費、乘法一個門、截斷幾行。
+        這讓我們可以精確地估算電路大小，為最佳化提供了堅實的基礎。
+      </p>
+    </div>
+
+    <!-- ============================================================
+         對本研究的意義
+         ============================================================ -->
+    <h2>對本研究的意義</h2>
+
+    <div class="callout theorem">
+      <div class="callout-title">設計選擇</div>
+      <p>
+        定點表示法是本論文四步方法（Range Reduction &rarr; Minimax 逼近 &rarr; 係數量化 &rarr; Horner 求值）的<strong>第零步</strong> &mdash;
+        所有後續步驟都建立在定點表示之上：
+      </p>
+      <ul>
+        <li>
+          <strong>Minimax 逼近</strong>（第 13 章）：在連續實數域上求最優多項式，
+          但其精度由 $\mathrm{ULP}_{\max} \approx \|f - p^*\|_\infty \cdot S$ 轉換到定點域度量。
+        </li>
+        <li>
+          <strong>Horner 求值</strong>（第 14 章）：每一步乘法都涉及尺度管理和截斷成本。
+          Deferred Truncation 將截斷從 $O(d)$ 次降至 $O(1)$ 次，
+          使高次數多項式在電路中變得可行。
+        </li>
+        <li>
+          <strong>電路設計</strong>：定點的成本模型（加法免費、乘法 + 截斷）
+          直接決定了電路架構的選擇。
+        </li>
+      </ul>
+    </div>
+
+    <div class="callout theorem">
+      <div class="callout-title">精度參數的核心取捨</div>
+      <p>
+        精度參數 $\mathsf{pp}$ 是連接<strong>精度</strong>和<strong>成本</strong>的旋鈕：
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>場景</th>
+            <th>建議 $\mathsf{pp}$</th>
+            <th>十進制精度</th>
+            <th>截斷成本</th>
+            <th>典型 $d$</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ZKML 推論</td>
+            <td>$16$</td>
+            <td>$\sim 4.8$ 位</td>
+            <td>中等（每次 $\sim 6$ byte lookup）</td>
+            <td>$5 \sim 9$</td>
+          </tr>
+          <tr>
+            <td>金融 / 高精度</td>
+            <td>$24$</td>
+            <td>$\sim 7.2$ 位</td>
+            <td>較高（每次 $\sim 10$ byte lookup）</td>
+            <td>$5 \sim 9$</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        $\mathsf{pp} = 16$ 是本論文的<strong>預設選擇</strong>：
+        精度足以應對 ZKML 推論場景（神經網路本身就是近似模型，$4.8$ 位十進制精度已超過模型精度需求），
+        且截斷成本在可控範圍內。
+        對於需要更高精度的場景，方法論完全相同 &mdash; 只需調整 $\mathsf{pp}$ 和多項式次數 $d$。
+      </p>
+    </div>
+
+    <div class="callout theorem">
+      <div class="callout-title">Deferred Truncation 的關鍵作用</div>
+      <p>
+        第 14 章將介紹的 Deferred Truncation 技術是定點算術在 ZK 電路中
+        <strong>從理論可行到實際可用</strong>的關鍵一步。
+        透過將 Horner 求值中的 $d$ 次截斷合併為 $1$ 次：
+      </p>
+      <ul>
+        <li>截斷行數從 $\sim 3d$ 降至 $\sim 3$（一次性截斷）</li>
+        <li>Byte lookup 次數從 $\sim 6d$ 降至 $\sim 6$</li>
+        <li>使得 $d = 7$ 或更高次數的多項式在電路中不會因截斷成本而變得不實用</li>
+      </ul>
+      <p>
+        <strong>沒有 Deferred Truncation，定點乘法的累積截斷成本會壓倒 Horner 求值本身的成本</strong> &mdash;
+        這正是本章 12.4 節所指出的問題，也是推動第 14 章技術發展的核心動機。
+      </p>
+    </div>
+
+    <!-- ============================================================
+         PAGE NAVIGATION
+         ============================================================ -->
+    <div class="page-nav">
+      <a href="security-proofs.html">
+        <span class="nav-label">上一章</span>
+        <span class="nav-title">&larr; 11. 安全性證明</span>
+      </a>
+      <a href="approximation-theory.html">
+        <span class="nav-label">下一章</span>
+        <span class="nav-title">13. 多項式逼近理論 &rarr;</span>
+      </a>
+    </div>
+
+  </main>
+</body>
+</html>

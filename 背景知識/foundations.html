@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>第一章 數學基礎 — ZK Handbook</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>ZK Handbook</h1>
+      <div class="subtitle">零知識證明系統</div>
+    </div>
+    <nav>
+      <div class="section-label">總覽</div>
+      <a href="index.html"><span class="page-num">0.</span> 首頁</a>
+      <div class="section-label">基礎</div>
+      <a href="foundations.html" class="active"><span class="page-num">1.</span> 數學基礎</a>
+      <a href="zkp-basics.html"><span class="page-num">2.</span> ZKP：基礎與性質</a>
+      <div class="section-label">構建模組</div>
+      <a href="polynomial-commitments.html"><span class="page-num">3.</span> 多項式承諾</a>
+      <a href="arithmetization.html"><span class="page-num">4.</span> 算術化</a>
+      <a href="fft-domains.html"><span class="page-num">5.</span> FFT 與求值域</a>
+      <div class="section-label">證明系統</div>
+      <a href="groth16.html"><span class="page-num">6.</span> Groth16</a>
+      <a href="plonk.html"><span class="page-num">7.</span> PLONK</a>
+      <a href="halo2.html"><span class="page-num">8.</span> Halo2</a>
+      <div class="section-label">進階主題</div>
+      <a href="lookup-arguments.html"><span class="page-num">9.</span> 查找論證</a>
+      <a href="polynomial-method.html"><span class="page-num">10.</span> 多項式方法</a>
+      <a href="security-proofs.html"><span class="page-num">11.</span> 安全性證明</a>
+
+      <div class="section-label">論文方法論</div>
+      <a href="fixed-point.html"><span class="page-num">12.</span> 有限域定點運算</a>
+      <a href="approximation-theory.html"><span class="page-num">13.</span> 多項式逼近理論</a>
+      <a href="horner-evaluation.html"><span class="page-num">14.</span> Horner 求值</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+      <h1>第一章：數學基礎</h1>
+      <p class="page-subtitle">支撐所有零知識證明系統的代數結構：群、域、多項式、橢圓曲線與配對。</p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DEFINITIONS SECTION                                           -->
+    <!-- ============================================================ -->
+    <div class="definitions-section">
+      <h2>關鍵定義</h2>
+
+      <!-- 1. Group -->
+      <div class="def-item">
+        <div class="def-term">Group <span class="zh">群</span></div>
+        <div class="def-body">
+          <strong>群</strong>是一個有序對 $(G, \cdot)$，其中 $G$ 為一個集合，$\cdot$ 為一個滿足以下四個公理的二元運算：
+          (1)&nbsp;<em>封閉性</em> &mdash; $\forall a,b \in G: a \cdot b \in G$；
+          (2)&nbsp;<em>結合律</em> &mdash; $(a \cdot b) \cdot c = a \cdot (b \cdot c)$；
+          (3)&nbsp;<em>單位元</em> &mdash; $\exists\, e \in G$ 使得 $e \cdot a = a \cdot e = a$；
+          (4)&nbsp;<em>反元素</em> &mdash; $\forall a \in G, \exists\, a^{-1}$ 使得 $a \cdot a^{-1} = e$。
+          群的<em>階</em>為 $|G|$，即元素的個數。若所有元素還滿足 $a \cdot b = b \cdot a$，則稱該群為<em>阿貝爾群</em>（交換群）。
+        </div>
+      </div>
+
+      <!-- 2. Cyclic Group -->
+      <div class="def-item">
+        <div class="def-term">Cyclic Group <span class="zh">循環群</span></div>
+        <div class="def-body">
+          若群 $G$ 中存在一個<em>生成元</em> $g \in G$，使得 $G$ 中每個元素都能表示為 $g$ 的冪次，則稱 $G$ 為<strong>循環群</strong>：
+          $G = \langle g \rangle = \{g^0, g^1, g^2, \ldots, g^{|G|-1}\}$。
+          每個 $n$ 階循環群都同構於 $(\mathbb{Z}/n\mathbb{Z}, +)$。
+          質數階 $p$ 的循環群恰好有 $p - 1$ 個生成元。
+        </div>
+      </div>
+
+      <!-- 3. Finite Field / Prime Field -->
+      <div class="def-item">
+        <div class="def-term">Finite Field / Prime Field <span class="zh">有限域 / 質數域</span></div>
+        <div class="def-body">
+          <strong>有限域</strong> $\mathbb{F}_p$（其中 $p$ 為質數）是集合 $\{0, 1, 2, \ldots, p-1\}$，配備模 $p$ 的加法和乘法運算。每個非零元素都有乘法反元素。加法群 $(\mathbb{F}_p, +)$ 和乘法群 $(\mathbb{F}_p^*, \times)$ 都是循環群，階分別為 $p$ 和 $p-1$。對於每個質數冪次階 $q = p^k$，有限域都存在且在同構意義下是唯一的。
+        </div>
+      </div>
+
+      <!-- 4. Extension Field -->
+      <div class="def-item">
+        <div class="def-term">Extension Field <span class="zh">擴展域</span></div>
+        <div class="def-body">
+          <strong>擴展域</strong> $\mathbb{F}_{p^k}$ 的構造方式是取多項式環 $\mathbb{F}_p[X]$ 對一個 $k$ 次不可約多項式 $f(X)$ 取商：
+          $\mathbb{F}_{p^k} \cong \mathbb{F}_p[X] / (f(X))$。
+          其元素為次數 $&lt; k$ 的多項式，係數在 $\mathbb{F}_p$ 中。運算為多項式運算模 $f(X)$。擴展域在配對友好曲線中至關重要（例如 BN254 使用 $\mathbb{F}_{p^{12}}$）。
+        </div>
+      </div>
+
+      <!-- 5. Elliptic Curve -->
+      <div class="def-item">
+        <div class="def-term">Elliptic Curve <span class="zh">橢圓曲線</span></div>
+        <div class="def-body">
+          定義在域 $\mathbb{F}_p$（$p > 3$）上的<strong>橢圓曲線</strong>由短 Weierstrass 方程給出：
+          $E: y^2 = x^3 + ax + b$，其中 $a, b \in \mathbb{F}_p$ 且判別式 $\Delta = -16(4a^3 + 27b^2) \neq 0$（確保無奇異點）。連同<em>無窮遠點</em> $\mathcal{O}$，解集在幾何定義的加法法則（弦切法）下構成一個群。
+        </div>
+      </div>
+
+      <!-- 6. Elliptic Curve Group -->
+      <div class="def-item">
+        <div class="def-term">Elliptic Curve Group <span class="zh">橢圓曲線群</span></div>
+        <div class="def-body">
+          <strong>橢圓曲線群</strong> $(E(\mathbb{F}_p), +)$ 是曲線 $E$ 在 $\mathbb{F}_p$ 上所有有理點的集合，連同無窮遠點 $\mathcal{O}$，在橢圓曲線點加法下構成的群。該群為阿貝爾群。其階 $r = |E(\mathbb{F}_p)|$ 滿足 Hasse 界：$|r - (p+1)| \leq 2\sqrt{p}$。在密碼學應用中，我們要求 $r$ 具有大質因子（理想情況下 $r$ 本身為質數）。
+        </div>
+      </div>
+
+      <!-- 7. Scalar Field -->
+      <div class="def-item">
+        <div class="def-term">Scalar Field <span class="zh">標量域</span></div>
+        <div class="def-body">
+          <strong>標量域</strong> $\mathbb{F}_r$ 是階等於橢圓曲線點數的有限域：$r = |E(\mathbb{F}_p)|$。標量乘法 $[k]P$ 中的標量 $k$ 屬於 $\mathbb{F}_r$。在零知識電路中，所有<em>見證值</em>（私有輸入）和<em>約束係數</em>都是標量域的元素。對於 BN254，$r$ 是一個特定的 254 位元質數，與 $p$ 不同。
+        </div>
+      </div>
+
+      <!-- 8. Base Field -->
+      <div class="def-item">
+        <div class="def-term">Base Field <span class="zh">基底域</span></div>
+        <div class="def-body">
+          <strong>基底域</strong> $\mathbb{F}_p$ 是定義橢圓曲線的域。每個曲線點的座標 $(x, y)$ 都是 $\mathbb{F}_p$（或其擴展）的元素。對於 BN254，$p$ 是一個特定的 254 位元質數。基底域和標量域的區別至關重要：混淆兩者會導致電路實作中微妙且難以除錯的錯誤。
+        </div>
+      </div>
+
+      <!-- 9. Bilinear Pairing -->
+      <div class="def-item">
+        <div class="def-term">Bilinear Pairing <span class="zh">雙線性配對</span></div>
+        <div class="def-body">
+          <strong>雙線性配對</strong>是一個映射 $e: \mathbb{G}_1 \times \mathbb{G}_2 \to \mathbb{G}_T$，其中 $\mathbb{G}_1, \mathbb{G}_2$ 是橢圓曲線上 $r$ 階的加法群，$\mathbb{G}_T$ 是 $\mathbb{F}_{p^k}^*$ 中 $r$ 階的乘法子群。它滿足：
+          (1)&nbsp;<em>雙線性</em>：$e(aP, bQ) = e(P, Q)^{ab}$；
+          (2)&nbsp;<em>非退化性</em>：對生成元 $P, Q$，$e(P, Q) \neq 1$；
+          (3)&nbsp;<em>可計算性</em>：$e$ 可以高效計算（Tate、Ate 或 optimal Ate 配對）。
+        </div>
+      </div>
+
+      <!-- 10. DLP -->
+      <div class="def-item">
+        <div class="def-term">Discrete Logarithm Problem (DLP) <span class="zh">離散對數問題</span></div>
+        <div class="def-body">
+          給定一個 $n$ 階循環群 $G$、一個生成元 $g$ 和一個元素 $h \in G$，<strong>離散對數問題</strong>要求：找到 $x \in \mathbb{Z}_n$ 使得 $g^x = h$。在橢圓曲線記法中：給定 $P$ 和 $Q = [x]P$，求 $x$。DLP 在精心選擇的群中的假設困難性是橢圓曲線密碼學以及本手冊中討論的所有零知識證明系統的基礎。
+        </div>
+      </div>
+
+      <!-- 11. Lagrange Interpolation -->
+      <div class="def-item">
+        <div class="def-term">Lagrange Interpolation <span class="zh">拉格朗日插值</span></div>
+        <div class="def-body">
+          給定域 $\mathbb{F}$ 上的 $n$ 個不同點 $(x_0, y_0), \ldots, (x_{n-1}, y_{n-1})$，存在<strong>唯一</strong>的次數 $\leq n-1$ 的多項式 $f(X)$ 通過所有 $n$ 個點：
+          $f(X) = \sum_{i=0}^{n-1} y_i \cdot L_i(X)$，其中 Lagrange 基底多項式為
+          $L_i(X) = \prod_{j \neq i} \frac{X - x_j}{x_i - x_j}$。
+          這是零知識系統中將計算編碼為多項式的核心技術。
+        </div>
+      </div>
+
+      <!-- 12. Polynomial Ring -->
+      <div class="def-item">
+        <div class="def-term">Polynomial Ring <span class="zh">多項式環</span></div>
+        <div class="def-body">
+          <strong>多項式環</strong> $\mathbb{F}_p[X]$ 是所有以 $\mathbb{F}_p$ 中元素為係數、以 $X$ 為不定元的多項式的集合。它是一個環（不是域），因為不是每個非零多項式都有乘法反元素。然而，它是一個<em>歐幾里得整環</em>，因此帶餘除法是良定義的，且理想由單個多項式生成。對 $\mathbb{F}_p[X]$ 取不可約多項式的商可得到擴展域。
+        </div>
+      </div>
+
+      <!-- 13. Root of Unity -->
+      <div class="def-item">
+        <div class="def-term">Root of Unity <span class="zh">單位根</span></div>
+        <div class="def-body">
+          $\mathbb{F}_p$ 中的 $n$ 次<strong>單位根</strong>是滿足 $\omega^n = 1$ 的元素 $\omega \in \mathbb{F}_p$。<em>原始</em> $n$ 次單位根還需滿足對所有 $0 < k < n$ 都有 $\omega^k \neq 1$。這樣的 $\omega$ 存在於 $\mathbb{F}_p$ 中的充要條件是 $n \mid (p-1)$。集合 $H = \{1, \omega, \omega^2, \ldots, \omega^{n-1}\}$ 構成 $\mathbb{F}_p^*$ 中一個 $n$ 階的循環乘法子群，使得基於 FFT 的多項式運算成為可能。
+        </div>
+      </div>
+
+      <!-- 14. Schwartz-Zippel Lemma -->
+      <div class="def-item">
+        <div class="def-term">Schwartz-Zippel Lemma <span class="zh">Schwartz-Zippel 引理</span></div>
+        <div class="def-body">
+          設 $f(X_1, \ldots, X_m)$ 為域 $\mathbb{F}$ 上總次數為 $d$ 的非零多項式。若每個 $r_i$ 從 $\mathbb{F}$ 的有限子集 $S \subseteq \mathbb{F}$ 中均勻隨機選取，則
+          $\Pr[f(r_1, \ldots, r_m) = 0] \leq \frac{d}{|S|}$。
+          在單變量情形（$m=1$）且 $S = \mathbb{F}_p$ 時，可得 $\Pr[f(r) = 0] \leq d/p$。對於密碼學級別的域大小（$p \approx 2^{254}$），此機率可忽略不計，這就是為何隨機點求值是一種可靠的驗證策略。
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 1.1 GROUPS AND FIELDS                                         -->
+    <!-- ============================================================ -->
+    <h2 id="groups-and-fields">1.1 群與域</h2>
+
+    <h3>為何需要代數結構？</h3>
+    <p>
+      每個零知識證明系統都在代數結構內部操作數值 &mdash; 主要是<strong>群</strong>和<strong>域</strong>。理解這些結構並非可選的背景知識；它是陳述、分析和實作證明系統所使用的語言。域算術中的一個錯誤會在整個證明管線中無聲傳播，直到驗證失敗（或更糟，接受了一個無效的證明）。
+    </p>
+
+    <h3>群公理回顧</h3>
+    <p>
+      回憶上方定義中的四個公理。在密碼學中，我們幾乎總是使用<em>阿貝爾</em>（交換）群，其中 $a \cdot b = b \cdot a$。常見的例子包括：
+    </p>
+    <ul>
+      <li>$(\mathbb{Z}/n\mathbb{Z}, +)$ &mdash; 模 $n$ 整數在加法下的群。這是 $n$ 階的循環群。</li>
+      <li>$(\mathbb{F}_p^*, \times)$ &mdash; 質數域的非零元素在乘法下的群。這是 $p - 1$ 階的循環群。</li>
+      <li>$(E(\mathbb{F}_p), +)$ &mdash; 橢圓曲線上的點在點加法下的群。這是現代零知識證明的核心工具。</li>
+    </ul>
+
+    <div class="callout definition">
+      <div class="callout-title">子群與 Lagrange 定理</div>
+      <p>
+        若子集 $H \subseteq G$ 在同一運算下本身構成群，則 $H$ 為 $G$ 的<strong>子群</strong>。Lagrange 定理指出：若 $G$ 為有限群且 $H \leq G$，則 $|H|$ 整除 $|G|$。這就是我們關心群元素<em>階</em>的原因：$g$ 的階（使得 $g^k = e$ 的最小正整數 $k$）總是整除 $|G|$。推論：在質數階 $p$ 的群中，每個非單位元都是生成元。
+      </p>
+    </div>
+
+    <h3>從群到域</h3>
+    <p>
+      <strong>域</strong>是一個具有<em>兩種</em>運算 &mdash; 加法和乘法 &mdash; 的集合，使得 $(F, +)$ 是以 $0$ 為單位元的阿貝爾群，$(F^*, \times)$ 是以 $1$ 為單位元的阿貝爾群，且乘法對加法滿足分配律。熟悉的 $\mathbb{Q}, \mathbb{R}, \mathbb{C}$ 是無限域。在密碼學中，我們需要<em>有限</em>域。
+    </p>
+
+    <h3>質數域算術：$\mathbb{F}_p$</h3>
+    <p>
+      最簡單的有限域是 $\mathbb{F}_p = \{0, 1, 2, \ldots, p-1\}$，其中 $p$ 為質數。算術為模運算：
+    </p>
+    <ul>
+      <li><strong>加法：</strong> $a + b \pmod{p}$</li>
+      <li><strong>減法：</strong> $a - b \pmod{p}$（等價於 $a + (p - b) \pmod{p}$）</li>
+      <li><strong>乘法：</strong> $a \times b \pmod{p}$</li>
+      <li><strong>反元素：</strong> $a^{-1} \pmod{p}$ &mdash; 即滿足 $a \cdot b \equiv 1 \pmod{p}$ 的唯一 $b$</li>
+    </ul>
+
+    <div class="callout theorem">
+      <div class="callout-title">Fermat 小定理</div>
+      <p>
+        對任意 $a \not\equiv 0 \pmod{p}$，有 $a^{p-1} \equiv 1 \pmod{p}$。這直接給出乘法反元素的公式：
+        $$a^{-1} \equiv a^{p-2} \pmod{p}$$
+        這就是域中求逆的實際做法 &mdash; 通過模冪運算（平方與乘法法），代價為 $O(\log p)$ 次乘法。
+      </p>
+    </div>
+
+    <div class="callout example">
+      <div class="callout-title">算例：$\mathbb{F}_7$ 中的算術</div>
+      <p>元素為 $\{0, 1, 2, 3, 4, 5, 6\}$。計算如下：</p>
+      <ul>
+        <li>$3 + 5 = 8 \equiv 1 \pmod{7}$</li>
+        <li>$4 \times 5 = 20 \equiv 6 \pmod{7}$</li>
+        <li>$3^{-1} = 3^{7-2} = 3^5 = 243 \equiv 243 \bmod 7 = 5 \pmod{7}$。驗證：$3 \times 5 = 15 \equiv 1 \pmod{7}$。正確。</li>
+        <li>$2^{-1} = 2^5 = 32 \equiv 4 \pmod{7}$。驗證：$2 \times 4 = 8 \equiv 1 \pmod{7}$。正確。</li>
+      </ul>
+      <p>
+        乘法群 $\mathbb{F}_7^* = \{1,2,3,4,5,6\}$ 的階為 $6$。它是循環群嗎？是 &mdash; $3$ 是一個生成元：
+        $3^1 = 3$, $3^2 = 2$, $3^3 = 6$, $3^4 = 4$, $3^5 = 5$, $3^6 = 1$。因此 $\langle 3 \rangle = \mathbb{F}_7^*$。
+      </p>
+    </div>
+
+    <div class="callout warning">
+      <div class="callout-title">常見混淆：$\mathbb{Z}_n$ 與 $\mathbb{F}_p$</div>
+      <p>
+        $\mathbb{Z}_n$（模 $n$ 整數）是一個<em>環</em>，不一定是域。只有當 $n$ 為質數時才是域。當 $n$ 為合數時，某些非零元素沒有反元素（例如在 $\mathbb{Z}_6$ 中，$2$ 沒有反元素，因為 $\gcd(2, 6) = 2 \neq 1$）。在零知識文獻中，務必確認：模數是否為質數？若否，則你是在環中運算，許多「域」的性質不再成立。
+      </p>
+    </div>
+
+    <h3>為何零知識證明使用質數域？</h3>
+    <p>
+      零知識證明系統需要每個非零值都可逆（用於多項式除法、Lagrange 插值等）。質數域保證了這一點。$p$ 的選擇不是任意的 &mdash; 它必須：
+    </p>
+    <ul>
+      <li>足夠大以確保安全性（通常為 254 或 255 位元）</li>
+      <li>與橢圓曲線相容（匹配標量域階 $r$ 或基底域質數 $p$）</li>
+      <li>結構上便於高效算術（例如 $p = 2^{254} + \epsilon$，以利快速約化）</li>
+      <li>$p - 1$ 含有大的 2 的冪次因子（以支援大域上的 FFT）</li>
+    </ul>
+
+    <!-- ============================================================ -->
+    <!-- 1.2 POLYNOMIALS OVER FINITE FIELDS                            -->
+    <!-- ============================================================ -->
+    <h2 id="polynomials">1.2 有限域上的多項式</h2>
+
+    <h3>多項式環 $\mathbb{F}_p[X]$</h3>
+    <p>
+      $\mathbb{F}_p$ 上的多項式是一個形式表達式 $f(X) = a_0 + a_1 X + a_2 X^2 + \cdots + a_d X^d$，其中每個係數 $a_i \in \mathbb{F}_p$。$f$ 的<strong>次數</strong>為 $d$（最高非零係數的冪次）。所有此類多項式的集合記為 $\mathbb{F}_p[X]$，在多項式加法和乘法（係數運算在 $\mathbb{F}_p$ 中進行）下構成一個環。
+    </p>
+
+    <p>$\mathbb{F}_p[X]$ 的關鍵性質：</p>
+    <ul>
+      <li><strong>歐幾里得除法：</strong>對任意 $f, g$（$g \neq 0$），存在唯一的 $q, r$ 使得 $f = qg + r$ 且 $\deg(r) < \deg(g)$。</li>
+      <li><strong>根的上界：</strong>次數為 $d$ 的非零多項式在 $\mathbb{F}_p$ 中<em>至多</em>有 $d$ 個根。</li>
+      <li><strong>唯一分解：</strong>每個多項式都可唯一分解為不可約多項式的乘積（不計順序和純量倍數）。</li>
+    </ul>
+
+    <div class="callout note">
+      <div class="callout-title">為何多項式在零知識證明中居於核心地位</div>
+      <p>
+        多項式是零知識證明系統中計算的「通用編碼」。計算（電路）被轉換為多項式方程。證明者通過展示滿足特定恆等式的多項式來證明其知道一個滿足約束的賦值。驗證者在隨機點上檢查這些恆等式，依靠 Schwartz-Zippel 引理來確保健全性。這種「多項式互動式預言機證明」範式是 Groth16、PLONK、Halo2 以及幾乎所有現代 SNARK 的基礎。
+      </p>
+    </div>
+
+    <h3>多項式求值與根</h3>
+    <p>
+      在點 $\alpha \in \mathbb{F}_p$ 處對 $f$ 求值意味著計算 $f(\alpha) = a_0 + a_1 \alpha + \cdots + a_d \alpha^d$。這可以通過 <strong>Horner 法則</strong>高效完成：$f(\alpha) = a_0 + \alpha(a_1 + \alpha(a_2 + \cdots))$，只需 $d$ 次乘法和 $d$ 次加法。
+    </p>
+    <p>
+      若 $f(\alpha) = 0$，則稱 $\alpha$ 為 $f$ 的一個<strong>根</strong>。根據因式定理，$\alpha$ 是 $f$ 的根當且僅當 $(X - \alpha)$ 整除 $f(X)$。這是零知識證明中「商多項式」技術的基礎：為了證明 $f$ 在集合 $H$ 上消失，證明者需展示 $f(X) = q(X) \cdot Z_H(X)$，其中 $Z_H(X) = \prod_{h \in H}(X - h)$ 為消失多項式。
+    </p>
+
+    <h3>Lagrange 插值</h3>
+    <p>
+      給定 $\mathbb{F}_p$ 中的 $n$ 個不同點 $(x_0, y_0), (x_1, y_1), \ldots, (x_{n-1}, y_{n-1})$，恰好存在一個次數 $\leq n - 1$ 的多項式 $f(X)$ 使得對所有 $i$ 都有 $f(x_i) = y_i$。它由 Lagrange 插值公式給出：
+    </p>
+    $$f(X) = \sum_{i=0}^{n-1} y_i \cdot L_i(X)$$
+    <p>其中 <strong>Lagrange 基底多項式</strong>為：</p>
+    $$L_i(X) = \prod_{\substack{j=0 \\ j \neq i}}^{n-1} \frac{X - x_j}{x_i - x_j}$$
+    <p>
+      每個 $L_i$ 具有性質 $L_i(x_j) = \delta_{ij}$（當 $i = j$ 時等於 $1$，否則為 $0$）。因此插值多項式是這些基底多項式的線性組合，以所需的 $y$ 值為權重。
+    </p>
+
+    <div class="callout example">
+      <div class="callout-title">算例：$\mathbb{F}_{13}$ 中的 Lagrange 插值</div>
+      <p>
+        假設我們要在 $\mathbb{F}_{13}$ 中求通過 $(1, 3)$、$(2, 7)$、$(4, 5)$ 的多項式。
+      </p>
+      <p><strong>步驟一：計算 Lagrange 基底多項式。</strong></p>
+      <p>
+        $L_0(X) = \frac{(X - 2)(X - 4)}{(1 - 2)(1 - 4)} = \frac{(X-2)(X-4)}{(-1)(-3)} = \frac{(X-2)(X-4)}{3}$
+      </p>
+      <p>在 $\mathbb{F}_{13}$ 中：$3^{-1} = 9$（因為 $3 \times 9 = 27 \equiv 1$）。所以 $L_0(X) = 9(X-2)(X-4)$。</p>
+      <p>
+        $L_1(X) = \frac{(X-1)(X-4)}{(2-1)(2-4)} = \frac{(X-1)(X-4)}{(1)(-2)} = \frac{(X-1)(X-4)}{-2}$
+      </p>
+      <p>在 $\mathbb{F}_{13}$ 中：$(-2)^{-1} = 11^{-1}$。因為 $11 \times 6 = 66 \equiv 1 \pmod{13}$，得 $(-2)^{-1} = 6$。所以 $L_1(X) = 6(X-1)(X-4)$。</p>
+      <p>
+        $L_2(X) = \frac{(X-1)(X-2)}{(4-1)(4-2)} = \frac{(X-1)(X-2)}{3 \cdot 2} = \frac{(X-1)(X-2)}{6}$
+      </p>
+      <p>在 $\mathbb{F}_{13}$ 中：$6^{-1} = 11$（因為 $6 \times 11 = 66 \equiv 1$）。所以 $L_2(X) = 11(X-1)(X-2)$。</p>
+      <p><strong>步驟二：合併。</strong></p>
+      <p>
+        $f(X) = 3 \cdot L_0(X) + 7 \cdot L_1(X) + 5 \cdot L_2(X)$
+      </p>
+      <p>
+        $= 3 \cdot 9(X-2)(X-4) + 7 \cdot 6(X-1)(X-4) + 5 \cdot 11(X-1)(X-2)$
+      </p>
+      <p>
+        $= 27(X-2)(X-4) + 42(X-1)(X-4) + 55(X-1)(X-2)$
+      </p>
+      <p>
+        在 $\mathbb{F}_{13}$ 中：$27 \equiv 1$, $42 \equiv 3$, $55 \equiv 3$。所以：
+      </p>
+      <p>
+        $f(X) = 1 \cdot (X^2 - 6X + 8) + 3 \cdot (X^2 - 5X + 4) + 3 \cdot (X^2 - 3X + 2)$
+      </p>
+      <p>
+        $= (X^2 - 6X + 8) + (3X^2 - 15X + 12) + (3X^2 - 9X + 6)$
+      </p>
+      <p>
+        $= 7X^2 - 30X + 26 \equiv 7X^2 + 9X + 0 \pmod{13}$
+      </p>
+      <p><strong>驗證：</strong> $f(1) = 7 + 9 = 16 \equiv 3$。$f(2) = 28 + 18 = 46 \equiv 7$。$f(4) = 112 + 36 = 148 \equiv 5$。全部正確。</p>
+    </div>
+
+    <h3>Schwartz-Zippel 引理</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">Schwartz-Zippel 引理</div>
+      <p>
+        設 $f(X_1, \ldots, X_m) \in \mathbb{F}[X_1, \ldots, X_m]$ 為總次數為 $d$ 的非零多項式。設 $S \subseteq \mathbb{F}$ 為有限集合。若 $r_1, \ldots, r_m$ 從 $S$ 中獨立均勻隨機選取，則：
+        $$\Pr[f(r_1, \ldots, r_m) = 0] \leq \frac{d}{|S|}$$
+      </p>
+    </div>
+
+    <p>
+      對於零知識證明中最相關的單變量情形，這簡化為：若 $f(X)$ 為次數為 $d$ 的非零多項式，且 $r$ 從 $\mathbb{F}_p$ 中均勻選取，則 $\Pr[f(r) = 0] \leq d / p$。
+    </p>
+    <p>
+      <strong>為何這對健全性至關重要：</strong>假設一個作弊的證明者想要說服驗證者兩個多項式 $f$ 和 $g$（次數皆 $\leq d$）相等，但實際上不相等。驗證者通過在隨機點 $r$ 處求值來檢查。差 $h = f - g$ 是次數 $\leq d$ 的非零多項式，因此 $\Pr[h(r) = 0] \leq d/p$。對於 $d \approx 2^{20}$ 和 $p \approx 2^{254}$，此機率約為 $\approx 2^{-234}$ &mdash; 極其微小。這就是<em>多項式恆等測試</em>的核心機制。
+    </p>
+
+    <div class="callout warning">
+      <div class="callout-title">次數很重要！</div>
+      <p>
+        Schwartz-Zippel 界取決於次數 $d$。若協議允許證明者提交無界次數的多項式，則該界將毫無意義。這就是為何證明系統總是對已承諾的多項式施加次數界 &mdash; 無論是顯式的（FRI 中的次數檢查）還是隱式的（通過承諾方案的結構，例如 KZG 對次數 $d$ 多項式的承諾使用大小為 $d + 1$ 的可信設置）。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 1.3 ELLIPTIC CURVES                                           -->
+    <!-- ============================================================ -->
+    <h2 id="elliptic-curves">1.3 橢圓曲線</h2>
+
+    <h3>曲線方程</h3>
+    <p>
+      定義在 $\mathbb{F}_p$（$p > 3$）上的橢圓曲線由<strong>短 Weierstrass 形式</strong>給出：
+    </p>
+    $$E: y^2 = x^3 + ax + b, \quad a, b \in \mathbb{F}_p, \quad 4a^3 + 27b^2 \neq 0$$
+    <p>
+      條件 $4a^3 + 27b^2 \neq 0$ 確保曲線沒有奇異點（尖點或自交點）。連同<em>無窮遠點</em> $\mathcal{O}$（作為單位元），解集構成一個阿貝爾群。
+    </p>
+
+    <h3>點加法：弦切法</h3>
+    <p>
+      $E(\mathbb{F}_p)$ 上的群律以幾何方式定義。給定兩個點 $P = (x_1, y_1)$ 和 $Q = (x_2, y_2)$：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <strong>情形一：$P \neq Q$（點加法）。</strong>
+        過 $P$ 和 $Q$ 作一條直線。它與曲線交於第三個點 $R'$。將 $R'$ 關於 $x$ 軸反射得到 $R = P + Q$。<br><br>
+        代數上，斜率為 $\lambda = \frac{y_2 - y_1}{x_2 - x_1}$，且：
+        $$x_3 = \lambda^2 - x_1 - x_2, \qquad y_3 = \lambda(x_1 - x_3) - y_1$$
+      </div>
+      <div class="step">
+        <strong>情形二：$P = Q$（點倍乘）。</strong>
+        在 $P$ 處作曲線的切線。它與曲線交於第二個點 $R'$。反射得到 $R = [2]P$。<br><br>
+        斜率為 $\lambda = \frac{3x_1^2 + a}{2y_1}$，$x_3, y_3$ 的計算公式與上述相同。
+      </div>
+      <div class="step">
+        <strong>情形三：$Q = -P$（反元素）。</strong>
+        若 $Q = (x_1, -y_1)$，則連線為垂直線，不與曲線交於有限的第三個點。按約定 $P + (-P) = \mathcal{O}$。
+      </div>
+      <div class="step">
+        <strong>情形四：單位元。</strong>
+        對所有 $P$，$P + \mathcal{O} = P$。無窮遠點是單位元。
+      </div>
+    </div>
+
+    <div class="callout example">
+      <div class="callout-title">算例：$\mathbb{F}_7$ 上 $y^2 = x^3 + 2x + 3$ 的點加法</div>
+      <p>
+        設 $E: y^2 = x^3 + 2x + 3$ 定義在 $\mathbb{F}_7$ 上。首先檢查非奇異性：$4(2)^3 + 27(3)^2 = 32 + 243 = 275 \equiv 2 \pmod{7} \neq 0$。通過。
+      </p>
+      <p>
+        尋找一些點。對 $x = 1$：$y^2 = 1 + 2 + 3 = 6$。$6$ 是模 $7$ 的二次剩餘嗎？$1^2=1, 2^2=4, 3^2=2, 4^2=2, 5^2=4, 6^2=1$。不是 &mdash; $6$ 不是模 $7$ 的二次剩餘，所以 $x=1$ 沒有對應的點。
+      </p>
+      <p>
+        對 $x = 0$：$y^2 = 3$。$3$ 不是模 $7$ 的二次剩餘（如上所示）。沒有對應的點。
+      </p>
+      <p>
+        對 $x = 2$：$y^2 = 8 + 4 + 3 = 15 \equiv 1 \pmod 7$。$y = 1$ 或 $y = 6$。點：$(2, 1)$ 和 $(2, 6)$。
+      </p>
+      <p>
+        對 $x = 3$：$y^2 = 27 + 6 + 3 = 36 \equiv 1 \pmod 7$。$y = 1$ 或 $y = 6$。點：$(3, 1)$ 和 $(3, 6)$。
+      </p>
+      <p>
+        設 $P = (2, 1)$，$Q = (3, 1)$。計算 $P + Q$：
+      </p>
+      <p>
+        $\lambda = \frac{1 - 1}{3 - 2} = \frac{0}{1} = 0$
+      </p>
+      <p>
+        $x_3 = 0^2 - 2 - 3 = -5 \equiv 2 \pmod 7$
+      </p>
+      <p>
+        $y_3 = 0 \cdot (2 - 2) - 1 = -1 \equiv 6 \pmod 7$
+      </p>
+      <p>
+        所以 $P + Q = (2, 6)$。注意 $(2, 6) = -P$，因此 $P + Q + P = \mathcal{O}$，即在此群中 $Q = [-2]P$。
+      </p>
+    </div>
+
+    <h3>標量乘法</h3>
+    <p>
+      <strong>標量乘法</strong>是重複的點加法：$[k]P = \underbrace{P + P + \cdots + P}_{k \text{ times}}$。直接計算需要 $k - 1$ 次加法，但<strong>倍加法</strong>（double-and-add，類似於冪運算中的平方與乘法法）通過處理 $k$ 的二進位表示，將運算量降低至 $O(\log k)$ 次點運算。
+    </p>
+    <p>
+      對於 254 位元的標量，這意味著大約 254 次點倍乘和平均約 127 次點加法 &mdash; 在現代硬體上完全可行。
+    </p>
+
+    <h3>曲線階與 Hasse 界</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">Hasse 定理</div>
+      <p>
+        對於定義在 $\mathbb{F}_p$ 上的橢圓曲線 $E$，有理點的數目滿足：
+        $$|E(\mathbb{F}_p)| = p + 1 - t, \quad \text{where } |t| \leq 2\sqrt{p}$$
+        整數 $t$ 稱為 <strong>Frobenius 跡</strong>。等價地：
+        $$p + 1 - 2\sqrt{p} \leq |E(\mathbb{F}_p)| \leq p + 1 + 2\sqrt{p}$$
+        因此曲線階「接近」$p + 1$。
+      </p>
+    </div>
+
+    <p>
+      對於密碼學曲線，我們選擇參數使得 $r = |E(\mathbb{F}_p)|$ 為質數（或具有非常大的質因子）。這確保曲線群為質數階的循環群，意味著每個非單位元都是生成元 &mdash; 非常適合密碼學協議。
+    </p>
+
+    <h3>基底域與標量域：關鍵區別</h3>
+
+    <div class="callout warning">
+      <div class="callout-title">基底域 $\mathbb{F}_p$ 與標量域 $\mathbb{F}_r$ &mdash; 切勿混淆！</div>
+      <p>這是零知識實作中最常見的混淆來源。</p>
+      <ul>
+        <li><strong>基底域 $\mathbb{F}_p$</strong>：定義曲線的域。點座標 $(x, y)$ 是 $\mathbb{F}_p$ 的元素。序列化曲線點時，序列化的是 $\mathbb{F}_p$ 的元素。</li>
+        <li><strong>標量域 $\mathbb{F}_r$</strong>：其階等於曲線群階 $r = |E(\mathbb{F}_p)|$ 的域。$[k]P$ 中的標量 $k$ 屬於 $\mathbb{F}_r$。零知識電路中的所有<em>見證值</em>、所有<em>約束係數</em>和所有<em>多項式求值</em>都在 $\mathbb{F}_r$ 中。</li>
+      </ul>
+      <p>
+        一般而言 $p \neq r$。對於 BN254：$p$ 和 $r$ 都是 254 位元的質數，但它們是不同的數。混淆它們會導致證明在無聲中計算出錯誤的值。
+      </p>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>面向</th>
+          <th>基底域 $\mathbb{F}_p$</th>
+          <th>標量域 $\mathbb{F}_r$</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>存放的內容</td>
+          <td>點座標 $(x, y)$</td>
+          <td>$[k]P$ 中的標量 $k$；見證值</td>
+        </tr>
+        <tr>
+          <td>大小</td>
+          <td>由安全參數決定</td>
+          <td>由曲線階 $r$ 決定</td>
+        </tr>
+        <tr>
+          <td>關係</td>
+          <td>$r \approx p$（由 Hasse 界）</td>
+          <td>$r = |E(\mathbb{F}_p)|$</td>
+        </tr>
+        <tr>
+          <td>在零知識中的角色</td>
+          <td>承諾計算（MSM）</td>
+          <td>算術電路、多項式互動式預言機證明</td>
+        </tr>
+        <tr>
+          <td>FFT 域</td>
+          <td>通常不用於 FFT</td>
+          <td>FFT 在此運作（需要 $2^k | (r-1)$）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">實務上的意涵</div>
+      <p>
+        在零知識文獻中，當未加限定地提到「域」時，幾乎總是指<strong>標量域</strong>。電路約束、多項式恆等式和 Fiat-Shamir 挑戰都在 $\mathbb{F}_r$ 中。基底域只在需要進行「原生」曲線算術時出現（例如電路內的簽名驗證或遞迴證明組合，此時需要在 $\mathbb{F}_r$ 電路中模擬 $\mathbb{F}_p$ 算術 &mdash; 這是一個代價高昂的操作）。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 1.4 BILINEAR PAIRINGS                                         -->
+    <!-- ============================================================ -->
+    <h2 id="pairings">1.4 雙線性配對</h2>
+
+    <h3>定義與性質</h3>
+    <p>
+      雙線性配對是一個映射 $e: \mathbb{G}_1 \times \mathbb{G}_2 \to \mathbb{G}_T$，其中：
+    </p>
+    <ul>
+      <li>$\mathbb{G}_1$ 是 $E(\mathbb{F}_p)$ 中 $r$ 階的子群</li>
+      <li>$\mathbb{G}_2$ 是 $E(\mathbb{F}_{p^k})$ 中 $r$ 階的子群（其中 $k$ 為<em>嵌入度</em>）</li>
+      <li>$\mathbb{G}_T$ 是 $\mathbb{F}_{p^k}^*$ 中 $r$ 階的乘法子群</li>
+    </ul>
+    <p>關鍵性質為<strong>雙線性</strong>：</p>
+    $$e([a]P, [b]Q) = e(P, Q)^{ab}$$
+    <p>
+      對所有 $a, b \in \mathbb{Z}$ 及生成元 $P \in \mathbb{G}_1$、$Q \in \mathbb{G}_2$ 成立。此性質將指數中的乘法「搬移」到配對的輸出端，使得驗證已承諾值之間的乘法關係成為可能。
+    </p>
+
+    <h3>Type-III 配對</h3>
+    <p>
+      現代基於配對的密碼學使用 <strong>Type-III 配對</strong>，其中 $\mathbb{G}_1 \neq \mathbb{G}_2$ 且兩者之間不存在可高效計算的同構。這就是 BN254 和 BLS12-381 的設定。非對稱性很重要：
+    </p>
+    <ul>
+      <li>$\mathbb{G}_1$ 的點「較短」（$E(\mathbb{F}_p)$ 的元素，壓縮後通常為 32 或 48 位元組）</li>
+      <li>$\mathbb{G}_2$ 的點「較長」（對於 BN/BLS 曲線為 $E(\mathbb{F}_{p^2})$ 的元素，壓縮後為 64 或 96 位元組）</li>
+      <li>$\mathbb{G}_T$ 的元素更大（$\mathbb{F}_{p^{12}}$ 的元素，384 或 576 位元組）</li>
+    </ul>
+    <p>
+      協議設計者必須決定哪些值放在 $\mathbb{G}_1$ 中、哪些放在 $\mathbb{G}_2$ 中，以最小化證明大小。通常，證明元素放在 $\mathbb{G}_1$（較小）中，驗證金鑰元素放在 $\mathbb{G}_2$ 中。
+    </p>
+
+    <h3>為何配對對零知識證明至關重要</h3>
+    <p>
+      若沒有配對，我們只能驗證已承諾值的<em>線性</em>關係：給定承諾 $C_1 = [a]G$ 和 $C_2 = [b]G$，任何人都可以檢查 $C_1 + C_2 = [(a+b)]G$。但我們<em>無法</em>在不互動的情況下檢查乘法關係如 $a \cdot b = c$。
+    </p>
+    <p>
+      配對解決了這個問題。給定 $A = [a]G_1 \in \mathbb{G}_1$、$B = [b]G_2 \in \mathbb{G}_2$ 和 $C = [c]G_1 \in \mathbb{G}_1$：
+    </p>
+    $$e(A, B) = e(C, G_2) \quad \iff \quad e([a]G_1, [b]G_2) = e([c]G_1, G_2) \quad \iff \quad ab = c$$
+    <p>
+      這正是 <strong>Groth16 驗證方程</strong>的簡化版本。配對讓驗證者能夠通過單次配對計算來檢查隱藏值上的二次約束。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">Groth16 驗證方程（預覽）</div>
+      <p>Groth16 證明由三個群元素 $(\pi_A, \pi_B, \pi_C)$ 組成，其中 $\pi_A \in \mathbb{G}_1$、$\pi_B \in \mathbb{G}_2$、$\pi_C \in \mathbb{G}_1$。驗證檢查：</p>
+      $$e(\pi_A, \pi_B) = e(\alpha, \beta) \cdot e\!\left(\sum_{i=0}^{\ell} a_i \cdot L_i, \gamma\right) \cdot e(\pi_C, \delta)$$
+      <p>
+        其中 $\alpha, \beta, \gamma, \delta$ 為驗證金鑰元素，$a_0, \ldots, a_\ell$ 為公開輸入。這是一個包含三次配對的單一方程。我們將在第六章中完整推導。
+      </p>
+    </div>
+
+    <h3>曲線參數：BN254 與 BLS12-381</h3>
+    <p>
+      零知識證明中最廣泛使用的兩條配對友好曲線為：
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>參數</th>
+          <th>BN254 (alt_bn128)</th>
+          <th>BLS12-381</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>安全等級</td>
+          <td>~100 位元</td>
+          <td>~128 位元</td>
+        </tr>
+        <tr>
+          <td>基底域大小 $p$</td>
+          <td>254 位元</td>
+          <td>381 位元</td>
+        </tr>
+        <tr>
+          <td>標量域大小 $r$</td>
+          <td>254 位元</td>
+          <td>255 位元</td>
+        </tr>
+        <tr>
+          <td>嵌入度 $k$</td>
+          <td>12</td>
+          <td>12</td>
+        </tr>
+        <tr>
+          <td>$\mathbb{G}_1$ 點大小</td>
+          <td>32 位元組（壓縮）</td>
+          <td>48 位元組（壓縮）</td>
+        </tr>
+        <tr>
+          <td>$\mathbb{G}_2$ 點大小</td>
+          <td>64 位元組（壓縮）</td>
+          <td>96 位元組（壓縮）</td>
+        </tr>
+        <tr>
+          <td>配對成本</td>
+          <td>~1.5 毫秒</td>
+          <td>~3 毫秒</td>
+        </tr>
+        <tr>
+          <td>使用者</td>
+          <td>Ethereum（預編譯合約）、鏈上 Groth16</td>
+          <td>Zcash Sapling、Ethereum 2.0、Filecoin</td>
+        </tr>
+        <tr>
+          <td>FFT 友好？</td>
+          <td>$r - 1$ 含因子 $2^{28}$</td>
+          <td>$r - 1$ 含因子 $2^{32}$</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout warning">
+      <div class="callout-title">BN254 安全等級</div>
+      <p>
+        BN254 最初被估計具有約 128 位元的安全等級，但 $\mathbb{F}_{p^{12}}$ 上離散對數的數域篩法進展已將其降低至大約 100-110 位元。對於需要 128 位元安全等級的新部署，建議使用 BLS12-381。然而，由於已有的預編譯合約（EIP-196、EIP-197），BN254 在 Ethereum 上仍被廣泛使用，且對大多數實際應用而言仍被認為是安全的。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 1.5 HARDNESS ASSUMPTIONS                                      -->
+    <!-- ============================================================ -->
+    <h2 id="hardness-assumptions">1.5 困難性假設</h2>
+
+    <p>
+      每個零知識證明系統的安全性都建立在計算假設之上 &mdash; 這些是我們<em>相信</em>為真但無法證明的陳述。這些假設按從最弱（最保守）到最強（最激進）的順序排列：
+    </p>
+
+    <h3>標準假設</h3>
+
+    <div class="callout definition">
+      <div class="callout-title">離散對數（DL）</div>
+      <p>
+        給定一個質數階 $r$ 的循環群 $\mathbb{G}$、一個生成元 $G$ 和一個隨機元素 $H = [x]G$，計算上不可行求出 $x$。
+      </p>
+      <p>
+        <strong>橢圓曲線記法：</strong>給定橢圓曲線上的 $G$ 和 $Q = [x]G$，求 $x$。已知的通用群最佳演算法需要 $O(\sqrt{r})$ 時間（Pollard's rho）。
+      </p>
+    </div>
+
+    <div class="callout definition">
+      <div class="callout-title">計算 Diffie-Hellman（CDH）</div>
+      <p>
+        給定 $G$、$[a]G$ 和 $[b]G$，計算 $[ab]G$ 是不可行的。
+      </p>
+      <p>
+        CDH <em>不比</em> DL 更困難（若你能解決 DL，就能通過恢復 $a$ 然後計算 $[a]([b]G)$ 來解決 CDH）。在大多數感興趣的群中，CDH 被認為等價於 DL，但這在一般情況下尚未被證明。
+      </p>
+    </div>
+
+    <div class="callout definition">
+      <div class="callout-title">決策 Diffie-Hellman（DDH）</div>
+      <p>
+        給定 $G$、$[a]G$、$[b]G$ 和 $T$，區分 $T = [ab]G$ 和 $T = [c]G$（其中 $c$ 為隨機值）是不可行的。
+      </p>
+      <p>
+        <strong>重要提醒：</strong>DDH 在配對友好群中是<em>容易的</em>！給定 $[a]G_1$、$[b]G_1$ 和 $T$，攻擊者可以檢查 $e([a]G_1, [b]G_2) = e(T, G_2)$ 是否成立。這就是為何基於配對的系統依賴更強的假設。
+      </p>
+    </div>
+
+    <h3>基於配對的假設</h3>
+
+    <div class="callout definition">
+      <div class="callout-title">$q$-強雙線性 Diffie-Hellman（$q$-SBDH）</div>
+      <p>
+        給定元組 $(G_1, G_2, [\tau]G_1, [\tau^2]G_1, \ldots, [\tau^q]G_1, [\tau]G_2)$（其中 $\tau$ 為隨機秘密），對攻擊者自行選擇的任意 $c$，計算 $e(G_1, G_2)^{1/(\tau + c)}$ 是不可行的。
+      </p>
+      <p>
+        這是 KZG 多項式承諾方案所依據的假設。指數 $\tau, \tau^2, \ldots, \tau^q$ 正是可信設置儀式中產生的「tau 的冪次」。
+      </p>
+    </div>
+
+    <div class="callout definition">
+      <div class="callout-title">指數知識假設（KEA）</div>
+      <p>
+        若演算法 $\mathcal{A}$ 在給定 $(G, [\alpha]G)$（$\alpha$ 為隨機值）後輸出一個滿足 $\hat{C} = [\alpha]C$ 的有序對 $(C, \hat{C})$，則存在一個「萃取器」$\mathcal{E}$ 能夠輸出 $c$ 使得 $C = [c]G$。
+      </p>
+      <p>
+        直覺上：產生有效的有序對 $(C, \hat{C})$ 的唯一方式是「知道」離散對數 $c$。KEA 是一個<em>知識假設</em> &mdash; 它對產生輸出的<em>計算過程</em>做出了陳述，而非僅對輸出本身。這對於證明 SNARK 的知識健全性至關重要。
+      </p>
+    </div>
+
+    <div class="callout definition">
+      <div class="callout-title">代數群模型（AGM）</div>
+      <p>
+        AGM 不是單一假設，而是一種<em>計算模型</em>。它限制攻擊者只能將群元素作為先前所見群元素的線性組合來產生。形式上：若 $\mathcal{A}$ 輸出 $C \in \mathbb{G}$，它必須同時輸出係數 $(c_0, c_1, \ldots)$ 使得 $C = \sum c_i G_i$，其中 $G_i$ 是 $\mathcal{A}$ 已接收的所有群元素。
+      </p>
+      <p>
+        AGM 比標準模型更強（它對攻擊者施加了更多限制），但比通用群模型（GGM）更弱。PLONK 的安全性是在 AGM + 隨機預言機模型中被證明的。
+      </p>
+    </div>
+
+    <h3>各系統使用的假設</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>證明系統</th>
+          <th>主要假設</th>
+          <th>模型</th>
+          <th>需要可信設置？</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Groth16</td>
+          <td>$q$-PKE、$q$-SBDH（子群變體）</td>
+          <td>標準模型 + KEA</td>
+          <td>是（每電路）</td>
+        </tr>
+        <tr>
+          <td>PLONK (KZG)</td>
+          <td>$q$-SBDH、AGM</td>
+          <td>AGM + ROM</td>
+          <td>是（通用）</td>
+        </tr>
+        <tr>
+          <td>Halo2 (IPA)</td>
+          <td>DL</td>
+          <td>ROM</td>
+          <td>否（透明）</td>
+        </tr>
+        <tr>
+          <td>STARKs (FRI)</td>
+          <td>抗碰撞雜湊</td>
+          <td>ROM</td>
+          <td>否（透明）</td>
+        </tr>
+        <tr>
+          <td>Bulletproofs</td>
+          <td>DL</td>
+          <td>ROM</td>
+          <td>否（透明）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">假設強度的取捨</div>
+      <p>
+        更強的假設能實現更高效的證明。Groth16 擁有最短的證明（3 個群元素，約 128 位元組）和最快的驗證（3 次配對），但依賴最強的假設且需要每電路的可信設置。STARKs 做出最弱的假設（僅需抗碰撞雜湊），但產生大得多的證明（約 50-200 KB）。這是證明系統設計中的一個基本取捨。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 1.6 LAGRANGE BASIS AND ROOTS OF UNITY                         -->
+    <!-- ============================================================ -->
+    <h2 id="roots-of-unity">1.6 Lagrange 基底與單位根</h2>
+
+    <h3>有限域中的單位根</h3>
+    <p>
+      $\mathbb{F}_p$ 中的 <strong>$n$ 次單位根</strong>是滿足 $\omega^n = 1$ 的元素 $\omega$。<strong>原始</strong> $n$ 次單位根還需滿足對所有 $0 < k < n$ 都有 $\omega^k \neq 1$ &mdash; 即 $\omega$ 在乘法群 $\mathbb{F}_p^*$ 中的階恰好為 $n$。
+    </p>
+    <p>
+      <strong>存在條件：</strong>$\mathbb{F}_p$ 中存在原始 $n$ 次單位根的充要條件為 $n \mid (p - 1)$。這是因為 $\mathbb{F}_p^*$ 是 $p - 1$ 階的循環群，而 $N$ 階的循環群對 $N$ 的每個因子 $d$ 都包含 $d$ 階的元素（且恰好有 $\phi(d)$ 個，其中 $\phi$ 為 Euler 函數）。
+    </p>
+
+    <div class="callout example">
+      <div class="callout-title">在 $\mathbb{F}_{13}$ 中尋找單位根</div>
+      <p>
+        $p = 13$，所以 $p - 1 = 12 = 2^2 \cdot 3$。$12$ 的因子為 $\{1, 2, 3, 4, 6, 12\}$，因此 $\mathbb{F}_{13}$ 中存在 $n \in \{1, 2, 3, 4, 6, 12\}$ 的原始 $n$ 次單位根。
+      </p>
+      <p>
+        要找一個原始 4 次單位根，需要 $\omega^4 = 1$ 且 $\omega^2 \neq 1$。取 $\mathbb{F}_{13}^*$ 的一個生成元 $g$ &mdash; 令 $g = 2$（驗證：$2^{12} = 4096 \equiv 1 \pmod{13}$，且 $2$ 的冪次生成整個 $\mathbb{F}_{13}^*$）。
+      </p>
+      <p>
+        令 $\omega = g^{(p-1)/4} = 2^{12/4} = 2^3 = 8$。驗證：$8^1 = 8$, $8^2 = 64 \equiv 12$, $8^3 = 8 \cdot 12 = 96 \equiv 5$, $8^4 = 8 \cdot 5 = 40 \equiv 1$。且 $8^2 = 12 \neq 1$，所以 $\omega = 8$ 是原始 4 次單位根。
+      </p>
+      <p>
+        子群：$H = \{1, 8, 12, 5\} = \{8^0, 8^1, 8^2, 8^3\}$。
+      </p>
+    </div>
+
+    <h3>乘法子群 $H$</h3>
+    <p>
+      給定原始 $n$ 次單位根 $\omega$，集合
+    </p>
+    $$H = \{1, \omega, \omega^2, \ldots, \omega^{n-1}\}$$
+    <p>
+      是 $\mathbb{F}_p^*$ 中 $n$ 階的循環乘法子群。此子群之所以特殊，是因為它的<em>對稱性質</em>：
+    </p>
+    <ul>
+      <li><strong>均勻分佈：</strong>$H$ 的元素在 $\mathbb{F}_p^*$ 中「均勻分佈」（它們是 $X^n - 1$ 的 $n$ 個根）。</li>
+      <li><strong>FFT 相容：</strong>在 $H$ 上的多項式求值可通過快速傅立葉變換（數論變換）以 $O(n \log n)$ 完成，而非直接計算的 $O(n^2)$。</li>
+      <li><strong>陪集結構：</strong>對任意 $k \notin H$，陪集 $kH = \{k, k\omega, k\omega^2, \ldots, k\omega^{n-1}\}$ 與 $H$ 不相交且具有相同的代數性質，這對 PLONK 中的複製約束很有用。</li>
+    </ul>
+
+    <h3>單位根上的 Lagrange 基底</h3>
+    <p>
+      當求值域為 $H = \{1, \omega, \omega^2, \ldots, \omega^{n-1}\}$ 時，Lagrange 基底多項式有一個特別優雅的形式。定義：
+    </p>
+    $$L_i(X) = \frac{1}{n} \cdot \frac{\omega^i \cdot (X^n - 1)}{X - \omega^i}$$
+    <p>
+      這些多項式滿足 $L_i(\omega^j) = \delta_{ij}$（Kronecker delta）。此公式使用了兩個關鍵元素：消失多項式 $Z_H(X) = X^n - 1$ 和導數 $Z_H'(\omega^i) = n \cdot \omega^{i(n-1)} = n \cdot \omega^{-i}$。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">單位根上 $L_i$ 的推導</div>
+      <p>一般的 Lagrange 基底為：</p>
+      $$L_i(X) = \prod_{\substack{j=0 \\ j \neq i}}^{n-1} \frac{X - \omega^j}{\omega^i - \omega^j}$$
+      <p>分子為 $\frac{X^n - 1}{X - \omega^i}$（因為 $X^n - 1$ 的根恰好是 $\omega^0, \ldots, \omega^{n-1}$）。分母為：</p>
+      $$\prod_{\substack{j \neq i}} (\omega^i - \omega^j) = Z_H'(\omega^i)$$
+      <p>其中 $Z_H'(X) = nX^{n-1}$ 是 $Z_H(X) = X^n - 1$ 的形式導數。在 $X = \omega^i$ 處求值：</p>
+      $$Z_H'(\omega^i) = n \cdot \omega^{i(n-1)} = n \cdot \omega^{-i}$$
+      <p>（利用 $\omega^{in} = 1$，故 $\omega^{i(n-1)} = \omega^{-i}$）。因此：</p>
+      $$L_i(X) = \frac{X^n - 1}{n \cdot \omega^{-i} \cdot (X - \omega^i)} = \frac{\omega^i(X^n - 1)}{n(X - \omega^i)}$$
+    </div>
+
+    <h3>消失多項式</h3>
+    <p>
+      $H$ 的<strong>消失多項式</strong>為：
+    </p>
+    $$Z_H(X) = \prod_{i=0}^{n-1} (X - \omega^i) = X^n - 1$$
+    <p>
+      恆等式 $\prod_{i=0}^{n-1}(X - \omega^i) = X^n - 1$ 成立，因為 $\omega^0, \omega^1, \ldots, \omega^{n-1}$ 恰好是 $X^n - 1$ 的全部 $n$ 個根。
+    </p>
+    <p>
+      此多項式具有極其簡潔的形式 &mdash; 它是稀疏的（無論 $n$ 多大，只有兩個非零係數）。求值 $Z_H(\alpha) = \alpha^n - 1$ 只需 $O(\log n)$ 次乘法。這種高效性至關重要：驗證者在證明驗證過程中會反覆求值 $Z_H$。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">為何此結構對 PLONK 和 Halo2 至關重要</div>
+      <p>
+        在 PLONK 風格的證明系統中，證明者將整個計算軌跡編碼為在 $H$ 上求值的多項式。電路約束表達為必須對<em>所有 $x \in H$</em> 成立的多項式恆等式。為了證明這一點，證明者需展示約束多項式 $C(X)$ 可被 $Z_H(X)$ 整除：
+      </p>
+      $$C(X) = Q(X) \cdot Z_H(X)$$
+      <p>
+        驗證者在隨機點 $\zeta$ 處檢查（利用 Schwartz-Zippel 引理）：$C(\zeta) \stackrel{?}{=} Q(\zeta) \cdot Z_H(\zeta)$。由於 $Z_H(\zeta) = \zeta^n - 1$ 可以輕易計算，驗證者的工作量與電路規模無關。
+      </p>
+      <p>
+        此外，Lagrange 基底提供了軌跡的「定址方案」：第 $i$ 條線路的值被編碼為求值 $f(\omega^i)$，而 Lagrange 插值通過 FFT/iFFT 在 $O(n \log n)$ 時間內完成「求值表示」（線路值向量）和「係數表示」（多項式係數）之間的轉換。
+      </p>
+    </div>
+
+    <div class="callout example">
+      <div class="callout-title">算例：$\mathbb{F}_{13}$ 中的消失多項式檢查</div>
+      <p>
+        延續上面的例子，$\mathbb{F}_{13}$ 中 $H = \{1, 8, 12, 5\}$，$\omega = 8$，$n = 4$。
+      </p>
+      <p>
+        消失多項式為 $Z_H(X) = X^4 - 1$。驗證 $Z_H$ 在 $H$ 的每個元素上消失：
+      </p>
+      <ul>
+        <li>$Z_H(1) = 1 - 1 = 0$ &#10003;</li>
+        <li>$Z_H(8) = 8^4 - 1 = 4096 - 1 = 4095 \equiv 0 \pmod{13}$（因為 $4095 = 315 \times 13$）&#10003;</li>
+        <li>$Z_H(12) = 12^4 - 1 = 20736 - 1 = 20735$。$20735 / 13 = 1595$。所以 $20735 \equiv 0 \pmod{13}$ &#10003;</li>
+        <li>$Z_H(5) = 5^4 - 1 = 625 - 1 = 624$。$624 / 13 = 48$。所以 $624 \equiv 0 \pmod{13}$ &#10003;</li>
+      </ul>
+      <p>
+        現在假設我們有一個約束多項式 $C(X) = X^2 - X$，想檢查 $C$ 是否在 $H$ 上消失。求值：
+      </p>
+      <ul>
+        <li>$C(1) = 1 - 1 = 0$ &#10003;</li>
+        <li>$C(8) = 64 - 8 = 56 \equiv 4 \pmod{13}$ &#10007;</li>
+      </ul>
+      <p>
+        $C$ 在 $H$ 上<em>不</em>消失（在 $\omega^1 = 8$ 處失敗），所以 $Z_H(X)$ 不整除 $C(X)$，多項式除法會留下非零餘式。驗證者在隨機 $\zeta$ 處檢查 $C(\zeta) \stackrel{?}{=} Q(\zeta) \cdot Z_H(\zeta)$ 將以壓倒性的機率發現此問題。
+      </p>
+    </div>
+
+    <h3>域大小與 FFT</h3>
+    <p>
+      為使基於 FFT 的多項式運算可行，我們需要 $n$ 為 2 的冪次（用於標準的 radix-2 FFT）且 $n \mid (p - 1)$（以確保原始 $n$ 次單位根存在）。這就是為何零知識友好的質數被選為 $p - 1$ 含有大的 2 的冪次因子：
+    </p>
+    <ul>
+      <li><strong>BN254 標量域：</strong> $r - 1$ 含因子 $2^{28}$，允許最大域 $n = 2^{28} \approx 2.7 \times 10^8$（2.68 億個閘）。</li>
+      <li><strong>BLS12-381 標量域：</strong> $r - 1$ 含因子 $2^{32}$，允許最大域 $n = 2^{32} \approx 4.3 \times 10^9$（43 億個閘）。</li>
+    </ul>
+    <p>
+      這些限制決定了證明系統在不拆分為多個證明或使用遞迴的情況下所能處理的最大電路規模。我們將在第五章中詳細探討 FFT。
+    </p>
+
+    <h3>總結：代數管線</h3>
+    <p>
+      綜合以上內容，以下是將計算轉化為可驗證證明的代數管線：
+    </p>
+    <div class="steps">
+      <div class="step">
+        <strong>電路。</strong>計算以標量域 $\mathbb{F}_r$ 上的約束來表達。
+      </div>
+      <div class="step">
+        <strong>多項式。</strong>見證值被編碼為多項式在域 $H = \{1, \omega, \ldots, \omega^{n-1}\} \subset \mathbb{F}_r$ 上的求值。
+      </div>
+      <div class="step">
+        <strong>插值。</strong>FFT（使用 $\mathbb{F}_r$ 中的單位根）以 $O(n \log n)$ 將求值向量轉換為多項式係數。
+      </div>
+      <div class="step">
+        <strong>承諾。</strong>多項式係數通過 $E(\mathbb{F}_p)$（基底域）上的橢圓曲線運算進行承諾。對於 KZG：$\text{Com}(f) = \sum a_i [\tau^i] G_1$，即 $\mathbb{G}_1$ 中的多標量乘法（MSM）。
+      </div>
+      <div class="step">
+        <strong>求值證明。</strong>證明者在挑戰點 $\zeta \in \mathbb{F}_r$ 處打開多項式並提供證明。對於 KZG：證明是單個 $\mathbb{G}_1$ 元素。
+      </div>
+      <div class="step">
+        <strong>驗證。</strong>驗證者使用配對方程檢查求值證明：$e(\text{Com}(f) - [f(\zeta)]G_1, G_2) = e(\pi, [\tau]G_2 - [\zeta]G_2)$，涉及 $\mathbb{F}_p$（座標）和 $\mathbb{F}_r$（標量 $f(\zeta)$）兩個域的運算。
+      </div>
+    </div>
+
+    <div class="callout warning">
+      <div class="callout-title">兩個域同時在運作</div>
+      <p>
+        注意此管線同時涉及 $\mathbb{F}_r$（標量域，用於多項式算術和電路約束）和 $\mathbb{F}_p$（基底域，用於曲線點座標和 MSM）。這種雙域特性就是為何實作必須嚴格注意每個運算處於哪個域中。將本應模 $r$ 約化的地方誤用模 $p$（或反之）會產生無聲的錯誤結果。
+      </p>
+    </div>
+
+    <h2>對本研究的意義</h2>
+    <div class="callout theorem">
+      <div class="callout-title">本章技術如何支撐論文</div>
+      <p>
+        本章的代數結構是論文所有技術的數學基礎。具體而言：
+      </p>
+      <ul>
+        <li><strong>有限域 $\mathbb{F}_p$</strong>：所有定點運算、多項式求值、電路約束都在 Pallas 曲線的標量域上進行（$p \approx 2^{254}$，確切值為 $2^{254} + 45560315531506369815346746415080538113$）。</li>
+        <li><strong>橢圓曲線</strong>：Halo2 使用 Pallas/Vesta 曲線循環。Pallas 曲線 $E(\mathbb{F}_p)$ 的標量域恰好是 Vesta 的基底域，反之亦然——這使得遞迴證明組合成為可能。</li>
+        <li><strong>Schwartz-Zippel 引理</strong>：這是 PLONK/Halo2 健全性證明的核心工具。在我們的多項式方法中，錯誤的計算結果只有 $\leq d/|\mathbb{F}_p|$ 的概率通過驗證——對 254 位域來說，這是可忽略的。</li>
+        <li><strong>Lagrange 基底</strong>：Halo2 中的閘約束在求值域 $H$ 的 Lagrange 基底上表示。</li>
+      </ul>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>代數結構</th><th>在論文中的角色</th><th>具體實例</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>標量域 $\mathbb{F}_r$</td><td>所有電路運算的計算域</td><td>Pallas scalar field, 254 bits</td></tr>
+        <tr><td>基底域 $\mathbb{F}_p$</td><td>曲線點座標，IPA 承諾</td><td>Vesta scalar field = Pallas base field</td></tr>
+        <tr><td>單位根 $\omega$</td><td>定義求值域 $H$，FFT/iFFT 的基礎</td><td>$\omega^{2^k} = 1$ in $\mathbb{F}_r$</td></tr>
+        <tr><td>Lagrange 基底</td><td>多項式插值，閘約束的表示</td><td>$L_i(\omega^j) = \delta_{ij}$</td></tr>
+        <tr><td>Schwartz-Zippel</td><td>隨機點檢查保證健全性</td><td>$\Pr[\text{cheat}] \leq d/|\mathbb{F}_r| \approx 2^{-246}$</td></tr>
+      </tbody>
+    </table>
+
+    <!-- PAGE NAV at bottom -->
+    <div class="page-nav">
+      <a href="index.html">
+        <span class="nav-label">上一章</span>
+        <span class="nav-title">&larr; 首頁</span>
+      </a>
+      <a href="zkp-basics.html">
+        <span class="nav-label">下一章</span>
+        <span class="nav-title">2. ZKP：基礎與性質 &rarr;</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

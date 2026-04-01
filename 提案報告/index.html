@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>碩論提案報告：ZK 電路中超越函數的多項式近似設計方法論</title>
+<style>
+  :root {
+    --primary: #1a365d;
+    --accent: #2b6cb0;
+    --light-bg: #f7fafc;
+    --border: #e2e8f0;
+    --highlight: #ebf8ff;
+    --warn-bg: #fffaf0;
+    --success-bg: #f0fff4;
+    --code-bg: #edf2f7;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Noto Serif TC", "Times New Roman", Georgia, serif;
+    line-height: 1.8;
+    color: #2d3748;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    font-size: 17px;
+  }
+
+  h1 {
+    font-size: 28px;
+    color: var(--primary);
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 12px;
+    margin: 48px 0 24px 0;
+  }
+  h1:first-of-type { margin-top: 0; }
+
+  h2 {
+    font-size: 22px;
+    color: var(--primary);
+    margin: 36px 0 16px 0;
+    padding-left: 12px;
+    border-left: 4px solid var(--accent);
+  }
+
+  h3 {
+    font-size: 18px;
+    color: #4a5568;
+    margin: 24px 0 12px 0;
+  }
+
+  p { margin: 12px 0; }
+
+  .subtitle {
+    font-size: 16px;
+    color: #718096;
+    margin-bottom: 32px;
+  }
+
+  /* 重點框 */
+  .key-insight {
+    background: var(--highlight);
+    border-left: 4px solid var(--accent);
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .key-insight strong { color: var(--accent); }
+
+  .problem-box {
+    background: var(--warn-bg);
+    border-left: 4px solid #ed8936;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  .result-box {
+    background: var(--success-bg);
+    border-left: 4px solid #38a169;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  /* 表格 */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 15px;
+  }
+  th {
+    background: var(--primary);
+    color: white;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:nth-child(even) { background: var(--light-bg); }
+  td.num { text-align: center; font-family: monospace; }
+  td.em { font-weight: bold; color: var(--accent); }
+
+  /* 圖表預留區 */
+  .figure-placeholder {
+    background: var(--code-bg);
+    border: 2px dashed #a0aec0;
+    padding: 24px;
+    margin: 20px 0;
+    text-align: center;
+    border-radius: 8px;
+    color: #718096;
+    font-style: italic;
+  }
+  .figure-placeholder .label {
+    font-weight: bold;
+    color: var(--primary);
+    font-style: normal;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  /* Pipeline 圖 */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 24px 0;
+    flex-wrap: wrap;
+  }
+  .pipeline .step {
+    background: var(--accent);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+    min-width: 120px;
+  }
+  .pipeline .step.ours {
+    background: #2f855a;
+    border: 2px solid #276749;
+  }
+  .pipeline .step.external {
+    background: #a0aec0;
+    color: #2d3748;
+  }
+  .pipeline .arrow {
+    font-size: 24px;
+    color: #a0aec0;
+  }
+
+  /* 比較框 */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .compare .col {
+    padding: 16px;
+    border-radius: 8px;
+  }
+  .compare .before {
+    background: #fff5f5;
+    border: 1px solid #feb2b2;
+  }
+  .compare .after {
+    background: #f0fff4;
+    border: 1px solid #9ae6b4;
+  }
+  .compare .col-title {
+    font-weight: bold;
+    margin-bottom: 8px;
+    font-size: 15px;
+  }
+
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 15px;
+  }
+
+  .math {
+    font-family: "Times New Roman", serif;
+    font-style: italic;
+  }
+
+  .section-num {
+    color: var(--accent);
+    margin-right: 8px;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 40px 0;
+  }
+
+  @media print {
+    body { font-size: 12pt; padding: 0; }
+    .figure-placeholder { break-inside: avoid; }
+    table { break-inside: avoid; }
+    h1 { break-before: page; }
+  }
+  .site-nav {
+    display: flex; flex-wrap: wrap;
+    background: #1a365d; border-radius: 8px; overflow: hidden;
+    margin-bottom: 32px;
+    font-family: -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 14px;
+  }
+  .site-nav a {
+    color: #cbd5e0; text-decoration: none;
+    padding: 10px 18px; transition: background 0.2s;
+  }
+  .site-nav a:hover { background: #2b6cb0; color: #fff; }
+  .site-nav a.active { background: #2b6cb0; color: #fff; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="index.html" class="active">總報告</a>
+  <a href="research-background.html">研究背景</a>
+  <a href="contribution-comparison.html">差異比較</a>
+  <a href="what-we-did.html">技術說明</a>
+</nav>
+
+<!-- ===== 封面 ===== -->
+<div style="text-align:center; padding: 60px 0 40px 0;">
+  <h1 style="border:none; font-size:26px; margin:0;">碩士論文提案報告</h1>
+  <p style="font-size:22px; color:var(--primary); margin:24px 0 8px 0;">
+    ZK 電路中超越函數的多項式近似設計方法論
+  </p>
+  <p style="font-size:16px; color:#718096;">
+    Design Methodology for Polynomial Approximation of<br>
+    Transcendental Functions in Zero-Knowledge Circuits
+  </p>
+  <p style="margin-top:32px; color:#4a5568;">
+    研究生：[姓名]<br>
+    指導教授：[教授姓名]<br>
+    日期：2026 年 3 月
+  </p>
+</div>
+
+<hr>
+
+<!-- ===== 第一章：問題定義 ===== -->
+<h1><span class="section-num">1</span>問題定義</h1>
+
+<h2>1.1 什麼是零知識證明？為什麼跟數學函數有關？</h2>
+
+<p>
+  零知識證明 (Zero-Knowledge Proof, ZKP) 讓一方（證明者）向另一方（驗證者）證明
+  「我知道某個計算的結果」，但不洩漏計算過程中的任何秘密資訊。
+</p>
+
+<p>
+  實際應用場景：
+</p>
+<ul style="margin:12px 0 12px 24px;">
+  <li><b>隱私機器學習推論</b>：模型擁有者證明「我用這個模型對你的資料做了推論，結果是 X」，但不洩漏模型參數</li>
+  <li><b>DeFi / 金融</b>：證明「我的資產滿足某個條件」，但不公開具體數字</li>
+  <li><b>可驗證計算</b>：雲端伺服器證明「計算結果確實正確」，客戶端不需要重新計算</li>
+</ul>
+
+<p>
+  這些應用中，模型推論需要計算<b>啟動函數</b> (activation functions)，例如：
+</p>
+
+<table>
+  <tr><th>函數</th><th>用途</th><th>數學定義</th></tr>
+  <tr><td>exp(<span class="math">x</span>)</td><td>Softmax, 注意力機制</td><td><span class="math">e<sup>x</sup></span></td></tr>
+  <tr><td>ln(1+<span class="math">x</span>)</td><td>對數損失, 特徵轉換</td><td>自然對數</td></tr>
+  <tr><td>erf(<span class="math">x</span>)</td><td>GELU 啟動函數的核心</td><td><span class="math">(2/&radic;&pi;) &int; e<sup>-t&sup2;</sup>dt</span></td></tr>
+  <tr><td>GELU(<span class="math">x</span>)</td><td>Transformer 標準啟動函數</td><td><span class="math">x &middot; &Phi;(x)</span>，其中 &Phi; 涉及 erf</td></tr>
+</table>
+
+<h2>1.2 問題的核心：ZK 電路沒有浮點數</h2>
+
+<p>
+  ZK 電路在<b>有限域</b> (finite field) 上運算。以 BN254 曲線為例，所有計算都在一個
+  約 254 位元的質數域 <span class="math">F<sub>p</sub></span> 中進行，其中
+  <span class="math">p</span> &approx; 2<sup>254</sup>。
+</p>
+
+<div class="problem-box">
+  <strong>核心困難：</strong>有限域只支援整數的加法和乘法。沒有浮點數、沒有除法（只有乘法逆元）、沒有 <code>math.exp()</code>。
+  要在這樣的環境中計算 exp, ln, erf，需要把這些函數「翻譯」成只用整數加法和乘法的形式。
+</div>
+
+<h2>1.3 現有做法及其問題</h2>
+
+<h3>做法一：查表法 (Lookup Table)</h3>
+<p>
+  最直觀的方法：預先計算所有可能的 (輸入, 輸出) 對，存成一張表。
+  電路中只需要一次查表 (lookup) 就能得到結果。
+</p>
+
+<div class="compare">
+  <div class="col after">
+    <div class="col-title">優點</div>
+    <ul style="margin-left:16px;">
+      <li>精度完美 (ULP = 0)</li>
+      <li>電路結構簡單（1 次查表）</li>
+    </ul>
+  </div>
+  <div class="col before">
+    <div class="col-title">問題</div>
+    <ul style="margin-left:16px;">
+      <li>表格巨大：16-bit 精度需要 <b>65,536</b> 筆</li>
+      <li>每個函數需要各自的表</li>
+      <li>證明時間 ~1,200 ms（表格載入成本高）</li>
+    </ul>
+  </div>
+</div>
+
+<h3>做法二：Taylor 多項式</h3>
+<p>
+  用 Taylor 級數在某一點展開，取有限項作為近似。
+  例如 <span class="math">e<sup>x</sup> - 1 &approx; x + x&sup2;/2 + x&sup3;/6 + x<sup>4</sup>/24 + x<sup>5</sup>/120</span>。
+</p>
+
+<div class="compare">
+  <div class="col after">
+    <div class="col-title">優點</div>
+    <ul style="margin-left:16px;">
+      <li>只需 256-entry 的輔助表（byte range check）</li>
+      <li>電路結構通用</li>
+    </ul>
+  </div>
+  <div class="col before">
+    <div class="col-title">問題</div>
+    <ul style="margin-left:16px;">
+      <li>精度差：exp 的 max ULP = 12</li>
+      <li>ln 更慘：max ULP = <b>762</b></li>
+      <li>erf 最慘：max ULP = <b>1,467</b></li>
+      <li>Taylor 在展開點附近精確，但遠離展開點時誤差快速增長</li>
+    </ul>
+  </div>
+</div>
+
+<h2>1.4 我們的目標</h2>
+
+<div class="key-insight">
+  <strong>研究問題：</strong>
+  能不能設計一個方法，用跟 Taylor 一樣小的表 (256 entries)，但精度接近查表法？
+  而且這個方法要能<b>推廣至 13 個函數</b>（exp、ln、sin、erf、GELU、sigmoid 等）？
+</div>
+
+<p><b>答案是可以的。</b>下表比較達到 ULP &le; 1（最高精度）所需的<b>最低多項式次數 d*</b>（pp=16，同一 Halo2 Horner 電路，只換係數）：</p>
+<table>
+  <tr><th>函數</th><th>區間</th><th>Minimax d*</th><th>Taylor d*</th><th>節省</th></tr>
+  <tr><td>exp(x)-1</td><td>[0, ln2)</td><td class="num em">4</td><td class="num">7</td><td class="num">3 次</td></tr>
+  <tr><td>ln(1+x)</td><td>[0, ln2)</td><td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td><td class="num">—</td></tr>
+  <tr><td>sin(x)</td><td>[0, &pi;/4]</td><td class="num em">4</td><td class="num">7</td><td class="num">3 次</td></tr>
+  <tr><td>1-cos(x)</td><td>[0, &pi;/4]</td><td class="num em">4</td><td class="num">6</td><td class="num">2 次</td></tr>
+  <tr><td>tan(x)</td><td>[0, &pi;/4]</td><td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td><td class="num">—</td></tr>
+  <tr><td>arctan(x)</td><td>[0, tan(&pi;/8)]</td><td class="num em">4</td><td class="num">9</td><td class="num">5 次</td></tr>
+  <tr><td>arcsin(x)</td><td>[0, 0.5]</td><td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td><td class="num">—</td></tr>
+  <tr><td>erf(x)</td><td>[0, 1]</td><td class="num em">6</td><td class="num" style="color:#e53e3e;">&gt;9</td><td class="num">—</td></tr>
+  <tr><td>sigmoid(x)</td><td>[0, 1]</td><td class="num em">4</td><td class="num">9</td><td class="num">5 次</td></tr>
+  <tr><td>GELU(x)</td><td>[0, 1]</td><td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td><td class="num">—</td></tr>
+  <tr><td>sinh(x)</td><td>[0, ln2)</td><td class="num em">4</td><td class="num">7</td><td class="num">3 次</td></tr>
+  <tr><td>1-exp(-x)</td><td>[0, 1]</td><td class="num em">5</td><td class="num">7</td><td class="num">2 次</td></tr>
+  <tr><td>1-exp(-x&sup2;)</td><td>[0, 1]</td><td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td><td class="num">—</td></tr>
+</table>
+<p style="font-size:14px; color:#718096;">
+  d* = 達到 ULP &le; 1 的最低多項式次數（d = 3&ndash;9 搜索）。<b>6/13 函數</b>（<span style="color:#e53e3e;">紅色</span>）Taylor 在 d &le; 9 內完全無法達到 ULP &le; 1。
+  跨 4 個 pp 值（16/20/24/28）共 52 組配置中，<b>32 組</b> Taylor 無法達標，
+  <b>16 組</b>兩者達標（Minimax 平均節省 <b>3.0 次</b>），<b>4 組</b>兩者均失敗（tan/erf/1-exp(-x&sup2;) 在高 pp），<b>0 組</b> Taylor 優於 Minimax。
+</p>
+
+<hr>
+
+<!-- ===== 第二章：背景技術 ===== -->
+<h1><span class="section-num">2</span>背景技術</h1>
+
+<h2>2.1 零知識證明中的算術電路</h2>
+
+<p>
+  ZK 證明系統（如 PLONK、Halo2）將計算表達為<b>算術電路</b>：由加法門 (addition gates)
+  和乘法門 (multiplication gates) 組成的有向無環圖。電路的每條「線」(wire) 攜帶一個
+  有限域 <span class="math">F<sub>p</sub></span> 中的元素。
+</p>
+
+<p>電路有兩種輸入：</p>
+<ul style="margin:12px 0 12px 24px;">
+  <li><b>Public input</b>：驗證者知道的值（例如：函數輸出）</li>
+  <li><b>Private input (witness)</b>：只有證明者知道的值（例如：中間計算步驟）</li>
+</ul>
+
+<p>
+  <b>Lookup argument</b>（查表論證）是現代 ZK 系統的重要功能：
+  允許電路宣稱「某個值存在於某張預定義的表格中」。這讓我們可以用查表來替代複雜的
+  算術約束。例如：驗證一個值在 [0, 255] 範圍內，用 lookup 比用 8 個 bit 約束更高效。
+</p>
+
+<h2>2.2 有限域中的固定點算術</h2>
+
+<h3>為什麼需要固定點？</h3>
+<p>
+  有限域只有整數。要表達小數（例如 ln(1.5) = 0.405...），我們使用<b>固定點表示法</b>：
+  選定一個<b>縮放因子</b> <span class="math">S = 2<sup>pp</sup></span>，其中
+  <span class="math">pp</span> 是精度參數 (precision parameter)。
+</p>
+<p>
+  以 <span class="math">pp = 16, S = 65536</span> 為例：
+</p>
+<table>
+  <tr><th>真實值</th><th>固定點表示</th><th>計算方式</th></tr>
+  <tr><td>0.5</td><td class="num">32,768</td><td>0.5 &times; 65,536</td></tr>
+  <tr><td>0.693 (= ln2)</td><td class="num">45,426</td><td>0.6931... &times; 65,536 取整</td></tr>
+  <tr><td>0.843 (= erf(1))</td><td class="num">55,227</td><td>0.8427... &times; 65,536 取整</td></tr>
+  <tr><td>1.0</td><td class="num">65,536</td><td>= S（超出 16-bit 範圍）</td></tr>
+</table>
+
+<h3>精度指標：ULP (Unit in the Last Place)</h3>
+<p>
+  ULP 是固定點算術中的標準精度指標：
+</p>
+<div class="key-insight">
+  <strong>ULP 定義：</strong>
+  ULP(<span class="math">R</span>) = |<span class="math">w</span><sub>circuit</sub> &minus;
+  <span class="math">w</span><sub>reference</sub>|<br>
+  其中 <span class="math">w</span><sub>reference</sub> = round(<span class="math">f</span>(<span class="math">R/S</span>) &times; <span class="math">S</span>)
+  是理想的固定點結果。<br><br>
+  ULP = 0 表示完美精度；ULP = 1 表示差了最小刻度的 1 格；
+  <span class="math">pp</span> = 16 時，ULP = 1 相當於約 15 bits 的有效精度。
+</div>
+
+<h3>截斷問題 (Truncation)</h3>
+<p>
+  固定點乘法會產生「多餘的精度」。例如兩個 <span class="math">pp</span>=16 的數相乘：
+</p>
+<p style="text-align:center; font-family:monospace; font-size:15px;">
+  (a &times; S) &times; (b &times; S) = ab &times; S&sup2;
+</p>
+<p>
+  結果的 scale 變成 <span class="math">S&sup2;</span>，需要除以 <span class="math">S</span>
+  才能回到正確的 scale。在有限域中，這個「除以 S」的操作稱為<b>截斷</b> (truncation)：
+</p>
+<p style="text-align:center; font-family:monospace; font-size:15px;">
+  result = (a &times; b &times; S&sup2;) / S = ab &times; S + remainder
+</p>
+<p>
+  截斷會丟失 remainder（餘數），這是固定點算術的精度損失來源之一。
+</p>
+
+<h2>2.3 多項式近似</h2>
+
+<h3>Taylor 級數：在一點展開</h3>
+<p>
+  Taylor 級數在 <span class="math">x = 0</span> 處展開函數，取前 <span class="math">d</span>
+  項作為近似：
+</p>
+<p style="text-align:center;">
+  <span class="math">e<sup>x</sup> &minus; 1 &approx; x + x&sup2;/2! + x&sup3;/3! + x<sup>4</sup>/4! + x<sup>5</sup>/5!</span>
+</p>
+<p>
+  Taylor 的特性：<b>在展開點 (x=0) 附近非常精確，但隨著 x 遠離展開點，誤差快速增長。</b>
+  更精確地說，Taylor 最小化的是<b>局部</b>誤差（高階導數），不是整個區間上的最大誤差。
+</p>
+
+<h3>Minimax 近似：最小化最大誤差</h3>
+<p>
+  Minimax（也稱 L&infin; 最優）近似找到的是在整個區間 [<span class="math">a, b</span>]
+  上<b>最大誤差最小</b>的多項式：
+</p>
+<p style="text-align:center;">
+  <span class="math">P</span>* = argmin<sub><span class="math">P</span></sub>
+  max<sub><span class="math">x</span>&isin;[<span class="math">a,b</span>]</sub>
+  |<span class="math">f(x) &minus; P(x)</span>|
+</p>
+
+<div class="compare">
+  <div class="col before">
+    <div class="col-title">Taylor（局部最優）</div>
+    <p>在 x=0 完美，在區間邊緣誤差大</p>
+    <p style="text-align:center; font-size:14px; font-family:monospace;">
+      誤差分佈：[小 小 小 中 大 大 大]
+    </p>
+  </div>
+  <div class="col after">
+    <div class="col-title">Minimax（全域最優）</div>
+    <p>誤差在整個區間上均勻分佈（等振盪 equioscillation）</p>
+    <p style="text-align:center; font-size:14px; font-family:monospace;">
+      誤差分佈：[中 中 中 中 中 中 中]
+    </p>
+  </div>
+</div>
+
+<figure style="margin:24px 0; text-align:center;">
+  <img src="figures/fig1_taylor_vs_minimax.svg" alt="Taylor vs Minimax ULP comparison for exp(x)-1" style="width:100%; max-width:800px;">
+  <figcaption style="font-size:14px; color:#718096; margin-top:8px;">
+    圖 1：exp(x)-1 在 [0, ln2) 上的 ULP 誤差比較。Taylor（紅）在區間邊緣誤差暴增至 12，Minimax（藍）始終 &le; 1。
+  </figcaption>
+</figure>
+
+<div class="key-insight">
+  <strong>為什麼 Minimax 天然適合 ZK：</strong>
+  ZK 電路的精度指標是 <b>max ULP</b>（最壞情況），這正好是 L&infin; norm。
+  Taylor 最小化的是局部誤差，但 ZK 需要的是全域最壞情況保證。
+  Minimax 直接最小化我們關心的指標。
+</div>
+
+<p>
+  <b>Remez 演算法</b>是計算 Minimax 多項式的標準方法。輸入函數和區間，
+  輸出最優的多項式係數。這是一個成熟的數值方法（1934 年提出），
+  在 FHE（全同態加密）領域已廣泛使用。ZKFixedPointChip 也使用了 Minimax（via lolremez），但缺乏正式誤差分析和 Taylor 基線對照。
+</p>
+
+<h2>2.4 Horner 求值法</h2>
+
+<p>
+  Horner's method 是 sequential 多項式求值中乘法次數最少的方式（d 次，理論下界）。對於
+  <span class="math">P(x) = c<sub>5</sub>x<sup>5</sup> + c<sub>4</sub>x<sup>4</sup> + ... + c<sub>1</sub>x</span>：
+</p>
+<p style="text-align:center; font-family:monospace; font-size:15px;">
+  P(x) = ((((c<sub>5</sub> &middot; x + c<sub>4</sub>) &middot; x + c<sub>3</sub>) &middot; x + c<sub>2</sub>) &middot; x + c<sub>1</sub>) &middot; x
+</p>
+
+<p>
+  每一步只需要<b>一次乘法 + 一次加法</b>。<span class="math">d</span> 次多項式只需要 <span class="math">d</span> 步 Horner iteration。
+  在 ZK 電路中，每一步對應一個 <b>Horner gate</b>（算術約束）：
+</p>
+<p style="text-align:center; font-family:monospace; font-size:15px; background:var(--code-bg); padding:12px; border-radius:8px;">
+  acc<sub>next</sub> = acc<sub>current</sub> &times; R + D<sub>i</sub>
+</p>
+<p>
+  其中 <span class="math">R</span> 是輸入（固定點表示），
+  <span class="math">D<sub>i</sub></span> 是預先計算好的係數常數。
+</p>
+
+<h2>2.5 現有的查表方法</h2>
+
+<h3>Method A：直接查表 (Direct Lookup)</h3>
+<p>
+  預計算完整的 (R, w) 表格。R 是輸入，w = round(f(R/S) &times; S) 是對應的輸出。
+  表格大小 = S = 65,536 筆。電路中一次 lookup 搞定。
+</p>
+<p><b>精度：ULP = 0（完美）</b>，但表格巨大，prove time ~1,200 ms。</p>
+
+<h3>Method B：分塊查表 (Chunk Decomposition)</h3>
+<p>
+  利用 exp 的代數性質 <span class="math">e<sup>a+b</sup> = e<sup>a</sup> &times; e<sup>b</sup></span>，
+  將輸入拆成高低位元組查兩張小表，再乘起來。表格只需 768 筆。
+</p>
+
+<div class="problem-box">
+  <strong>Method B 的限制：</strong>
+  只適用於 exp。ln 的對應性質 ln(a&times;b) = ln(a) + ln(b) 無法用在加法輸入上。
+  erf 完全沒有類似的分解性質。<br>
+  <b>對於 ln 和 erf，多項式近似是唯一的小表方案。</b>
+</div>
+
+<h2>2.6 多項式逼近法的標準 Pipeline</h2>
+
+<p>
+  在進入第三章之前，先整理一下：如果要在 ZK 電路中用多項式近似來計算一個函數，
+  <b>標準流程是什麼？</b>以下 6 個步驟，就是我們第三章所有改進的基底。
+</p>
+
+<figure style="margin:24px 0; text-align:center;">
+  <img src="figures/fig7_poly_pipeline.svg" alt="Polynomial approximation standard pipeline" style="width:100%; max-width:900px;">
+  <figcaption style="font-size:14px; color:#718096; margin-top:8px;">
+    圖 7：多項式逼近法的標準 Pipeline。上排為離線設計階段（只做一次），下排為電路內執行階段（每次 prove 都跑）。
+  </figcaption>
+</figure>
+
+<h3>離線設計階段（只做一次）</h3>
+<table>
+  <tr><th>步驟</th><th>做什麼</th><th>輸入 &rarr; 輸出</th><th>例子</th></tr>
+  <tr>
+    <td><b>Step 1</b><br>選定區間</td>
+    <td>決定多項式要逼近的範圍 [<span class="math">a, b</span>)</td>
+    <td>函數特性 + range reduction 策略 &rarr; 區間</td>
+    <td>exp: [0, ln2)，ln: [0, ln2)，erf: [0, 1]</td>
+  </tr>
+  <tr>
+    <td><b>Step 2</b><br>求最優係數</td>
+    <td>用 Remez 演算法求 Minimax 多項式</td>
+    <td>函數 + 區間 + degree &rarr; 浮點係數 <span class="math">c<sub>1</sub>...c<sub>d</sub></span></td>
+    <td>exp 的 <span class="math">c<sub>1</sub></span> &approx; 0.999983</td>
+  </tr>
+  <tr>
+    <td><b>Step 3</b><br>量化為整數</td>
+    <td>把浮點係數乘以 <span class="math">S</span> 的某次方，取整為大整數</td>
+    <td><span class="math">c<sub>i</sub></span> &rarr; <span class="math">D<sub>i</sub></span> = round(<span class="math">c<sub>i</sub></span> &times; <span class="math">S<sup>d+1-i</sup></span>)</td>
+    <td>exp 的 <span class="math">D<sub>1</sub></span> &approx; 1.2 &times; 10<sup>24</sup>（~80 bits）</td>
+  </tr>
+</table>
+
+<h3>電路內執行階段（每次 prove 都跑）</h3>
+<table>
+  <tr><th>步驟</th><th>做什麼</th><th>電路 constraint</th><th>為什麼需要</th></tr>
+  <tr>
+    <td><b>Step 4</b><br>Horner 求值</td>
+    <td>用 Horner's method 逐步計算 <span class="math">P(R)</span></td>
+    <td><span class="math">acc<sub>next</sub></span> = <span class="math">acc</span> &times; <span class="math">R</span> + <span class="math">D<sub>i</sub></span>（重複 <span class="math">d</span> 次）</td>
+    <td>這是「算出答案」的核心步驟</td>
+  </tr>
+  <tr>
+    <td><b>Step 5</b><br>截斷</td>
+    <td>從 <span class="math">P(R)</span> 取出最終結果 <span class="math">w</span></td>
+    <td><span class="math">P(R)</span> = <span class="math">w</span> &times; <span class="math">S<sup>d</sup></span> + rem，且 rem &lt; <span class="math">S<sup>d</sup></span></td>
+    <td>Step 3 預乘的 <span class="math">S</span> 要除回來</td>
+  </tr>
+  <tr>
+    <td><b>Step 6</b><br>範圍驗證</td>
+    <td>確認輸入 <span class="math">R</span> 和輸出 <span class="math">w</span> 都在合法範圍</td>
+    <td><span class="math">R</span> = <span class="math">r<sub>lo</sub></span> + <span class="math">r<sub>hi</sub></span> &times; 256（byte decomp + lookup）<br>
+        <span class="math">w</span> = <span class="math">w<sub>lo</sub></span> + <span class="math">w<sub>hi</sub></span> &times; 256（byte decomp + lookup）</td>
+    <td>ZK 中沒有型別系統，prover 可以填任意 <span class="math">F<sub>p</sub></span> 值。<br>
+        不做檢查 = prover 可以作弊</td>
+  </tr>
+</table>
+
+<div class="key-insight">
+  <strong>為什麼 Step 6 是必要的？</strong>
+  在一般程式中，變數的範圍由型別系統保證（uint16 不可能超過 65535）。
+  但 ZK 電路的所有值都是有限域 <span class="math">F<sub>p</sub></span> 的元素（0 到 <span class="math">p</span>-1，約 254 bits）。
+  Prover 填 witness 時<b>沒有任何東西阻止他填一個不合理的值</b>——例如 R = 100,000。
+  如果不做 byte decomposition + lookup 檢查，電路不會發現這個作弊。
+</div>
+
+<p>
+  <b>第三章的改進就是針對這 6 個步驟中的 3 個做最佳化：</b>
+</p>
+
+<table>
+  <tr><th>步驟</th><th>傳統做法</th><th>我們的改進</th><th>效果</th></tr>
+  <tr><td>Step 2</td><td>Taylor 係數</td><td class="em">Minimax (Remez) 係數</td><td>精度改善 12x (exp)</td></tr>
+  <tr><td>Step 5</td><td>每步截斷 (Per-step)</td><td class="em">Deferred Truncation</td><td>精度改善 2&times;&ndash;7&times;</td></tr>
+  <tr><td>Step 6</td><td>無範圍驗證（不安全）</td><td class="em">ExplicitRC：gap decomposition</td><td>確定性安全</td></tr>
+</table>
+
+<hr>
+
+<!-- ===== 第三章：我們的方法 ===== -->
+<h1><span class="section-num">3</span>我們的方法：四步設計方法論</h1>
+
+<p>
+  我們的方法是對第二章背景技術的<b>四步設計</b>，每一步都針對一個具體問題：
+</p>
+
+<table>
+  <tr><th>步驟</th><th>改進什麼</th><th>背景技術的問題</th><th>我們的解法</th></tr>
+  <tr><td>Step 1</td><td>區間選擇 + ExplicitRC</td><td>需要驗證 R &le; R_MAX</td><td>Gap decomposition，確定性安全</td></tr>
+  <tr><td>Step 2</td><td>Minimax 係數</td><td>Taylor 精度差</td><td>Remez 最優多項式</td></tr>
+  <tr><td>Step 3</td><td>Deferred Truncation</td><td>每步截斷累積誤差</td><td>利用大域一次截斷</td></tr>
+  <tr><td>Step 4</td><td>通用 Horner Kernel</td><td>每個函數各自設計電路</td><td>同一電路，只換係數</td></tr>
+</table>
+
+<h2>3.1 Step 1: 區間選擇 + 輸入範圍驗證</h2>
+
+<h3>區間設計準則</h3>
+<p>
+  多項式近似在<b>越窄的區間上精度越好</b>。但區間越窄，覆蓋的輸入範圍越小，
+  可能需要額外的 range reduction 電路。我們依據四項設計準則選擇區間：
+</p>
+
+<table>
+  <tr><th>準則</th><th>要求</th><th>原因</th></tr>
+  <tr><td>C1: 零錨點</td><td><span class="math">f</span>(<span class="math">a</span>) = 0</td><td>消除常數項 c<sub>0</sub>，Horner 少算一步</td></tr>
+  <tr><td>C2: 輸出有界</td><td><span class="math">f</span>(<span class="math">x</span>) &isin; [0, 1)</td><td>輸出 <span class="math">w</span> 可用 2 bytes 表示（w &lt; S = 2<sup>pp</sup>）</td></tr>
+  <tr><td>C3: 光滑可逼近</td><td>區間內無奇異點</td><td>多項式近似收斂的前提</td></tr>
+  <tr><td>C4: 標準歸約區間</td><td>配合已知 range reduction</td><td>例如 ln 用 [0, ln2)，配合 x = 2<sup>k</sup>&middot;m 的分解</td></tr>
+</table>
+
+<p>
+  準則 C1（零錨點）尤其重要：當 <span class="math">f</span>(<span class="math">a</span>) = 0 時，
+  多項式常數項 c<sub>0</sub> = 0，Horner 求值少一步乘法。13 個函數中 12 個天然滿足此條件
+  （例如 exp(x)&minus;1 在 x=0 處為零），1-cos(x) 透過恆等式轉換後也滿足。
+</p>
+
+<table>
+  <tr><th>函數</th><th>窄區間</th><th>ULP</th><th>寬區間</th><th>ULP</th><th>精度代價</th></tr>
+  <tr><td>ln(1+x)</td><td>[0, ln2) &approx; [0, 0.693)</td><td class="num em">1</td><td>[0, e-1) &approx; [0, 1.718)</td><td class="num">9</td><td class="num">9x worse</td></tr>
+  <tr><td>erf(x)</td><td>[0, 1]</td><td class="num em">3</td><td>[0, 2)</td><td class="num">20</td><td class="num">6.7x worse</td></tr>
+</table>
+
+<p>我們選擇窄區間，優先保證精度。完整的 13 函數區間列表見 &sect;4 表格。</p>
+
+<h3>輸入範圍驗證：ExplicitRC（gap decomposition）</h3>
+
+<p>
+  <b>問題</b>：ZK 電路中的值都是有限域 F<sub>p</sub> 的元素。Prover 提供的輸入 R 可能超出設計範圍
+  [0, R_MAX]，導致多項式<b>外推</b>（extrapolation）而非近似——產生看似合法但錯誤的結果。
+</p>
+
+<p>
+  <b>解法</b>：ExplicitRC 用一個 gate 驗證 R &le; R_MAX。核心約束：
+</p>
+
+<div class="key-insight">
+  <strong>ExplicitRC 約束：</strong><br>
+  <code>gap_lo + gap_hi &times; 256 + R = R_MAX</code><br><br>
+  其中 gap_lo, gap_hi 各做 byte lookup（重用已有的 256-entry ByteTable）。<br>
+  <b>安全性（確定性）</b>：若 R &gt; R_MAX，則 gap = R_MAX &minus; R 在 F<sub>p</sub> 中 wrap around 為一個極大數
+  （約 2<sup>254</sup>），無法分解為兩個 byte。不依賴任何機率論證。
+</div>
+
+<div class="pipeline">
+  <div class="step external">輸入 R</div>
+  <div class="arrow">&rarr;</div>
+  <div class="step ours">ExplicitRC<br>R &le; R_MAX?</div>
+  <div class="arrow">&rarr;</div>
+  <div class="step ours">Horner 求值<br>P(R) = w&middot;S<sup>d</sup> + rem</div>
+  <div class="arrow">&rarr;</div>
+  <div class="step external">輸出 w</div>
+</div>
+
+<p>
+  ExplicitRC 的代價是 +1 gate（相對於不做任何範圍檢查的版本），但提供<b>確定性安全保證</b>，
+  且不增加 lookup 數量（gap_lo, gap_hi 重用 ByteTable）。
+</p>
+
+<div class="problem-box">
+  <strong>設計探索附註：</strong>
+  我們曾探索一種替代方案 ORV（Output Range Verification），利用多項式的單調性做隱式輸入驗證，
+  理論上可省 1 gate。但分析發現 7/13 函數的輸出上界 w_max &lt; S&minus;1，
+  存在安全缺口（最嚴重案例：arcsin，1,043 ULP 錯誤）。
+  ExplicitRC 以微小代價提供確定性安全，因此全面採用。詳見 &sect;4.1 Ablation 3。
+</div>
+
+<h2>3.2 Step 2: Minimax 係數取代 Taylor</h2>
+
+<p>
+  這是<b>對 §2.3 Taylor 的直接改進</b>。電路結構完全相同（都是 Horner 求值），
+  唯一的差異是把 Taylor 係數換成 Minimax（Remez 最優）係數。
+</p>
+
+<h3>為什麼改善這麼大？</h3>
+<p>
+  以 ln(1+x) 為例，Taylor 的 5 次展開：
+</p>
+<p style="text-align:center;">
+  <span class="math">ln(1+x) &approx; x &minus; x&sup2;/2 + x&sup3;/3 &minus; x<sup>4</sup>/4 + x<sup>5</sup>/5</span>
+</p>
+<p>
+  這些係數 (1, -1/2, 1/3, -1/4, 1/5) 是由 ln 在 x=0 的導數決定的。
+  它們是<b>數學上固定的</b>，完全沒有考慮區間 [0, ln2) 的特性。
+</p>
+<p>
+  Minimax 的係數是針對區間 [0, ln2) <b>最佳化</b>出來的，允許在 x=0 附近稍微
+  犧牲精度，換取區間邊緣的大幅改善。結果：
+</p>
+
+<div class="result-box">
+  <strong>達到 ULP &le; 1 所需的最低多項式次數 d*（d = 3&ndash;9 搜索，同一 Halo2 Horner 電路，只換係數）：</strong><br>
+  <table>
+    <tr>
+      <th rowspan="2">函數</th><th rowspan="2">區間</th>
+      <th colspan="2">pp=16</th><th colspan="2">pp=20</th>
+      <th colspan="2">pp=24</th><th colspan="2">pp=28</th>
+    </tr>
+    <tr>
+      <th>MM</th><th>TL</th><th>MM</th><th>TL</th>
+      <th>MM</th><th>TL</th><th>MM</th><th>TL</th>
+    </tr>
+    <tr><td>exp(x)-1</td><td>[0, ln2)</td>
+      <td class="num em">4</td><td class="num">7</td>
+      <td class="num em">5</td><td class="num">8</td>
+      <td class="num em">6</td><td class="num">9</td>
+      <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+    </tr>
+    <tr><td>ln(1+x)</td><td>[0, ln2)</td>
+      <td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">6</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">9</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+    </tr>
+    <tr><td>sin(x)</td><td>[0, &pi;/4]</td>
+      <td class="num em">4</td><td class="num">7</td>
+      <td class="num em">5</td><td class="num">7</td>
+      <td class="num em">6</td><td class="num">9</td>
+      <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+    </tr>
+    <tr><td>1-cos(x)</td><td>[0, &pi;/4]</td>
+      <td class="num em">4</td><td class="num">6</td>
+      <td class="num em">5</td><td class="num">8</td>
+      <td class="num em">6</td><td class="num">8</td>
+      <td class="num em">6</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+    </tr>
+    <tr><td>tan(x)</td><td>[0, &pi;/4]</td>
+      <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">8</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num" style="color:#e53e3e;">&gt;9</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num" style="color:#e53e3e;">&gt;9</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+    </tr>
+    <tr><td>arctan(x)</td><td>[0, tan(&pi;/8)]</td>
+      <td class="num em">4</td><td class="num">9</td>
+      <td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">6</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">8</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+    </tr>
+    <tr><td>arcsin(x)</td><td>[0, 0.5]</td>
+      <td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">6</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">9</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+    </tr>
+    <tr><td>erf(x)</td><td>[0, 1]</td>
+      <td class="num em">6</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">8</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">9</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num" style="color:#e53e3e;">&gt;9</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+    </tr>
+    <tr><td>sigmoid(x)</td><td>[0, 1]</td>
+      <td class="num em">4</td><td class="num">9</td>
+      <td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">6</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+    </tr>
+    <tr><td>GELU(x)</td><td>[0, 1]</td>
+      <td class="num em">5</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">9</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+    </tr>
+    <tr><td>sinh(x)</td><td>[0, ln2)</td>
+      <td class="num em">4</td><td class="num">7</td>
+      <td class="num em">5</td><td class="num">7</td>
+      <td class="num em">5</td><td class="num">9</td>
+      <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+    </tr>
+    <tr><td>1-exp(-x)</td><td>[0, 1]</td>
+      <td class="num em">5</td><td class="num">7</td>
+      <td class="num em">6</td><td class="num">9</td>
+      <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+    </tr>
+    <tr><td>1-exp(-x&sup2;)</td><td>[0, 1]</td>
+      <td class="num em">7</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">8</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num em">9</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+      <td class="num" style="color:#e53e3e;">&gt;9</td><td class="num" style="color:#e53e3e;">&gt;9</td>
+    </tr>
+  </table>
+  <p style="font-size:14px; color:#718096; margin-top:8px;">
+    d* = 達到 ULP &le; 1 的最低多項式次數。MM = Minimax, TL = Taylor。
+    52 組配置中：<b>32 組</b> Minimax 達標但 Taylor 無法（<span style="color:#e53e3e;">紅色</span>），
+    <b>16 組</b>兩者均達標但 Minimax 平均節省 <b>3.0 次</b>，
+    <b>0 組</b> Taylor 優於 Minimax。
+  </p>
+</div>
+
+<h3>d* 差距的根本原因</h3>
+
+<p>
+  為什麼 Taylor 在多數配置中無法達到 ULP&le;1？兩個<b>結構性原因</b>解釋了這個系統性差距：
+</p>
+
+<p>
+  <b>原因一：對稱零項浪費係數。</b>
+  奇函數的 Taylor 展開只含奇數次項——偶數次係數恆為零。
+  一個 degree-5 的 Taylor 多項式實際只使用 3 個非零項（d<sub>eff</sub> = 3），
+  而 Minimax 的 5 個係數全部是自由參數。
+  收斂快的奇函數（sin, sinh）靠 1/n! 衰減仍可在 d&le;9 達標，但
+  收斂慢的奇函數（erf, arcsin, tan）則被推至 d*&gt;9。
+  例如 arctan 在 pp=16 時，Minimax d*=4 而 Taylor d*=9——差距 5 次主要來自零項浪費。
+</p>
+
+<p>
+  <b>原因二：收斂緩慢或收斂半徑不足。</b>
+  ln(1+x) 的 Taylor 係數僅以 1/n 衰減（非 1/n!），
+  sigmoid 的收斂半徑僅 &pi; &approx; 3.14，
+  erf 等複合函數的高階係數衰減受限於內層函數結構。
+  不具對稱性的 ln、GELU、1-exp(-x&sup2;) 同樣因收斂不足而在所有 pp 值下 d*&gt;9。
+  6/13 無法達標的函數各受至少一個原因（部分兩者兼具）的強烈影響。
+</p>
+
+<div class="key-insight">
+  <strong>關鍵洞見：</strong>
+  兩個結構性原因解釋了 6/13 函數的 Taylor d* &gt; 9：
+  (1) 對稱零項浪費一半係數，(2) 收斂緩慢或收斂半徑不足。
+  每個無法達標的函數至少受其一影響（erf、arcsin、tan 兩者兼具）。
+  Minimax 避開了這兩個限制——所有係數均為自由參數，不受 Taylor 結構約束。
+</div>
+
+<h3>電路成本影響</h3>
+
+<p>
+  多項式次數直接決定 Horner 電路的大小。以 sigmoid pp=16 為例：
+</p>
+
+<table>
+  <tr><th>Metric</th><th>d=4 (Minimax d*)</th><th>d=9 (Taylor, 仍 ULP&gt;1)</th><th>節省</th></tr>
+  <tr><td>Rows (d+4)</td><td class="num em">8</td><td class="num">13</td><td class="num">38%</td></tr>
+  <tr><td>Lookups (&lceil;pp/8&rceil; + &lceil;d&times;pp/8&rceil;)</td><td class="num em">10</td><td class="num">20</td><td class="num">50%</td></tr>
+</table>
+<p style="font-size:14px; color:#718096; margin-top:8px;">
+  在 16 組兩者均達標的配置中，Minimax 平均節省 3.0 次多項式次數，對應約 35% 的 lookup 節省。
+  而 32 組 Taylor 無法達標的配置中，差距更為顯著——Taylor 即使付出更高電路成本仍無法滿足精度要求。
+</p>
+
+<p>
+  次數的節省直接縮短 Horner 鏈，而鏈的長度影響截斷誤差的累積——這正是下一節改進的目標。
+</p>
+
+<h2>3.3 Step 3: Deferred Truncation</h2>
+
+<p>
+  這是<b>對 §2.2 截斷問題的改進</b>。
+</p>
+
+<h3>Per-step Truncation（傳統做法）</h3>
+<p>
+  Horner 每一步都做截斷，把中間值限制在固定精度：
+</p>
+<p style="font-family:monospace; font-size:14px; background:var(--code-bg); padding:12px; border-radius:8px;">
+  step 1: acc = trunc(c<sub>5</sub> &times; R + c<sub>4</sub>)&nbsp;&nbsp;&larr; 截斷 1<br>
+  step 2: acc = trunc(acc &times; R + c<sub>3</sub>)&nbsp;&nbsp;&nbsp;&larr; 截斷 2<br>
+  step 3: acc = trunc(acc &times; R + c<sub>2</sub>)&nbsp;&nbsp;&nbsp;&larr; 截斷 3<br>
+  step 4: acc = trunc(acc &times; R + c<sub>1</sub>)&nbsp;&nbsp;&nbsp;&larr; 截斷 4<br>
+  step 5: w = trunc(acc &times; R)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&larr; 截斷 5
+</p>
+<p>每次截斷都丟失精度，5 次截斷的誤差累積。</p>
+
+<figure style="margin:24px 0; text-align:center;">
+  <img src="figures/fig5_truncation_compare.svg" alt="Deferred vs Per-step truncation comparison" style="width:100%; max-width:800px;">
+  <figcaption style="font-size:14px; color:#718096; margin-top:8px;">
+    圖 3：Per-step（左）每步截斷，精度逐步損失；Deferred（右）利用 BN254 大域，只在最後截斷一次。
+  </figcaption>
+</figure>
+
+<h3>Deferred Truncation（我們的做法）</h3>
+<p>
+  利用 BN254 有限域有 <b>254 bits</b> 的容量，而 <span class="math">d</span> 次 Horner 的中間值最多只需要
+  <b>(<span class="math">d</span>+1)&times;<span class="math">pp</span> bits</b>（例如 d=5, pp=16 時 ~96 bits，遠小於 254），
+  因此可以在整個 Horner chain 中<b>完全不截斷</b>，讓精度一直保持到最後才做一次截斷：
+</p>
+<p style="font-family:monospace; font-size:14px; background:var(--code-bg); padding:12px; border-radius:8px;">
+  step 1: acc = D<sub>5</sub> &times; R + D<sub>4</sub>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&larr; 不截斷<br>
+  step 2: acc = acc &times; R + D<sub>3</sub>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&larr; 不截斷<br>
+  step 3: acc = acc &times; R + D<sub>2</sub>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&larr; 不截斷<br>
+  step 4: acc = acc &times; R + D<sub>1</sub>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&larr; 不截斷<br>
+  step 5: P(R) = acc &times; R&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&larr; 不截斷<br>
+  final : w = P(R) / S<sup>d</sup>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&larr; 唯一一次截斷
+</p>
+
+<div class="key-insight">
+  <strong>關鍵洞見：</strong>
+  BN254 的域足夠大（254 bits），能夠容納整個 Horner chain 的中間值（<span class="math">(d+1)&times;pp</span> bits）而不 overflow。
+  這讓我們可以把 <span class="math">d</span> 次截斷合併為 1 次，大幅減少精度損失。
+  可行的 (pp, d) 組合必須滿足 <span class="math">(d+1)&times;pp &lt; 254</span>（BN254 約束）。
+</div>
+
+<p>精度改善（全部 R 值窮舉驗證）：</p>
+<table>
+  <tr><th>函數</th><th>Deferred ULP</th><th>Per-step ULP</th><th>改善</th></tr>
+  <tr><td>exp(x)-1</td><td class="num em">1</td><td class="num">2</td><td class="num">2.0x</td></tr>
+  <tr><td>ln(1+x)</td><td class="num em">1</td><td class="num">2</td><td class="num">2.0x</td></tr>
+  <tr><td>erf(x)</td><td class="num em">3</td><td class="num">6</td><td class="num">2.0x</td></tr>
+</table>
+<p>三個函數一致地獲得 2.0x 改善。代價是最後的截斷需要 10 個 byte lookup 來驗證餘數。</p>
+
+<h2>3.4 Step 4: 通用 Horner Evaluation Kernel</h2>
+
+<p>
+  將以上三個改進組合，得到一個<b>通用的 Horner 求值電路</b>：
+</p>
+
+<h3>通用電路成本公式</h3>
+<p>
+  Horner kernel 的電路規模由精度參數 <span class="math">pp</span> 和多項式次數 <span class="math">d</span> 兩個設計參數決定：
+</p>
+<table>
+  <tr><th>資源</th><th>通用公式</th><th>pp=16, d=5</th><th>pp=24, d=5</th></tr>
+  <tr><td>Gates</td><td>6（固定）</td><td class="num">6</td><td class="num">6</td></tr>
+  <tr><td>Lookups</td><td>&lceil;<span class="math">pp</span>/8&rceil; + &lceil;<span class="math">d&times;pp</span>/8&rceil;</td><td class="num">12</td><td class="num">18</td></tr>
+  <tr><td>Rows</td><td><span class="math">d</span> + 4</td><td class="num">9</td><td class="num">9</td></tr>
+  <tr><td>Table entries</td><td>256（固定，ByteTable）</td><td class="num">256</td><td class="num">256</td></tr>
+</table>
+
+<div class="result-box">
+  <strong>通用性：</strong>
+  這個電路對所有函數<b>結構完全相同</b>。切換函數只需要替換 <span class="math">d</span> 個係數常數
+  (D<sub>1</sub>...D<sub>d</sub>) 和 R_MAX。
+  Gate definitions、lookup arguments、table size 全部不變。
+  改變 <span class="math">pp</span> 或 <span class="math">d</span> 只影響 lookup 數量和行數，不需要重新設計電路。
+</div>
+
+<p>實測數據（Halo2 PSE v0.3.0, KZG/SHPLONK, BN254, real proof, pp=16, d=5）：</p>
+<table>
+  <tr><th>函數</th><th>區間</th><th>Max ULP</th><th>Prove (ms)</th><th>Verify (ms)</th><th>Proof size</th></tr>
+  <tr><td>exp(x)-1</td><td>[0, ln2)</td><td class="num em">1</td><td class="num">137.8</td><td class="num">1.75</td><td class="num">4,992 B</td></tr>
+  <tr><td>ln(1+x)</td><td>[0, ln2)</td><td class="num em">1</td><td class="num">135.9</td><td class="num">1.88</td><td class="num">4,992 B</td></tr>
+  <tr><td>erf(x)</td><td>[0, 1]</td><td class="num em">3</td><td class="num">137.0</td><td class="num">1.83</td><td class="num">4,992 B</td></tr>
+  <tr><td>GELU(x)</td><td>[0, 1]</td><td class="num em">1</td><td class="num">137.5</td><td class="num">1.76</td><td class="num">4,992 B</td></tr>
+</table>
+<p style="font-size:14px; color:#718096;">
+  提高 pp 會增加 lookup 數量和 prove time。例如 pp=24, d=5 的 prove time 約 280 ms（18 lookups, 6,912 B proof）。
+</p>
+
+<hr>
+
+<!-- ===== 第四章：實驗結果 ===== -->
+<h1><span class="section-num">4</span>實驗結果</h1>
+
+<h2>4.1 Ablation Study: 每個改進的獨立貢獻</h2>
+
+<p>
+  為了證明每個步驟都有獨立價值，我們做了對照實驗（控制其他變因，只改變一個）：
+</p>
+
+<h3>Ablation 1: Minimax vs Taylor（只換係數，電路不變）</h3>
+<p>
+  兩者使用完全相同的 Halo2 電路架構（Horner + deferred truncation + ExplicitRC），僅多項式係數不同。
+  比較指標：達到 ULP &le; 1 所需的最低多項式次數 d*（d = 3&ndash;9 範圍搜索，pp = 16/20/24/28）。
+</p>
+
+<p><b>窄區間（13 個函數，完整數據見 &sect;3.2 表格）：</b></p>
+<ul style="margin:8px 0 8px 24px;">
+  <li>52 組 (函數 &times; pp) 配置中，<b>32 組</b> Minimax 達到 ULP &le; 1 但 Taylor 在 d &le; 9 內無法達到</li>
+  <li><b>16 組</b>兩者均達標，Minimax 平均節省 <b>3.0 次</b>多項式</li>
+  <li><b>0 組</b> Taylor 優於 Minimax</li>
+  <li>6/13 函數（ln, tan, arcsin, erf, GELU, 1-exp(-x&sup2;)）Taylor 在<b>所有 pp 值</b>下均無法達到 ULP &le; 1</li>
+</ul>
+
+<p><b>寬區間（3-byte R，5 個飽和/組合函數）：</b></p>
+<table>
+  <tr><th>函數</th><th>區間</th><th>Taylor ULP</th><th>Minimax ULP</th><th>改善</th><th>Taylor 溢出數</th></tr>
+  <tr><td>erf(x)</td><td>[0, 2.5]</td><td class="num">456,379</td><td class="num em">122</td><td class="num">3,741x</td><td class="num">83,756</td></tr>
+  <tr><td>sigmoid(x)</td><td>[0, 8]</td><td class="num">3,888,491</td><td class="num em">14,230</td><td class="num">273x</td><td class="num">300,135</td></tr>
+  <tr><td>GELU(x)</td><td>[0, 4]</td><td class="num">191,511</td><td class="num em">485</td><td class="num">395x</td><td class="num">163,116</td></tr>
+  <tr><td>1-exp(-x)</td><td>[0, 8]</td><td class="num">10,660,544</td><td class="num em">5,620</td><td class="num">1,897x</td><td class="num">381,364</td></tr>
+  <tr><td>1-exp(-x&sup2;)</td><td>[0, 3]</td><td class="num">56,664</td><td class="num em">407</td><td class="num">139x</td><td class="num">103,927</td></tr>
+</table>
+<p style="font-size:14px; color:#718096;">
+  寬區間下 Taylor 不僅 ULP 劣勢更大，還出現大量溢出（w &ge; S）和負多項式輸出（P &lt; 0），
+  這在 ZK 電路中直接導致 proof 無法生成。sigmoid 的 Taylor 級數收斂半徑為 &pi; &approx; 3.14，
+  在 [0, 8] 區間上發散。
+</p>
+
+<p style="font-size:14px; color:#718096;">
+  <b>窄區間</b>：52 組配置中 32 組 Minimax 獨勝，16 組兩者達標（Minimax 省 3.0 次），0 組 Taylor 勝出。
+  <b>寬區間</b>：5/5 配置 Minimax 全勝（d=5 pp=16），Taylor 出現大量溢出和負輸出。
+</p>
+
+<div class="key-insight">
+  <strong>Ablation 1 的設計意義：</strong>
+  Minimax 不僅是精度改善，更是<b>可行性門檻</b>。
+  Taylor 在 62% 的窄區間配置中無法達到 ULP&le;1，意味著選擇 Taylor 係數
+  會直接排除大部分 (函數, pp) 設計空間。Minimax 使這些配置變得可用，
+  且不增加電路複雜度——同一 Horner kernel，同樣的 gate 數量，只換常數值。
+  其結構性原因（對稱零項、收斂限制）已在 &sect;3.2 分析。
+</div>
+
+<figure style="margin:24px 0; text-align:center;">
+  <img src="figures/fig2_ulp_histograms.svg" alt="ULP distribution histograms for all 3 functions" style="width:100%; max-width:900px;">
+  <figcaption style="font-size:14px; color:#718096; margin-top:8px;">
+    圖 4：三個函數的 Minimax ULP 分佈。exp 和 ln 的 ULP 集中在 0-1，erf 分佈在 0-3。約半數輸入 ULP=0。
+  </figcaption>
+</figure>
+
+<h3>Ablation 2: Deferred vs Per-step Truncation（只改截斷策略）</h3>
+<table>
+  <tr><th>函數</th><th>Deferred (ours)</th><th>Per-step</th><th>改善</th></tr>
+  <tr><td>exp(x)-1</td><td class="num em">1 ULP</td><td class="num">2 ULP</td><td class="num">2.0x</td></tr>
+  <tr><td>ln(1+x)</td><td class="num em">1 ULP</td><td class="num">2 ULP</td><td class="num">2.0x</td></tr>
+  <tr><td>erf(x)</td><td class="num em">3 ULP</td><td class="num">6 ULP</td><td class="num">2.0x</td></tr>
+</table>
+
+<h3>Ablation 3: 範圍驗證策略比較</h3>
+<table>
+  <tr><th>策略</th><th>Gates</th><th>Rows</th><th>安全性</th><th>說明</th></tr>
+  <tr><td>無檢查（baseline）</td><td class="num">4</td><td class="num">8</td><td class="num" style="color:red;">不安全</td><td>prover 可提供越界 R，外推產生錯誤結果</td></tr>
+  <tr><td>ORV（探索方案）</td><td class="num">5</td><td class="num">9</td><td class="num" style="color:#ed8936;">6/13 安全</td><td>依賴 w_max = S&minus;1，7 函數有缺口</td></tr>
+  <tr><td class="em">ExplicitRC（採用）</td><td class="num em">6</td><td class="num">9</td><td class="num em" style="color:#38a169;">確定性安全</td><td>gap decomposition，所有函數統一</td></tr>
+</table>
+<p style="font-size:14px; color:#718096;">
+  ORV 在 7/13 函數中存在安全缺口：w_max &lt; S&minus;1 時，超出 R_MAX 的輸入仍可產生合法 w 值。
+  最嚴重案例為 arcsin（22,935 個可利用 R 值，最大 1,043 ULP 錯誤）。
+  ExplicitRC 的 prove time 與 ORV 差異 &lt; 2%（在測量雜訊內），proof size 僅增加 32 B（+0.6%）。
+</p>
+
+<h2>4.2 與查表法的比較</h2>
+
+<table>
+  <tr><th>方法</th><th>Table entries</th><th>Prove (ms)</th><th>Proof size</th><th>Max ULP</th><th>適用函數</th></tr>
+  <tr><td>A (Direct Lookup)</td><td class="num">65,536</td><td class="num">1,244</td><td class="num">736 B</td><td class="num">0</td><td>任意</td></tr>
+  <tr><td>B (Chunk Decomp)</td><td class="num">768</td><td class="num">61</td><td class="num">2,048 B</td><td class="num">2</td><td><b>僅 exp</b></td></tr>
+  <tr><td class="em">G (Ours)</td><td class="num em">256</td><td class="num">138</td><td class="num">4,992 B</td><td class="num">1-3</td><td>已驗證 13 個函數</td></tr>
+</table>
+
+<div class="key-insight">
+  <strong>關鍵結論：</strong>
+  <ul style="margin:8px 0 0 16px;">
+    <li>對 exp：Method B 更快，但只適用於 exp。我們的優勢在精度 (ULP=1 vs 2) 和表格大小 (256 vs 768)。</li>
+    <li><b>對 ln 和 erf：Method B 不適用，Method A 需要 65K 表格。
+    我們的方法是唯一的小表方案。</b></li>
+  </ul>
+</div>
+
+<h2>4.3 文獻定位</h2>
+
+<table>
+  <tr><th>系統</th><th>exp</th><th>ln</th><th>erf</th><th>方法</th><th>表格大小</th></tr>
+  <tr><td>zkTaylor (AAIA'24)</td><td>YES</td><td>NO</td><td>NO</td><td>Taylor + Circom</td><td>--</td></tr>
+  <tr><td>ZKFixedPointChip</td><td>exp2</td><td>log2</td><td>NO</td><td>Remez deg-14</td><td>Large</td></tr>
+  <tr><td>Lagrange Labs (ePrint'25)</td><td>YES</td><td style="color:red;"><b>未 benchmark</b></td><td>YES</td><td>GL quadrature + Pad&eacute;</td><td>Large</td></tr>
+  <tr><td>ZIP (CCS'25)</td><td>YES</td><td style="color:red;"><b>未覆蓋</b></td><td>via GeLU</td><td>Piecewise + Caulk</td><td>Lookup-based</td></tr>
+  <tr><td class="em">Ours</td><td class="em">YES</td><td class="em">YES</td><td class="em">YES</td><td>Minimax + ExplicitRC + Deferred, (pp,d) 可配置</td><td class="em">256</td></tr>
+</table>
+
+<div class="result-box">
+  <strong>文獻空白：</strong>
+  <ul style="margin:8px 0 0 16px;">
+    <li><b>ln(1+x)</b>：Lagrange Labs 沒有 benchmark，ZIP 沒有覆蓋。據我們的文獻回顧，目前還沒有提供小表 ZK 電路 + 形式分析的工作。</li>
+    <li><b>erf(x)</b>：據我們的文獻回顧，目前沒有任何先前工作用多項式近似做過 ZK erf 電路。</li>
+  </ul>
+</div>
+
+<hr>
+
+<!-- ===== 第五章：Scope 與限制 ===== -->
+<h1><span class="section-num">5</span>範圍界定與已知限制</h1>
+
+<h2>5.1 論文範圍</h2>
+
+<figure style="margin:24px 0; text-align:center;">
+  <img src="figures/fig6_pipeline.svg" alt="Pipeline scope diagram" style="width:100%; max-width:900px;">
+  <figcaption style="font-size:14px; color:#718096; margin-top:8px;">
+    圖 5：系統 pipeline。綠色方框為本論文範圍（Horner Kernel + ExplicitRC），灰色虛框為 function-specific 的未來工作。
+  </figcaption>
+</figure>
+
+<p>
+  本論文聚焦於<b>綠色方框</b>：Horner evaluation kernel + ExplicitRC。
+  Range reduction（將任意輸入映射到多項式區間內）和 reconstruction（將結果組合回去）
+  是<b>function-specific 的應用層電路</b>，不屬於本論文的通用方法論。
+</p>
+<p>
+  ExplicitRC（gap decomposition）使得 kernel 本身是自洽的：合法輸入得到正確輸出，非法輸入被確定性地拒絕。
+  所有函數統一使用 ExplicitRC，代價僅 +1 gate（相對於不安全的無檢查版本）。
+  電路架構的其餘部分（Horner kernel + deferred truncation）完全不受影響。
+</p>
+
+<h2>5.2 已知限制（誠實呈現）</h2>
+
+<table>
+  <tr><th>限制</th><th>影響</th><th>說明</th></tr>
+  <tr><td>ULP claims scope to Horner kernel</td><td>中</td><td>End-to-end 精度取決於 range reduction 實作</td></tr>
+  <tr><td>GELU 只覆蓋 [0,1]</td><td>低</td><td>x &gt; 1 需要 piecewise extension</td></tr>
+  <tr><td>Batch scaling: G 輸給 B</td><td>中</td><td>N=1000 時 G 需 k=14 (1,011ms) vs B k=11 (135ms)。k 為電路容量參數（2<sup>k</sup> rows）</td></tr>
+  <tr><td>線性深度</td><td>低</td><td>Horner 是天然 sequential；常見 d=3~9 足夠短</td></tr>
+</table>
+
+<figure style="margin:24px 0; text-align:center;">
+  <img src="figures/fig3_batch_scaling.svg" alt="Batch scaling comparison" style="width:100%; max-width:700px;">
+  <figcaption style="font-size:14px; color:#718096; margin-top:8px;">
+    圖 6：Batch scaling。Method G 在 N=1000 時比 Method B 慢 7.5x（rows per call 主導）。誠實呈現限制。
+  </figcaption>
+</figure>
+
+<hr>
+
+<!-- ===== 第六章：結論 ===== -->
+<h1><span class="section-num">6</span>結論與預期貢獻</h1>
+
+<h2>三個預期學術貢獻</h2>
+<ol style="margin:12px 0 12px 24px; line-height:2.2;">
+  <li><b>Minimax 係數選擇</b>：據我們的文獻回顧，目前還沒有在 ZK Horner 電路中系統性地使用 Remez 最優多項式的工作。
+    d* 比較顯示：52 組 (函數 &times; pp) 配置中 32 組 Taylor 無法在 d&le;9 內達到 ULP&le;1 而 Minimax 可以；
+    6/13 函數 Taylor 在所有精度等級下均無法達標。7 個兩者達標的函數中 Minimax 平均節省 3.0 次（見 &sect;3.2 表格）</li>
+  <li><b>Deferred Truncation</b>：利用 BN254 的 254-bit 大域容量（中間值僅需 96 bits），將 Horner chain 內 d 次截斷合併為 1 次，lookup 數量節省約 40%，精度改善 2&times;&ndash;7&times;（13 函數範圍）。據我們的文獻回顧，30 個 ZK 系統中無人在 Horner chain 內做延遲截斷</li>
+  <li><b>(pp, d) 通用設計空間</b>：同一電路結構、同一張 256-entry ByteTable，服務 13 個超越函數。切換函數只需改 5 個多項式係數。精度 pp 和多項式次數 d 均為可配置參數，共 546 個可行配置點</li>
+</ol>
+
+<h2>(pp, d) 設計空間</h2>
+<p>
+  本方法的核心優勢之一是 <b>pp（精度）和 d（多項式次數）均為可配置的設計參數</b>。
+  使用者可根據精度需求和電路預算，從設計空間中選擇最適合的組合。
+  以下為 13 個函數在不同 (pp, d) 配置下達成 ULP&le;1 的覆蓋情況（pp&le;28 為窮舉驗證）：
+</p>
+<table>
+  <tr><th>pp</th><th>1 ULP 精度</th><th>d&le;5 覆蓋</th><th>d&le;7 覆蓋</th><th>d&le;9 覆蓋</th></tr>
+  <tr><td class="num">12</td><td class="num">2.4&times;10<sup>&minus;4</sup></td><td class="num em">13/13</td><td class="num em">13/13</td><td class="num em">13/13</td></tr>
+  <tr><td class="num">16</td><td class="num">1.5&times;10<sup>&minus;5</sup></td><td class="num">10/13</td><td class="num em">13/13</td><td class="num em">13/13</td></tr>
+  <tr><td class="num">20</td><td class="num">9.5&times;10<sup>&minus;7</sup></td><td class="num">6/13</td><td class="num">10/13</td><td class="num em">13/13</td></tr>
+  <tr><td class="num">24</td><td class="num">6.0&times;10<sup>&minus;8</sup></td><td class="num">1/13</td><td class="num">10/13</td><td class="num">12/13</td></tr>
+  <tr><td class="num">28</td><td class="num">3.7&times;10<sup>&minus;9</sup></td><td class="num">0/13</td><td class="num">6/13</td><td class="num">10/13</td></tr>
+</table>
+<p style="font-size:14px; color:#718096;">
+  pp=16 搭配 d&le;7 即可涵蓋全部 13 個函數達到 ULP=1。提高 pp 可獲得更高精度，但需搭配更高 d。
+  所有組合須滿足 BN254 約束 (d+1)&times;pp &lt; 254。
+</p>
+
+<h2>驗證強度</h2>
+<ul style="margin:12px 0 12px 24px;">
+  <li>13 個函數 &times; pp&isin;{12,16,20,24,28,32,36} &times; d&isin;{3~9} = <b>546 個可行配置點</b>（442 窮舉 + 104 取樣；另有 91 個因 BN254 溢出排除）</li>
+  <li>所有電路經過<b>real KZG proof</b>（不只是 MockProver）</li>
+  <li>Python 和 Rust 獨立實作<b>交叉驗證</b></li>
+  <li>完整的 ablation study 隔離每個貢獻的獨立效果</li>
+</ul>
+
+<h2>預期的論文結構</h2>
+<table>
+  <tr><th>章節</th><th>內容</th><th>頁數</th></tr>
+  <tr><td>Ch.1 Introduction</td><td>問題定義、動機、貢獻概述</td><td class="num">~2</td></tr>
+  <tr><td>Ch.2 Background</td><td>ZKP, 固定點, 多項式近似, Horner</td><td class="num">~3</td></tr>
+  <tr><td>Ch.3 Methodology</td><td>四步設計方法論（通用 (pp, d) 架構）</td><td class="num">~5</td></tr>
+  <tr><td>Ch.4 Case Study: exp</td><td>完整範例 + ablation</td><td class="num">~4</td></tr>
+  <tr><td>Ch.5 Multi-function</td><td>13 函數推廣 + (pp, d) 設計空間分析</td><td class="num">~4</td></tr>
+  <tr><td>Ch.6 Related Work</td><td>文獻比較</td><td class="num">~2</td></tr>
+  <tr><td>Ch.7 Conclusion</td><td>貢獻、限制、未來工作</td><td class="num">~1</td></tr>
+</table>
+
+</body>
+</html>

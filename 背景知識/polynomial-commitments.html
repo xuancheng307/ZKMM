@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ch.3 多項式承諾方案 &mdash; ZK Handbook</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+  <aside class="sidebar">
+    <div class="sidebar-header"><h1>ZK Handbook</h1><div class="subtitle">Zero-Knowledge Proof Systems</div></div>
+    <nav>
+      <div class="section-label">總覽</div>
+      <a href="index.html"><span class="page-num">0.</span> 首頁</a>
+      <div class="section-label">基礎</div>
+      <a href="foundations.html"><span class="page-num">1.</span> 數學基礎</a>
+      <a href="zkp-basics.html"><span class="page-num">2.</span> ZKP：基本概念與性質</a>
+      <div class="section-label">構建模組</div>
+      <a href="polynomial-commitments.html" class="active"><span class="page-num">3.</span> 多項式承諾</a>
+      <a href="arithmetization.html"><span class="page-num">4.</span> 算術化</a>
+      <a href="fft-domains.html"><span class="page-num">5.</span> FFT 與求值域</a>
+      <div class="section-label">證明系統</div>
+      <a href="groth16.html"><span class="page-num">6.</span> Groth16</a>
+      <a href="plonk.html"><span class="page-num">7.</span> PLONK</a>
+      <a href="halo2.html"><span class="page-num">8.</span> Halo2</a>
+      <div class="section-label">進階主題</div>
+      <a href="lookup-arguments.html"><span class="page-num">9.</span> 查找論證</a>
+      <a href="polynomial-method.html"><span class="page-num">10.</span> 多項式方法</a>
+      <a href="security-proofs.html"><span class="page-num">11.</span> 安全性證明</a>
+
+      <div class="section-label">論文方法論</div>
+      <a href="fixed-point.html"><span class="page-num">12.</span> 有限域定點運算</a>
+      <a href="approximation-theory.html"><span class="page-num">13.</span> 多項式逼近理論</a>
+      <a href="horner-evaluation.html"><span class="page-num">14.</span> Horner 求值</a>
+    </nav>
+  </aside>
+  <main class="main-content">
+
+    <!-- ============================================================
+         PAGE HEADER
+         ============================================================ -->
+    <div class="page-header">
+      <h1>第三章：多項式承諾方案</h1>
+      <p class="page-subtitle">
+        多項式承諾方案是連接資訊理論多項式 IOP 與具體密碼學證明系統的橋梁。
+        本章涵蓋 KZG、IPA 和 FRI &mdash; 分別驅動 Groth16、PLONK、Halo2 和 STARKs 的三大承諾範式。
+      </p>
+    </div>
+
+    <!-- ============================================================
+         DEFINITIONS SECTION
+         ============================================================ -->
+    <div class="definitions-section">
+      <h2>關鍵定義</h2>
+
+      <!-- 1. PCS -->
+      <div class="def-item">
+        <div class="def-term">Polynomial Commitment Scheme (PCS) <span class="zh">多項式承諾方案</span></div>
+        <div class="def-body">
+          由四個演算法組成的元組 $(\mathsf{Setup}, \mathsf{Commit}, \mathsf{Open}, \mathsf{Verify})$。
+          <ul>
+            <li>$\mathsf{Setup}(1^\lambda, d) \to \mathsf{pp}$：為次數 $\leq d$ 的多項式生成公開參數。</li>
+            <li>$\mathsf{Commit}(\mathsf{pp}, f(X)) \to C$：輸出對多項式 $f(X) \in \mathbb{F}[X]$ 的承諾 $C$。</li>
+            <li>$\mathsf{Open}(\mathsf{pp}, f(X), z) \to (v, \pi)$：計算 $v = f(z)$ 並產生證明 $\pi$。</li>
+            <li>$\mathsf{Verify}(\mathsf{pp}, C, z, v, \pi) \to \{0, 1\}$：驗證者檢查求值聲明。</li>
+          </ul>
+          該方案將證明者綁定到多項式 $f(X)$，之後允許在不揭露整個多項式的情況下證明個別求值 $f(z) = v$。
+        </div>
+      </div>
+
+      <!-- 2. Binding -->
+      <div class="def-item">
+        <div class="def-term">Binding <span class="zh">綁定性</span></div>
+        <div class="def-body">
+          在承諾 $C$ 之後，證明者無法在同一點產生兩個不同值的有效開啟。
+          形式化地，對於所有 PPT 敵手 $\mathcal{A}$：
+          $$\Pr\!\Big[\mathsf{Verify}(\mathsf{pp}, C, z, v, \pi) = 1 \;\wedge\; \mathsf{Verify}(\mathsf{pp}, C, z, v', \pi') = 1 \;\wedge\; v \neq v'\Big] \leq \mathrm{negl}(\lambda)$$
+          這保證了證明者在承諾後被「鎖定」在單一多項式上。
+          變體包括：<em>計算綁定性</em>（針對 PPT 敵手）和
+          <em>可提取綁定性</em>（存在一個提取器能從 $C$ 恢復 $f$）。
+        </div>
+      </div>
+
+      <!-- 3. Hiding -->
+      <div class="def-item">
+        <div class="def-term">Hiding <span class="zh">隱藏性</span></div>
+        <div class="def-body">
+          承諾 $C$ 不會揭露底層多項式 $f(X)$ 的任何資訊，除了可從次數上界推斷的部分。
+          形式化地，對於任意兩個次數 $\leq d$ 的多項式 $f_0, f_1$，
+          分佈 $\{\mathsf{Commit}(\mathsf{pp}, f_0)\}$ 和 $\{\mathsf{Commit}(\mathsf{pp}, f_1)\}$
+          是計算上（或統計上）不可區分的。
+          注意：「原始」KZG <strong>不具備</strong>隱藏性 &mdash; 必須添加盲化項。
+        </div>
+      </div>
+
+      <!-- 4. KZG Commitment -->
+      <div class="def-item">
+        <div class="def-term">KZG Commitment <span class="zh">KZG 承諾</span></div>
+        <div class="def-body">
+          Kate-Zaverucha-Goldberg 承諾（2010）。對於多項式 $f(X) = \sum_{i=0}^d a_i X^i$：
+          <ul>
+            <li><strong>承諾：</strong> $C = [f(s)]_1 = \sum_{i=0}^d a_i [s^i]_1$ &mdash; 一個 $\mathbb{G}_1$ 元素。</li>
+            <li><strong>在 $z$ 處開啟：</strong> 計算商多項式 $q(X) = \frac{f(X) - f(z)}{X - z}$，然後證明 $\pi = [q(s)]_1$。</li>
+            <li><strong>驗證：</strong> 檢查配對方程式 $e(\pi,\; [s - z]_2) = e(C - [f(z)]_1,\; [1]_2)$。</li>
+          </ul>
+          商多項式 $q(X)$ 是一個多項式（即除法整除）若且唯若 $f(z)$ 正確。
+          這是關鍵的代數洞察。
+        </div>
+      </div>
+
+      <!-- 5. SRS -->
+      <div class="def-item">
+        <div class="def-term">Structured Reference String (SRS) for KZG <span class="zh">KZG的結構化參考字串</span></div>
+        <div class="def-body">
+          由可信設置產生的公開參數：
+          $$\mathsf{SRS} = \Big(\;[1]_1,\; [s]_1,\; [s^2]_1,\; \ldots,\; [s^d]_1,\;\; [1]_2,\; [s]_2\;\Big)$$
+          其中 $s \in \mathbb{F}_p$ 是<strong>有毒廢料（toxic waste）</strong> &mdash; 一個必須在設置後銷毀的秘密純量。
+          如果任何一方得知 $s$，他們便可偽造任意求值的證明。
+          實務上使用多方儀式（MPC）：每位參與者貢獻隨機性，
+          只要<em>至少一位</em>參與者是誠實的，$s$ 便是安全的。
+        </div>
+      </div>
+
+      <!-- 6. IPA -->
+      <div class="def-item">
+        <div class="def-term">Inner Product Argument (IPA) <span class="zh">內積論證</span></div>
+        <div class="def-body">
+          Bulletproofs 風格的承諾與求值證明。證明者透過 Pedersen 向量承諾進行承諾：
+          $C = \langle \mathbf{a}, \mathbf{G} \rangle + r \cdot H = \sum_{i=0}^{n-1} a_i G_i + r \cdot H$，
+          其中 $\mathbf{G} = (G_0, \ldots, G_{n-1})$ 是獨立的生成元，$H$ 是盲化生成元。
+          求值證明使用遞迴對半切分：在每一輪中，向量被分為兩半並使用驗證者的挑戰值進行摺疊，
+          將問題從長度 $n$ 縮減至 $n/2$。
+          經過 $\log_2 n$ 輪之後，證明由 $2 \log_2 n$ 個群元素組成。
+          驗證需要 $O(n)$ 次群運算（對驗證者而言不具簡潔性）。
+        </div>
+      </div>
+
+      <!-- 7. FRI -->
+      <div class="def-item">
+        <div class="def-term">FRI (Fast Reed-Solomon IOP of Proximity) <span class="zh">FRI</span></div>
+        <div class="def-body">
+          一個基於雜湊的協議，用於證明一個已承諾的函數接近（或等於）次數 $&lt; d$ 的多項式。
+          基於 Reed-Solomon 碼和遞迴的奇偶係數分解摺疊。
+          證明者在每一輪摺疊中 Merkle 承諾求值。驗證者查詢隨機位置並檢查一致性。
+          證明大小：$O(\text{polylog}(d))$。由於僅依賴抗碰撞雜湊函數（CRHF），具有後量子安全性。
+          用於 STARKs、Plonky2 和 Plonky3。
+        </div>
+      </div>
+
+      <!-- 8. Evaluation Proof -->
+      <div class="def-item">
+        <div class="def-term">Evaluation Proof <span class="zh">求值證明</span></div>
+        <div class="def-body">
+          證明已承諾多項式 $f$ 在給定點 $z$ 處滿足 $f(z) = v$ 的證明 $\pi$。
+          驗證者僅持有承諾 $C$，並使用 $\pi$ 來檢查聲明，而無需存取 $f$。
+          在 KZG 中，$\pi$ 是單一群元素。在 IPA 中，$\pi$ 是 $O(\log n)$ 個群元素。
+          在 FRI 中，$\pi$ 是一組 Merkle 路徑和域元素，大小為 $O(\text{polylog}(d))$。
+        </div>
+      </div>
+
+      <!-- 9. Batch Opening -->
+      <div class="def-item">
+        <div class="def-term">Batch Opening <span class="zh">批次開啟</span></div>
+        <div class="def-body">
+          在單一精簡證明中證明多個求值 $f_1(z_1) = v_1, f_2(z_2) = v_2, \ldots, f_k(z_k) = v_k$，
+          而非 $k$ 個獨立證明。技術包括：
+          <ul>
+            <li><strong>同點批次處理：</strong>隨機線性組合 $g = \sum \gamma^i f_i$，對 $g(z)$ 進行單一證明。</li>
+            <li><strong>多點批次處理（Shplonk/GWC）：</strong>將不同點的開啟歸約為單一多項式除法。</li>
+          </ul>
+          批次處理對 PLONK 的效能至關重要，因為驗證者需要約 10 個多項式的求值。
+        </div>
+      </div>
+
+      <!-- 10. Degree Bound -->
+      <div class="def-item">
+        <div class="def-term">Degree Bound <span class="zh">度數上界</span></div>
+        <div class="def-body">
+          已承諾多項式的最大次數 $d$。PCS 保證已承諾的多項式次數 $\leq d$。
+          不同方案的強制方式不同：
+          <ul>
+            <li><strong>KZG：</strong>隱含保證 &mdash; SRS 恰好有 $d+1$ 個冪次，因此次數 $&gt; d$ 的多項式無法被承諾。</li>
+            <li><strong>IPA：</strong>必須透過額外的協議（度數檢查）單獨證明。</li>
+            <li><strong>FRI：</strong>整個協議<em>本身就是</em>度數測試 &mdash; 它證明函數接近次數 $&lt; d$ 的多項式。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         3.1 WHY POLYNOMIAL COMMITMENTS MATTER
+         ============================================================ -->
+    <h2>3.1 多項式承諾為何重要</h2>
+
+    <h3>多項式 IOP 範式</h3>
+    <p>
+      現代零知識證明系統建立在一個清晰的兩層架構之上：
+    </p>
+    <ol>
+      <li>
+        <strong>資訊理論層（Polynomial IOP）：</strong>一種理想化的互動證明，其中
+        證明者向預言機發送<em>多項式</em>，而驗證者查詢這些多項式的求值。
+        在此理想模型中，安全性是無條件（資訊理論上）被證明的。
+      </li>
+      <li>
+        <strong>密碼學層（PCS）：</strong>多項式承諾方案取代了預言機。
+        證明者不再「發送多項式」，而是發送承諾。驗證者不再「查詢預言機」，
+        而是要求證明者在特定點開啟承諾。
+      </li>
+    </ol>
+
+    <div class="callout definition">
+      <div class="callout-title">多項式 IOP 範式</div>
+      <p>
+        每一個現代 ZK 證明系統都可以分解為：
+      </p>
+      $$\boxed{\text{ZK Proof System} = \text{Polynomial IOP} + \text{Polynomial Commitment Scheme (PCS)}}$$
+      <p>
+        Polynomial IOP 定義了證明者必須展示<em>什麼</em>（哪些多項式恆等式成立）。
+        PCS 定義了<em>如何</em>在密碼學上承諾和驗證那些多項式值。
+        替換 PCS 可以改變信任假設和效能特性，而不影響數學可靠性論證。
+      </p>
+    </div>
+
+    <h3>PCS 作為「密碼學編譯器」</h3>
+    <p>
+      可以將 PCS 視為從理想化證明到具體證明的編譯器：
+    </p>
+    <ul>
+      <li>PLONK + KZG = 常數大小證明、可信設置、基於配對。</li>
+      <li>PLONK + IPA = 對數大小證明、無需可信設置、基於離散對數（本質上就是 Halo2）。</li>
+      <li>PLONK + FRI = 多對數大小證明、無需可信設置、基於雜湊、後量子安全（有時稱為「PLONKY」）。</li>
+    </ul>
+    <p>
+      同一個 Polynomial IOP（PLONK）僅透過更換 PCS，便可產生三個完全不同的證明系統。
+      這種模組化特性正是獨立理解 PCS 如此重要的原因。
+    </p>
+
+    <h3>PCS 的必要性質</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>性質</th>
+          <th>含義</th>
+          <th>重要性</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>正確性</strong></td>
+          <td>誠實的證明者總能說服驗證者</td>
+          <td>系統必須實際運作</td>
+        </tr>
+        <tr>
+          <td><strong>綁定性</strong></td>
+          <td>不能將 $C$ 開啟為兩個不同的多項式</td>
+          <td>整體證明系統的可靠性</td>
+        </tr>
+        <tr>
+          <td><strong>隱藏性</strong></td>
+          <td>$C$ 不揭露 $f$ 的任何資訊</td>
+          <td>零知識性質</td>
+        </tr>
+        <tr>
+          <td><strong>簡潔性</strong></td>
+          <td>承諾和證明大小 $\ll$ 多項式大小</td>
+          <td>高效驗證、小型證明</td>
+        </tr>
+        <tr>
+          <td><strong>可提取性</strong></td>
+          <td>提取器能從產生 $C$ 的敵手中恢復 $f$</td>
+          <td>知識可靠性（不僅是可靠性）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ============================================================
+         3.2 KZG COMMITMENTS
+         ============================================================ -->
+    <h2>3.2 KZG 承諾（Kate-Zaverucha-Goldberg）</h2>
+
+    <p>
+      KZG 方案（於 2010 年在 <em>"Constant-Size Commitments to Polynomials and Their Applications"</em> 中提出）
+      是基於配對的證明系統中最廣泛使用的 PCS。它以可信設置為代價，
+      實現了 $O(1)$ 的證明大小和 $O(1)$ 的驗證時間。
+    </p>
+
+    <h3>步驟一：可信設置（SRS 生成）</h3>
+
+    <div class="steps">
+      <div class="step">
+        <h4>選擇秘密</h4>
+        <p>隨機取樣 $s \xleftarrow{\$} \mathbb{F}_p$。這就是<strong>有毒廢料（toxic waste）</strong>。</p>
+      </div>
+      <div class="step">
+        <h4>在 $\mathbb{G}_1$ 中計算冪次</h4>
+        <p>
+          對 $i = 0, 1, \ldots, d$ 計算 $[s^i]_1 = s^i \cdot G_1$。得到：
+        </p>
+        $$\mathsf{SRS}_1 = \Big([1]_1,\; [s]_1,\; [s^2]_1,\; \ldots,\; [s^d]_1\Big)$$
+      </div>
+      <div class="step">
+        <h4>計算 $\mathbb{G}_2$ 元素</h4>
+        <p>
+          計算 $[s]_2 = s \cdot G_2$。完整的 SRS 為：
+        </p>
+        $$\mathsf{SRS} = \Big(\mathsf{SRS}_1,\;\; [1]_2,\; [s]_2\Big)$$
+      </div>
+      <div class="step">
+        <h4>銷毀 $s$</h4>
+        <p>
+          刪除秘密純量 $s$。在多方儀式中（例如 Zcash Powers of Tau、Ethereum KZG Ceremony），
+          每位參與者 $i$ 貢獻 $s_i$，有效秘密為 $s = s_1 \cdot s_2 \cdots s_k$。
+          只要<em>至少一位</em>參與者誠實地刪除了其 $s_i$，儀式便是安全的。
+        </p>
+      </div>
+    </div>
+
+    <div class="callout warning">
+      <div class="callout-title">有毒廢料（Toxic Waste）</div>
+      <p>
+        如果<em>任何人</em>得知 $s$，他們便可偽造任意多項式的承諾和證明。
+        具體來說，知道 $s$ 可以為任意 $f$ 計算 $[f(s)]_1$，也可以為任意聲稱的求值計算商證明
+        $[q(s)]_1$ &mdash; 完全破壞可靠性。
+        這就是可信設置儀式如此關鍵的原因。
+      </p>
+    </div>
+
+    <h3>步驟二：承諾多項式</h3>
+
+    <p>
+      給定多項式 $f(X) = a_0 + a_1 X + a_2 X^2 + \cdots + a_d X^d$，承諾為：
+    </p>
+    $$C = \mathsf{Commit}(\mathsf{SRS}, f) = \sum_{i=0}^{d} a_i \cdot [s^i]_1 = [f(s)]_1$$
+    <p>
+      這是一個<strong>多重純量乘法（Multi-Scalar Multiplication, MSM）</strong>：以多項式係數為權重，
+      計算 SRS 元素的線性組合。
+      結果是 $\mathbb{G}_1$ 的單一元素（例如在 BLS12-381 上為 48 位元組）。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">MSM 效能</div>
+      <p>
+        MSM 是 KZG 承諾的計算瓶頸。對於次數為 $d$ 的多項式，
+        樸素方法需要 $d$ 次純量乘法和 $d$ 次點加法。
+        最佳化演算法（Pippenger、桶方法）將其降低至大約
+        $O(d / \log d)$ 次群運算。在生產環境的 ZK 系統中，
+        GPU 加速 MSM 是一個主要的最佳化方向。
+      </p>
+    </div>
+
+    <h3>步驟三：求值證明（開啟）</h3>
+
+    <p>
+      為了證明 $f(z) = v$（$z$ 為公開的求值點），證明者計算：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <h4>計算商多項式</h4>
+        <p>
+          根據<strong>多項式餘式定理</strong>，若 $f(z) = v$，則 $(X - z)$ 整除 $f(X) - v$。
+          商多項式為：
+        </p>
+        $$q(X) = \frac{f(X) - v}{X - z}$$
+        <p>
+          此除法是<em>整除</em>的（餘式為零）若且唯若 $f(z) = v$。
+          若證明者對值 $v$ 說謊，則 $f(X) - v$ 無法被 $(X - z)$ 整除，
+          $q(X)$ 將不是多項式 &mdash; 證明者無法構造有效的證明。
+        </p>
+      </div>
+      <div class="step">
+        <h4>計算證明</h4>
+        <p>證明是 $q(X)$ 的 KZG 承諾：</p>
+        $$\pi = [q(s)]_1 = \sum_{i=0}^{d-1} q_i \cdot [s^i]_1$$
+        <p>
+          這是另一個 MSM，次數為 $d - 1$（商多項式的次數比 $f$ 少一）。
+        </p>
+      </div>
+    </div>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理：KZG 可靠性的直觀理解</div>
+      <p>
+        代數恆等式 $f(X) - v = q(X) \cdot (X - z)$ 作為多項式恆等式成立
+        <em>若且唯若</em> $f(z) = v$。配對檢查將此多項式恆等式轉換為
+        群層級的方程式，驗證者僅使用 $C$、$\pi$、$z$ 和 $v$ 即可檢查。
+        破壞此方案需要計算離散對數或求解 $q$-Strong Bilinear
+        Diffie-Hellman（$q$-SBDH）問題。
+      </p>
+    </div>
+
+    <h3>步驟四：驗證（配對檢查）</h3>
+
+    <p>
+      驗證者檢查配對方程式：
+    </p>
+    $$e\Big(C - [v]_1,\;\; [1]_2\Big) = e\Big(\pi,\;\; [s]_2 - [z]_2\Big)$$
+
+    <p>讓我們展開來看為何這是正確的。回憶 $C = [f(s)]_1$ 且 $\pi = [q(s)]_1$：</p>
+    <ul>
+      <li>左側：$e\big([f(s) - v]_1,\; [1]_2\big)$</li>
+      <li>右側：$e\big([q(s)]_1,\; [s - z]_2\big)$</li>
+    </ul>
+    <p>
+      根據配對 $e$ 的雙線性性，左側等於 $e(G_1, G_2)^{f(s) - v}$，右側
+      等於 $e(G_1, G_2)^{q(s) \cdot (s - z)}$。這兩者相等若且唯若：
+    </p>
+    $$f(s) - v = q(s) \cdot (s - z) \quad \text{(在 } \mathbb{F}_p\text{ 中)}$$
+    <p>
+      但我們知道 $f(X) - v = q(X)(X - z)$ 是一個多項式恆等式（來自步驟三）。
+      在 $X = s$ 處對兩側求值，恰好得到上述方程式。
+      因此配對檢查在「指數中」確認了多項式恆等式，而無需揭露 $s$。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">驗證成本</div>
+      <p>
+        驗證者需要計算：$\mathbb{G}_1$ 中的 2 次純量乘法（$[v]_1$ 和 $[z]_2$）、
+        2 次點減法，以及 2 次配對（或等效地，透過
+        $e(C - [v]_1, [1]_2) \cdot e(-\pi, [s]_2 - [z]_2) = 1_{\mathbb{G}_T}$ 進行 1 次配對乘積檢查）。
+        配對運算開銷較大（在現代硬體上約 1&ndash;2ms），但次數為 $O(1)$，
+        與多項式次數無關。
+      </p>
+    </div>
+
+    <h3>數值計算範例</h3>
+
+    <div class="callout example">
+      <div class="callout-title">範例：小域上的 KZG</div>
+      <p>
+        讓我們在 $\mathbb{F}_{13}$（模 13 的整數域）上，以多項式
+        $f(X) = 3X^2 + 2X + 5$ 為例。假設秘密為 $s = 4$。
+      </p>
+      <p><strong>設置：</strong>計算 $s$ 的冪次：</p>
+      <ul>
+        <li>$s^0 = 1$</li>
+        <li>$s^1 = 4$</li>
+        <li>$s^2 = 16 \equiv 3 \pmod{13}$</li>
+      </ul>
+      <p>
+        SRS 由 $[1]_1, [4]_1, [3]_1$ 組成（在實際的群中，這些是 $1 \cdot G, 4 \cdot G, 3 \cdot G$）。
+      </p>
+      <p><strong>承諾：</strong></p>
+      $$C = a_0 \cdot [s^0]_1 + a_1 \cdot [s^1]_1 + a_2 \cdot [s^2]_1 = 5 \cdot [1]_1 + 2 \cdot [4]_1 + 3 \cdot [3]_1$$
+      $$= [5 + 8 + 9]_1 = [22]_1 = [22 \bmod 13]_1 = [9]_1$$
+      <p>驗算：$f(s) = f(4) = 3(16) + 2(4) + 5 = 48 + 8 + 5 = 61 \equiv 9 \pmod{13}$。正確。</p>
+
+      <p><strong>在 $z = 2$ 處開啟：</strong></p>
+      <ul>
+        <li>$f(2) = 3(4) + 2(2) + 5 = 12 + 4 + 5 = 21 \equiv 8 \pmod{13}$。故 $v = 8$。</li>
+        <li>
+          商多項式：$q(X) = \frac{f(X) - 8}{X - 2} = \frac{3X^2 + 2X + 5 - 8}{X - 2} = \frac{3X^2 + 2X - 3}{X - 2}$。
+        </li>
+        <li>
+          在 $\mathbb{F}_{13}$ 中進行多項式長除法：
+          <br>$3X^2 + 2X - 3 = (X - 2)(3X + 8)$，因為 $(X - 2)(3X + 8) = 3X^2 + 8X - 6X - 16 = 3X^2 + 2X - 16$，
+          且 $-16 \equiv -3 \pmod{13}$。所以 $q(X) = 3X + 8$。
+        </li>
+      </ul>
+      <p><strong>證明：</strong></p>
+      $$\pi = [q(s)]_1 = [3 \cdot 4 + 8]_1 = [20]_1 = [7]_1$$
+
+      <p><strong>驗證：</strong>檢查 $f(s) - v = q(s)(s - z)$：</p>
+      <ul>
+        <li>左側：$9 - 8 = 1$</li>
+        <li>右側：$7 \cdot (4 - 2) = 7 \cdot 2 = 14 \equiv 1 \pmod{13}$</li>
+        <li>$1 = 1$。配對方程式成立。</li>
+      </ul>
+    </div>
+
+    <h3>KZG 的安全性</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理：KZG 綁定性（正式）</div>
+      <p>
+        在 <strong>$q$-Strong Bilinear Diffie-Hellman（$q$-SBDH）</strong>假設下，KZG 方案
+        具有計算綁定性。具體而言，給定 SRS $([s^i]_1)_{i=0}^{d}$ 和 $[s]_2$，
+        沒有 PPT 敵手能找到 $C, z, v, \pi, v', \pi'$（其中 $v \neq v'$）使得
+        $\mathsf{Verify}(C, z, v, \pi) = 1$ 且 $\mathsf{Verify}(C, z, v', \pi') = 1$ 同時成立。
+      </p>
+      <p>
+        <strong>證明概要：</strong>若敵手能在同一點 $z$ 將 $C$ 開啟為兩個不同值 $v \neq v'$，
+        則他們擁有 $\pi, \pi'$ 使得：
+      </p>
+      $$q(s)(s - z) = f(s) - v \quad \text{且} \quad q'(s)(s - z) = f(s) - v'$$
+      <p>
+        相減：$(q(s) - q'(s))(s - z) = v' - v \neq 0$。這意味著
+        $s - z = \frac{v' - v}{q(s) - q'(s)}$，表示敵手可從群元素中計算出 $s$
+        &mdash; 違反了 $q$-SBDH 假設。
+      </p>
+    </div>
+
+    <div class="callout warning">
+      <div class="callout-title">KZG 預設不具備隱藏性</div>
+      <p>
+        基本的 KZG 承諾 $C = [f(s)]_1$ 是<strong>確定性的</strong>：相同的多項式總是產生相同的承諾。
+        猜到 $f$ 的敵手可以從 SRS 計算 $[f(s)]_1$ 來驗證。
+        為了達成隱藏性，需添加隨機盲化多項式：
+      </p>
+      $$\tilde{C} = [f(s) + r \cdot b(s)]_1$$
+      <p>
+        其中 $r \xleftarrow{\$} \mathbb{F}_p$，$b(X)$ 是盲化多項式（例如 $b(X) = Z_H(X) \cdot \hat{b}(X)$，
+        使得 $b$ 在求值域上消失，從而保持恆等式檢查的正確性）。
+      </p>
+    </div>
+
+
+    <!-- ============================================================
+         3.3 KZG BATCH OPENING
+         ============================================================ -->
+    <h2>3.3 KZG 批次開啟</h2>
+
+    <p>
+      在 PLONK 等證明系統中，驗證者需要檢查許多多項式
+      （線路多項式、置換多項式、商多項式等）在一個或多個點上的求值。
+      逐一證明每個求值將需要多次配對檢查。批次開啟將所有內容歸約為單一檢查。
+    </p>
+
+    <h3>情況一：多個多項式，同一點</h3>
+
+    <p>
+      假設我們有 $k$ 個多項式 $f_1, f_2, \ldots, f_k$，承諾分別為 $C_1, \ldots, C_k$，
+      且我們要對所有 $i$ 證明 $f_i(z) = v_i$。
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <h4>驗證者發送隨機挑戰 $\gamma$</h4>
+        <p>
+          驗證者（或 Fiat-Shamir 雜湊）產生隨機挑戰 $\gamma \in \mathbb{F}_p$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>證明者構造聚合多項式</h4>
+        <p>定義隨機線性組合：</p>
+        $$g(X) = \sum_{i=1}^{k} \gamma^{i-1} \cdot f_i(X), \qquad v = \sum_{i=1}^{k} \gamma^{i-1} \cdot v_i$$
+      </div>
+      <div class="step">
+        <h4>對 $g(z) = v$ 進行單一 KZG 證明</h4>
+        <p>證明者計算單一商多項式和證明：</p>
+        $$q(X) = \frac{g(X) - v}{X - z}, \qquad \pi = [q(s)]_1$$
+      </div>
+      <div class="step">
+        <h4>驗證者檢查一個配對方程式</h4>
+        <p>聚合承諾：$C_g = \sum_{i=1}^{k} \gamma^{i-1} \cdot C_i$。然後驗證：</p>
+        $$e(C_g - [v]_1,\; [1]_2) = e(\pi,\; [s - z]_2)$$
+      </div>
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">為何這是可靠的</div>
+      <p>
+        以壓倒性的機率（關於 $\gamma$），聚合多項式 $g(z) = v$ 成立
+        若且唯若<em>所有</em>個別求值 $f_i(z) = v_i$ 成立。這由
+        Schwartz-Zippel 引理推出：一個次數為 $k$ 的非零多項式至多有 $k$ 個根，因此
+        隨機 $\gamma$ 掩蓋不正確求值的機率 $\leq k / |\mathbb{F}_p|$，
+        可忽略不計。
+      </p>
+    </div>
+
+    <h3>情況二：多個多項式，不同點（Shplonk / GWC）</h3>
+
+    <p>
+      在實務中，PLONK 需要在 $z$ 處開啟某些多項式，而在 $z\omega$（偏移求值點）處開啟其他多項式。
+      樸素方法需要兩次獨立的配對檢查。
+      <strong>GWC</strong>（Gabizon-Williamson-Ciobotaru）和 <strong>Shplonk</strong> 技術將其歸約為一次。
+    </p>
+
+    <h4>GWC 技術（用於原始 PLONK）</h4>
+    <p>
+      假設我們在點 $z$ 處開啟多項式 $\{f_i\}$，在點 $z\omega$ 處開啟多項式 $\{g_j\}$。
+      驗證者發送隨機挑戰 $\gamma$ 和 $\nu$，證明者構造：
+    </p>
+    $$W_z(X) = \frac{\sum_i \gamma^i (f_i(X) - f_i(z))}{X - z}, \qquad
+      W_{z\omega}(X) = \frac{\sum_j \nu^j (g_j(X) - g_j(z\omega))}{X - z\omega}$$
+    <p>
+      驗證者檢查兩個配對方程式，但可以透過另一個隨機挑戰 $r$ 進一步合併為單一檢查：
+    </p>
+    $$e\Big([W_z(s)]_1 + r \cdot [W_{z\omega}(s)]_1,\; [s]_2\Big) =
+      e\Big(z \cdot [W_z(s)]_1 + r \cdot z\omega \cdot [W_{z\omega}(s)]_1 + [F - E]_1,\; [1]_2\Big)$$
+    <p>
+      其中 $F$ 和 $E$ 分別是聚合的承諾項和求值項。
+    </p>
+
+    <h4>Shplonk 最佳化</h4>
+    <p>
+      Shplonk（2019）即使在多個開啟點的情況下，也能將證明進一步歸約為<em>單一群元素</em>。
+      關鍵想法是：定義所有開啟點 $\{z_j\}$ 的消失多項式 $Z_T(X) = \prod_{j} (X - z_j)$，
+      然後將所有開啟聲明表達為模 $Z_T(X)$ 的單一多項式恆等式。
+      這產生一個商多項式和一個證明元素，將驗證者的工作歸約為單一配對檢查。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">對 PLONK 效能的影響</div>
+      <p>
+        在 PLONK 中，證明者需要在 2 個不同的點開啟大約 10&ndash;13 個多項式。
+        若不進行批次處理，需要 10 次以上的配對。使用 GWC：2 次配對（合併為 1 次多重配對）。
+        使用 Shplonk：1 個證明元素和 1 次配對檢查。由於每次配對耗費約 1ms，
+        對於鏈上驗證（gas 成本與計算量成正比）而言，這一節省非常顯著。
+      </p>
+    </div>
+
+
+    <!-- ============================================================
+         3.4 INNER PRODUCT ARGUMENT (IPA)
+         ============================================================ -->
+    <h2>3.4 內積論證（IPA）</h2>
+
+    <p>
+      內積論證（Inner Product Argument）在 Bulletproofs 論文（Bunz et al., 2018）中提出，
+      提供了一種<strong>無需可信設置</strong>的多項式承諾方案。代價是：
+      驗證為 $O(n)$ 而非 $O(1)$，證明為 $O(\log n)$ 而非 $O(1)$。
+    </p>
+
+    <h3>Pedersen 向量承諾</h3>
+
+    <p>
+      令 $\mathbf{G} = (G_0, G_1, \ldots, G_{n-1})$ 為素數階 $p$ 的群 $\mathbb{G}$ 中的
+      $n$ 個獨立生成元，另有一個盲化生成元 $H$。
+      對向量 $\mathbf{a} = (a_0, a_1, \ldots, a_{n-1}) \in \mathbb{F}_p^n$ 的 Pedersen 向量承諾為：
+    </p>
+    $$C = \langle \mathbf{a}, \mathbf{G} \rangle + r \cdot H = \sum_{i=0}^{n-1} a_i \cdot G_i + r \cdot H$$
+    <p>
+      其中 $r \xleftarrow{\$} \mathbb{F}_p$ 是盲化因子。
+      此承諾是<strong>完美隱藏的</strong>（對於任何 $C$，在正確的 $r$ 下，每個 $\mathbf{a}$ 都是等機率的），
+      且在離散對數假設下具有<strong>計算綁定性</strong>。
+    </p>
+
+    <div class="callout definition">
+      <div class="callout-title">從向量承諾到多項式承諾</div>
+      <p>
+        要承諾多項式 $f(X) = \sum a_i X^i$，只需承諾其係數向量
+        $\mathbf{a} = (a_0, a_1, \ldots, a_{n-1})$。要證明 $f(z) = v$，我們需要證明內積：
+      </p>
+      $$\langle \mathbf{a}, \mathbf{z} \rangle = v, \qquad \text{其中 } \mathbf{z} = (1, z, z^2, \ldots, z^{n-1})$$
+      <p>
+        這將多項式求值歸約為內積聲明，而 IPA 協議正是高效地證明此聲明。
+      </p>
+    </div>
+
+    <h3>遞迴對半切分協議</h3>
+
+    <p>
+      IPA 透過遞迴地將向量對半切分來達成 $O(\log n)$ 的證明大小：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <h4>切分</h4>
+        <p>
+          將向量分為左右兩半：
+        </p>
+        $$\mathbf{a} = (\mathbf{a}_L \| \mathbf{a}_R), \quad \mathbf{G} = (\mathbf{G}_L \| \mathbf{G}_R), \quad
+          \mathbf{b} = (\mathbf{b}_L \| \mathbf{b}_R)$$
+        <p>其中 $\mathbf{b} = \mathbf{z} = (1, z, z^2, \ldots)$ 是求值向量。</p>
+      </div>
+      <div class="step">
+        <h4>計算交叉項</h4>
+        <p>證明者計算並發送兩個「交叉項」群元素：</p>
+        $$L = \langle \mathbf{a}_L, \mathbf{G}_R \rangle + [\langle \mathbf{a}_L, \mathbf{b}_R \rangle] \cdot Q + r_L \cdot H$$
+        $$R = \langle \mathbf{a}_R, \mathbf{G}_L \rangle + [\langle \mathbf{a}_R, \mathbf{b}_L \rangle] \cdot Q + r_R \cdot H$$
+        <p>其中 $Q$ 是用於編碼內積聲明的生成元。</p>
+      </div>
+      <div class="step">
+        <h4>驗證者挑戰</h4>
+        <p>
+          驗證者發送（或透過 Fiat-Shamir 推導）隨機挑戰 $u \xleftarrow{\$} \mathbb{F}_p$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>摺疊</h4>
+        <p>雙方計算摺疊後的向量（長度減半）：</p>
+        $$\mathbf{a}' = \mathbf{a}_L + u \cdot \mathbf{a}_R$$
+        $$\mathbf{G}' = \mathbf{G}_L + u^{-1} \cdot \mathbf{G}_R$$
+        $$\mathbf{b}' = \mathbf{b}_L + u^{-1} \cdot \mathbf{b}_R$$
+        <p>
+          承諾更新為 $C' = u^2 \cdot L + C + u^{-2} \cdot R$（驗證者從 $L, R, C, u$ 計算此值）。
+        </p>
+      </div>
+      <div class="step">
+        <h4>遞迴</h4>
+        <p>
+          以長度減半的 $(\mathbf{a}', \mathbf{G}', \mathbf{b}')$ 重複步驟 1&ndash;4。
+          經過 $\log_2 n$ 輪後，向量長度為 1。證明者發送最終純量 $a'_0$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>最終驗證</h4>
+        <p>
+          驗證者檢查：$a'_0 \cdot G'_0 + [a'_0 \cdot b'_0] \cdot Q + r' \cdot H = C_{\text{final}}$，
+          其中 $C_{\text{final}}$ 是所有摺疊輪次累積的承諾。
+        </p>
+      </div>
+    </div>
+
+    <h3>證明大小與驗證成本</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>組成部分</th>
+          <th>數量</th>
+          <th>大小（BLS12-381）</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>交叉項對 $(L_j, R_j)$</td>
+          <td>$2 \log_2 n$ 個群元素</td>
+          <td>$96 \log_2 n$ 位元組</td>
+        </tr>
+        <tr>
+          <td>最終純量 $a'_0$</td>
+          <td>1 個域元素</td>
+          <td>32 位元組</td>
+        </tr>
+        <tr>
+          <td><strong>總證明大小</strong></td>
+          <td>$2 \log_2 n + 1$</td>
+          <td>例如 $n = 2^{20}$：約 1.9 KB</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout warning">
+      <div class="callout-title">驗證不具簡潔性</div>
+      <p>
+        驗證者必須透過 $\log_2 n$ 輪摺疊來重建 $G'_0$，這涉及所有 $n$ 個生成元。
+        樸素方法需要 $O(n)$ 次群運算。這是 IPA 的主要缺點：
+        雖然證明很小，但驗證與多項式次數呈線性關係。
+        各種技術（例如 Halo2 中的累積方法）可在多個證明間攤銷此成本。
+      </p>
+    </div>
+
+    <h3>IPA 與 KZG 的比較</h3>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>KZG</h4>
+        <ul>
+          <li><strong>設置：</strong>可信（SRS 儀式）</li>
+          <li><strong>承諾：</strong>1 個 $\mathbb{G}_1$ 元素（48 位元組）</li>
+          <li><strong>證明大小：</strong>1 個 $\mathbb{G}_1$ 元素（48 位元組）</li>
+          <li><strong>驗證：</strong>2 次配對 &mdash; $O(1)$</li>
+          <li><strong>假設：</strong>$q$-SBDH（基於配對）</li>
+          <li><strong>隱藏性：</strong>預設不具備；需要盲化</li>
+          <li><strong>用於：</strong>PLONK、Marlin、EIP-4844</li>
+        </ul>
+      </div>
+      <div class="comparison-card">
+        <h4>IPA（Bulletproofs）</h4>
+        <ul>
+          <li><strong>設置：</strong>透明（隨機生成元）</li>
+          <li><strong>承諾：</strong>1 個群元素（48 位元組）</li>
+          <li><strong>證明大小：</strong>$2\log_2 n$ 個群元素</li>
+          <li><strong>驗證：</strong>$O(n)$ 次群運算</li>
+          <li><strong>假設：</strong>Discrete Log（無需配對）</li>
+          <li><strong>隱藏性：</strong>構造上完美隱藏</li>
+          <li><strong>用於：</strong>Halo2、Bulletproofs、Zcash Orchard</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">Halo2 的累積技巧</div>
+      <p>
+        Halo2 透過<strong>延遲</strong>昂貴的檢查來解決 IPA 的 $O(n)$ 驗證問題。
+        驗證者不是立即驗證每個 IPA 證明，而是累積這些聲明。
+        在批次處理完所有證明後，單一 $O(n)$ 檢查涵蓋所有證明。
+        在遞迴證明組合（IVC）中，此延遲檢查被傳遞給下一個證明，
+        形成一條鏈，僅最終的驗證者需要支付 $O(n)$ 的成本。
+      </p>
+    </div>
+
+
+    <!-- ============================================================
+         3.5 FRI
+         ============================================================ -->
+    <h2>3.5 FRI（Fast Reed-Solomon IOP of Proximity）</h2>
+
+    <p>
+      FRI（Ben-Sasson et al., 2018）採用了根本不同的方法。FRI 不使用代數承諾
+      （群元素），而是使用<strong>基於雜湊的承諾</strong>（Merkle 樹），
+      並透過基於 Reed-Solomon 碼的互動式預言機證明（IOP）來證明多項式性質。
+    </p>
+
+    <h3>核心想法：低度數測試</h3>
+
+    <p>
+      FRI 回答的核心問題是：
+    </p>
+
+    <div class="callout definition">
+      <div class="callout-title">Reed-Solomon 鄰近性測試</div>
+      <p>
+        給定對函數 $f: D \to \mathbb{F}$（其中 $D$ 是求值域）的預言機存取，
+        判斷 $f$ 是否<em>接近</em>（即在大多數點上一致）
+        次數 $&lt; d$ 的多項式。等價地：$f$ 是否為速率 $\rho = d / |D|$ 的有效 Reed-Solomon 碼字？
+      </p>
+    </div>
+
+    <p>
+      如果函數<em>確實是</em>次數 $&lt; d$ 的多項式，證明者可以透過誠實執行說服驗證者。
+      如果函數與所有次數 $d$ 的多項式的漢明距離為 $\delta$，驗證者將以高機率拒絕。
+    </p>
+
+    <h3>FRI 協議：遞迴摺疊</h3>
+
+    <div class="steps">
+      <div class="step">
+        <h4>初始承諾</h4>
+        <p>
+          證明者在大小為 $|D_0| = \rho^{-1} \cdot d$ 的大域 $D_0$ 上求值 $f_0(X) = f(X)$
+          （通常 $\rho = 2^{-k}$，其中 $k$ 為某個膨脹因子）。證明者 Merkle 承諾所有求值：
+        </p>
+        $$\mathsf{root}_0 = \mathsf{MerkleCommit}\big(f_0(x)\big)_{x \in D_0}$$
+      </div>
+      <div class="step">
+        <h4>分解為奇偶部分</h4>
+        <p>
+          將 $f_0(X) = f_0^{\text{even}}(X^2) + X \cdot f_0^{\text{odd}}(X^2)$。即按奇偶次冪拆分多項式：
+        </p>
+        $$f_0(X) = \underbrace{(a_0 + a_2 X^2 + a_4 X^4 + \cdots)}_{f_0^{\text{even}}(X^2)}
+          + X \cdot \underbrace{(a_1 + a_3 X^2 + a_5 X^4 + \cdots)}_{f_0^{\text{odd}}(X^2)}$$
+        <p>
+          $f_0^{\text{even}}$ 和 $f_0^{\text{odd}}$ 的次數均 $&lt; d/2$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>驗證者挑戰</h4>
+        <p>
+          驗證者發送隨機 $\alpha_0 \in \mathbb{F}$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>摺疊</h4>
+        <p>
+          證明者計算摺疊後的多項式：
+        </p>
+        $$f_1(Y) = f_0^{\text{even}}(Y) + \alpha_0 \cdot f_0^{\text{odd}}(Y)$$
+        <p>
+          注意：$f_1$ 的次數 $&lt; d/2$，定義在大小減半的域 $D_1$ 上
+          （其中 $D_1 = \{x^2 : x \in D_0\}$）。
+          證明者在 $D_1$ 上 Merkle 承諾 $f_1$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>遞迴</h4>
+        <p>
+          重複：將 $f_1$ 分解為奇偶部分，取得挑戰 $\alpha_1$，摺疊為次數 $&lt; d/4$ 的 $f_2$。
+          持續進行 $\log_2 d$ 輪，直到多項式為常數 $f_{\log d}(X) = c$。
+          證明者直接發送 $c$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>查詢階段</h4>
+        <p>
+          驗證者隨機選取位置 $x \in D_0$，並查詢 Merkle 樹以驗證連續輪次之間的一致性。
+          對於每次查詢，驗證者檢查：
+        </p>
+        $$f_{i+1}(x^2) = \frac{f_i(x) + f_i(-x)}{2} + \alpha_i \cdot \frac{f_i(x) - f_i(-x)}{2x}$$
+        <p>
+          此方程式驗證摺疊是否正確執行。
+          每次查詢需要每輪開啟 2 條 Merkle 路徑，因此總證明大小為
+          $O(\lambda \cdot \log^2 d)$，其中 $\lambda$ 是安全參數（查詢次數）。
+        </p>
+      </div>
+    </div>
+
+    <div class="diagram">
+<pre>
+Round 0:  f_0(X) 次數 &lt; d,     域 D_0 大小 N
+             |
+             | 挑戰 alpha_0
+             v
+Round 1:  f_1(Y) 次數 &lt; d/2,   域 D_1 大小 N/2
+             |
+             | 挑戰 alpha_1
+             v
+Round 2:  f_2(Z) 次數 &lt; d/4,   域 D_2 大小 N/4
+             |
+             |  ...（共 log_2 d 輪）
+             v
+Round k:  f_k = 常數 c           域 D_k 大小 rho^{-1}
+</pre>
+    </div>
+
+    <h3>FRI 作為多項式承諾</h3>
+
+    <p>
+      FRI 本身是低度數測試，而非 PCS。要構建完整的 PCS：
+    </p>
+    <ul>
+      <li>
+        <strong>承諾：</strong>Merkle 承諾 $f$ 在 $D_0$ 上的求值。
+        Merkle 根即為承諾 $C$。
+      </li>
+      <li>
+        <strong>在 $z$ 處的求值證明：</strong>證明者提供 $v = f(z)$ 並對商多項式
+        $q(X) = \frac{f(X) - v}{X - z}$ 執行 FRI。若 $q$ 的次數 $&lt; d - 1$，則 $f(z) = v$。
+        （這與 KZG 相同的代數技巧，但透過 FRI 而非配對來證明。）
+      </li>
+    </ul>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理：FRI 可靠性</div>
+      <p>
+        若 $f$ 與所有次數 $&lt; d$ 的多項式的距離為 $\delta$（即
+        $\Delta(f, \text{RS}[d]) \geq \delta$），則驗證者拒絕的機率
+        $\geq 1 - (1 - \delta + O(\sqrt{d/|D|}))^{\lambda}$，其中 $\lambda$ 是查詢次數。
+        對於標準參數（$|D| = 4d$，$\delta \geq 1/4$），每次查詢提供大約 1 位元的安全性。
+        典型部署使用 $\lambda \approx 80$&ndash;$128$ 次查詢。
+      </p>
+    </div>
+
+    <h3>FRI 的性質</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>性質</th>
+          <th>值</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>設置</td>
+          <td>透明（無秘密，僅需選擇雜湊函數）</td>
+        </tr>
+        <tr>
+          <td>證明大小</td>
+          <td>$O(\lambda \cdot \log^2 d)$ &mdash; 多對數但實際上較大（約 50&ndash;200 KB）</td>
+        </tr>
+        <tr>
+          <td>驗證者時間</td>
+          <td>$O(\lambda \cdot \log d)$ 次雜湊求值 + 域運算</td>
+        </tr>
+        <tr>
+          <td>證明者時間</td>
+          <td>$O(d \log d)$ 次域運算（FFT 主導）</td>
+        </tr>
+        <tr>
+          <td>假設</td>
+          <td>僅需抗碰撞雜湊函數（CRHF）</td>
+        </tr>
+        <tr>
+          <td>後量子安全</td>
+          <td>是（無群／配對假設）</td>
+        </tr>
+        <tr>
+          <td>用於</td>
+          <td>STARKs（StarkWare、Polygon Miden）、Plonky2、Plonky3、RISC Zero</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">FRI 與 KZG：大小與假設的權衡</div>
+      <p>
+        FRI 證明比 KZG 證明大 100&ndash;1000 倍（約 100 KB 對比約 48 位元組）。
+        然而，FRI <em>無需可信設置</em>且具有<em>後量子安全性</em>。
+        對於信任最小化比證明大小更重要的應用
+        （例如 Layer 1 區塊鏈的有效性證明，其中驗證者在鏈下執行），
+        FRI/STARKs 更為適合。對於鏈上驗證（calldata 成本至關重要）
+        的場景（例如 Ethereum L2 rollups），KZG 的微小證明更為經濟。
+      </p>
+    </div>
+
+
+    <!-- ============================================================
+         3.6 COMPREHENSIVE COMPARISON
+         ============================================================ -->
+    <h2>3.6 PCS 方案比較</h2>
+
+    <p>
+      下表總結了三大多項式承諾範式：
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>性質</th>
+          <th>KZG</th>
+          <th>IPA（Bulletproofs）</th>
+          <th>FRI</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>設置</strong></td>
+          <td>可信 SRS（儀式）</td>
+          <td>透明（隨機生成元）</td>
+          <td>透明（雜湊函數）</td>
+        </tr>
+        <tr>
+          <td><strong>承諾大小</strong></td>
+          <td>$O(1)$ &mdash; 1 個群元素</td>
+          <td>$O(1)$ &mdash; 1 個群元素</td>
+          <td>$O(1)$ &mdash; 1 個 Merkle 根（32 位元組）</td>
+        </tr>
+        <tr>
+          <td><strong>證明大小</strong></td>
+          <td>$O(1)$ &mdash; 48 位元組</td>
+          <td>$O(\log n)$ &mdash; 約 1&ndash;2 KB</td>
+          <td>$O(\lambda \cdot \log^2 n)$ &mdash; 約 50&ndash;200 KB</td>
+        </tr>
+        <tr>
+          <td><strong>驗證者時間</strong></td>
+          <td>$O(1)$ &mdash; 2 次配對（約 2 ms）</td>
+          <td>$O(n)$ &mdash; 與次數呈線性</td>
+          <td>$O(\lambda \cdot \log n)$ &mdash; 多對數</td>
+        </tr>
+        <tr>
+          <td><strong>證明者時間</strong></td>
+          <td>$O(n)$ &mdash; MSM 主導</td>
+          <td>$O(n)$ &mdash; MSM 主導</td>
+          <td>$O(n \log n)$ &mdash; FFT 主導</td>
+        </tr>
+        <tr>
+          <td><strong>密碼學假設</strong></td>
+          <td>$q$-SBDH（配對群）</td>
+          <td>Discrete Log（無需配對）</td>
+          <td>僅需 CRHF（基於雜湊）</td>
+        </tr>
+        <tr>
+          <td><strong>後量子安全</strong></td>
+          <td>否</td>
+          <td>否</td>
+          <td>是</td>
+        </tr>
+        <tr>
+          <td><strong>隱藏性</strong></td>
+          <td>預設不具備（需要盲化）</td>
+          <td>完美隱藏</td>
+          <td>預設不具備（需要盲化）</td>
+        </tr>
+        <tr>
+          <td><strong>批次處理</strong></td>
+          <td>優秀（Shplonk：1 個元素）</td>
+          <td>中等（多重證明累積）</td>
+          <td>良好（共享 Merkle 樹）</td>
+        </tr>
+        <tr>
+          <td><strong>用於</strong></td>
+          <td>PLONK、Marlin、Groth16（變體）、EIP-4844</td>
+          <td>Halo2、Bulletproofs、Zcash Orchard</td>
+          <td>STARK、Plonky2/3、RISC Zero</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>選擇指南</h3>
+
+    <div class="callout note">
+      <div class="callout-title">應該使用哪種 PCS？</div>
+      <ul>
+        <li>
+          <strong>最小證明大小、鏈上驗證：</strong>KZG。
+          證明為 48 位元組，驗證為 2 次配對。適用於 calldata 成本主導的 Ethereum L2 rollups。
+        </li>
+        <li>
+          <strong>無需可信設置、中等證明大小：</strong>IPA。
+          透明設置消除了儀式風險。Halo2 中用於遞迴證明組合。
+          適合能夠攤銷 $O(n)$ 驗證成本的場景。
+        </li>
+        <li>
+          <strong>後量子安全、基於雜湊：</strong>FRI。
+          證明較大但僅依賴雜湊函數。適用於需要長期安全性、
+          可信設置不可接受且證明大小可容忍的應用。
+        </li>
+      </ul>
+    </div>
+
+    <h3>具體大小比較（次數 $n = 2^{20} \approx 10^6$）</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>指標</th>
+          <th>KZG（BLS12-381）</th>
+          <th>IPA（Curve25519）</th>
+          <th>FRI（$\lambda = 128$）</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>承諾</td>
+          <td>48 位元組</td>
+          <td>32 位元組</td>
+          <td>32 位元組（Merkle 根）</td>
+        </tr>
+        <tr>
+          <td>單一求值證明</td>
+          <td>48 位元組</td>
+          <td>約 1.3 KB（$2 \times 20 \times 32$ 位元組）</td>
+          <td>約 100&ndash;200 KB</td>
+        </tr>
+        <tr>
+          <td>驗證時間</td>
+          <td>約 2 ms（2 次配對）</td>
+          <td>約 500 ms（$2^{20}$ 次純量乘法）</td>
+          <td>約 10&ndash;50 ms（雜湊 + 域運算）</td>
+        </tr>
+        <tr>
+          <td>證明者時間</td>
+          <td>約 1&ndash;2 s（MSM）</td>
+          <td>約 1&ndash;2 s（MSM）</td>
+          <td>約 2&ndash;5 s（FFT + 雜湊）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>視覺總結：PCS 全景</h3>
+
+    <div class="diagram">
+<pre>
+                        信任假設
+                 可信設置            透明
+                      |                      |
+  證明大小      KZG   |              IPA     |     FRI
+  O(1)        [=====] |                      |
+  O(log n)            |          [=========] |
+  O(polylog n)        |                      | [===========]
+                      |                      |
+  驗證時間            |                      |
+  O(1)        [=====] |                      |
+  O(n)                |          [=========] |
+  O(polylog n)        |                      | [===========]
+                      |                      |
+  後量子安全          |                      |
+  否          [=====] |          [=========] |
+  是                  |                      | [===========]
+
+  圖例：
+    KZG    = 基於配對，O(1) 證明，可信設置
+    IPA    = 基於離散對數，O(log n) 證明，透明，O(n) 驗證
+    FRI    = 基於雜湊，O(polylog n) 證明，透明，後量子安全
+</pre>
+    </div>
+
+
+    <!-- ============================================================
+         ADVANCED: FORMAL SECURITY DETAILS
+         ============================================================ -->
+    <h2>3.7 正式安全性細節</h2>
+
+    <h3>$q$-SBDH 假設</h3>
+
+    <div class="callout definition">
+      <div class="callout-title">$q$-Strong Bilinear Diffie-Hellman 假設</div>
+      <p>
+        令 $\mathcal{G} = (\mathbb{G}_1, \mathbb{G}_2, \mathbb{G}_T, e, p)$ 為一個雙線性群。
+        給定元組 $([1]_1, [s]_1, [s^2]_1, \ldots, [s^q]_1, [1]_2, [s]_2)$（其中
+        $s \xleftarrow{\$} \mathbb{F}_p$ 為隨機），沒有 PPT 敵手能夠對任意其選擇的
+        $c \in \mathbb{F}_p$ 計算 $e(G_1, G_2)^{1/(s+c)}$。
+      </p>
+      <p>
+        這是一個「$q$-type」假設：安全性隨 SRS 的次數 $q$ 而降低。
+        它由更標準的 $q$-SDH 假設所蘊含，且被認為在
+        配對友好群（BN254、BLS12-381）中成立。
+      </p>
+    </div>
+
+    <h3>可提取性與知識可靠性</h3>
+
+    <p>
+      對於 ZK 證明系統，我們需要的不僅是綁定性 &mdash; 我們需要<strong>知識可靠性</strong>：
+      如果證明者能產生有效的承諾和開啟，則證明者「知道」該多項式。
+      形式化地，存在一個提取器 $\mathcal{E}$ 能從任何成功的證明者 $\mathcal{P}^*$ 中提取多項式 $f$。
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>方案</th>
+          <th>可提取性</th>
+          <th>模型</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>KZG</td>
+          <td>在 AGM（代數群模型）下可提取</td>
+          <td>AGM + $q$-SBDH</td>
+        </tr>
+        <tr>
+          <td>IPA</td>
+          <td>透過回捲可提取（特殊可靠性）</td>
+          <td>DLog + ROM（隨機預言機模型）</td>
+        </tr>
+        <tr>
+          <td>FRI</td>
+          <td>透過 Reed-Solomon 碼的列表解碼可提取</td>
+          <td>CRHF + ROM</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout example">
+      <div class="callout-title">範例：為何可提取性重要</div>
+      <p>
+        考慮一個 PLONK 證明，其中證明者承諾線路多項式 $a(X), b(X), c(X)$。
+        證明者必須<em>知道</em>這些多項式（不僅僅能在查詢點處開啟）。
+        否則，惡意證明者可能在特定點上產生有效的開啟，卻實際上並不知道有效的見證賦值。
+      </p>
+      <p>
+        可提取性保證了從任何能說服驗證者的證明者中，我們都能提取出實際的多項式
+        &mdash; 進而提取出見證。這使得證明系統成為
+        <strong>知識證明</strong>，而不僅是真實性證明。
+      </p>
+    </div>
+
+
+    <!-- ============================================================
+         SUMMARY
+         ============================================================ -->
+    <h2>總結</h2>
+
+    <p>
+      多項式承諾方案是現代 ZK 證明系統的密碼學骨幹。
+      本章的關鍵要點：
+    </p>
+
+    <ol>
+      <li>
+        <strong>現代 ZK = Polynomial IOP + PCS。</strong>PCS 的選擇決定了整個系統的
+        信任模型、證明大小、驗證成本和後量子安全性。
+      </li>
+      <li>
+        <strong>KZG</strong> 提供最佳的證明大小（$O(1)$）和驗證時間（$O(1)$ 次配對），
+        代價是可信設置和配對假設。
+        其代數核心是商多項式技巧：$f(X) - v = q(X)(X - z)$。
+      </li>
+      <li>
+        <strong>IPA</strong> 透過 Pedersen 向量承諾和遞迴對半切分消除了可信設置。
+        證明為 $O(\log n)$，但驗證為 $O(n)$。
+        Halo2 使用累積方法來攤銷此成本。
+      </li>
+      <li>
+        <strong>FRI</strong> 更進一步：基於雜湊、後量子安全、透明。
+        證明為多對數但具體上較大（約 100 KB）。
+        主導 STARK 生態系統。
+      </li>
+      <li>
+        <strong>批次開啟</strong>（Shplonk、GWC）對於實際效能至關重要，
+        將多個求值證明歸約為單一配對檢查或證明元素。
+      </li>
+    </ol>
+
+    <p>
+      下一章（<a href="arithmetization.html">算術化</a>）涵蓋計算如何被編碼為
+      多項式約束 &mdash; 這是方程式的另一半。
+      算術化（定義多項式恆等式）和 PCS（證明它們）
+      共同構成完整的 ZK 證明系統。
+    </p>
+
+
+    <h2>對本研究的意義</h2>
+    <div class="callout theorem">
+      <div class="callout-title">設計選擇：為何選 IPA 而非 KZG</div>
+      <p>
+        本論文使用 Halo2 框架，其底層多項式承諾方案為 IPA（Inner Product Argument）。以下比較說明此選擇的理由：
+      </p>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>特性</th><th>IPA（我們的選擇）</th><th>KZG</th><th>FRI</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>可信設置</strong></td>
+          <td style="color: green;">✗ 不需要</td>
+          <td style="color: red;">✓ 需要 Powers-of-Tau</td>
+          <td style="color: green;">✗ 不需要</td>
+        </tr>
+        <tr>
+          <td><strong>證明大小</strong></td>
+          <td>$O(\log n)$ — 較大</td>
+          <td>$O(1)$ — 最小</td>
+          <td>$O(\text{polylog}\ n)$</td>
+        </tr>
+        <tr>
+          <td><strong>驗證時間</strong></td>
+          <td>$O(n)$ — 較慢</td>
+          <td>$O(1)$ — 最快</td>
+          <td>$O(\text{polylog}\ n)$</td>
+        </tr>
+        <tr>
+          <td><strong>安全假設</strong></td>
+          <td>DLog（標準）</td>
+          <td>q-type 配對假設（較強）</td>
+          <td>CRHF（最弱）</td>
+        </tr>
+        <tr>
+          <td><strong>後量子安全</strong></td>
+          <td>✗</td>
+          <td>✗</td>
+          <td style="color: green;">✓</td>
+        </tr>
+        <tr>
+          <td><strong>遞迴友好</strong></td>
+          <td style="color: green;">✓ Pallas/Vesta</td>
+          <td>△ 需要配對友好曲線</td>
+          <td>✓</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">取捨分析</div>
+      <p>
+        IPA 的代價是更大的證明（$O(\log n)$ vs $O(1)$）和更慢的驗證（$O(n)$ vs $O(1)$）。
+        但對於學術研究和去中心化應用場景，消除可信設置假設帶來的好處超過了效能上的讓步。
+        此外，Pallas/Vesta 曲線循環使未來的<strong>遞迴證明組合</strong>成為可能——這是 KZG + BN254 難以實現的。
+      </p>
+      <p>
+        PSE 分支的 Halo2 也支援 KZG 後端——如果未來需要部署到以太坊（需要最小化鏈上驗證成本），可以切換承諾方案而不重寫電路。
+      </p>
+    </div>
+
+    <!-- ============================================================
+         PAGE NAVIGATION
+         ============================================================ -->
+    <div class="page-nav">
+      <a href="zkp-basics.html"><span class="nav-label">上一章</span><span class="nav-title">&larr; 2. ZKP 基礎</span></a>
+      <a href="arithmetization.html"><span class="nav-label">下一章</span><span class="nav-title">4. 算術化 &rarr;</span></a>
+    </div>
+  </main>
+</body>
+</html>

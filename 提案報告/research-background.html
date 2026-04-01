@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>研究背景與動機：為什麼需要在零知識證明中計算複雜函數</title>
+<style>
+  :root {
+    --primary: #1a365d;
+    --accent: #2b6cb0;
+    --light-bg: #f7fafc;
+    --border: #e2e8f0;
+    --highlight: #ebf8ff;
+    --warn-bg: #fffaf0;
+    --success-bg: #f0fff4;
+    --code-bg: #edf2f7;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Noto Serif TC", "Times New Roman", Georgia, serif;
+    line-height: 1.8; color: #2d3748; max-width: 960px;
+    margin: 0 auto; padding: 40px 24px; font-size: 17px;
+  }
+  h1 { font-size: 28px; color: var(--primary); border-bottom: 3px solid var(--accent); padding-bottom: 12px; margin: 48px 0 24px 0; }
+  h1:first-of-type { margin-top: 0; }
+  h2 { font-size: 22px; color: var(--primary); margin: 36px 0 16px 0; padding-left: 12px; border-left: 4px solid var(--accent); }
+  h3 { font-size: 18px; color: #4a5568; margin: 24px 0 12px 0; }
+  p { margin: 12px 0; }
+  .subtitle { font-size: 16px; color: #718096; margin-bottom: 32px; }
+  .key-insight { background: var(--highlight); border-left: 4px solid var(--accent); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  .key-insight strong { color: var(--accent); }
+  .problem-box { background: var(--warn-bg); border-left: 4px solid #ed8936; padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  .result-box { background: var(--success-bg); border-left: 4px solid #38a169; padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  .scenario-box { background: #faf5ff; border-left: 4px solid #805ad5; padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  .scenario-box strong { color: #805ad5; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 15px; }
+  th { background: var(--primary); color: white; padding: 10px 12px; text-align: left; font-weight: 600; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  tr:nth-child(even) { background: var(--light-bg); }
+  td.num { text-align: center; font-family: monospace; }
+  td.em { font-weight: bold; color: var(--accent); }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+  .compare .col { padding: 16px; border-radius: 8px; }
+  .compare .before { background: #fff5f5; border: 1px solid #feb2b2; }
+  .compare .after { background: #f0fff4; border: 1px solid #9ae6b4; }
+  .compare .col-title { font-weight: bold; margin-bottom: 8px; font-size: 15px; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 15px; }
+  .math { font-family: "Times New Roman", serif; font-style: italic; }
+  .section-num { color: var(--accent); margin-right: 8px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+  ul, ol { margin: 12px 0 12px 24px; }
+  li { margin: 6px 0; }
+  @media print { body { font-size: 12pt; padding: 0; } h1 { page-break-before: always; } }
+  .site-nav {
+    display: flex; flex-wrap: wrap;
+    background: #1a365d; border-radius: 8px; overflow: hidden;
+    margin-bottom: 32px;
+    font-family: -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 14px;
+  }
+  .site-nav a {
+    color: #cbd5e0; text-decoration: none;
+    padding: 10px 18px; transition: background 0.2s;
+  }
+  .site-nav a:hover { background: #2b6cb0; color: #fff; }
+  .site-nav a.active { background: #2b6cb0; color: #fff; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="index.html">總報告</a>
+  <a href="research-background.html" class="active">研究背景</a>
+  <a href="contribution-comparison.html">差異比較</a>
+  <a href="what-we-did.html">技術說明</a>
+</nav>
+
+<h1>研究背景與動機</h1>
+<p class="subtitle">為什麼需要在零知識證明中計算複雜函數，以及我們如何用不同的方式解決這個問題</p>
+
+<!-- ====== Section 1 ====== -->
+<h2><span class="section-num">&sect;1</span>什麼是「可驗證計算」</h2>
+
+<p>假設有人把一段計算外包出去——交給雲端、交給另一台機器、交給區塊鏈上的某個合約。你拿到了一個結果，但你怎麼知道對方真的有照規定算？有沒有偷改數據、跳過步驟、或者直接編造答案？</p>
+
+<p>傳統的做法是「重新算一遍」。但如果計算量很大，或者你根本拿不到原始資料（因為涉及隱私），重新算就不可行了。</p>
+
+<p><strong>零知識證明（Zero-Knowledge Proof, ZKP）</strong>提供了一個數學上的解決方案：計算方（prover）產生一份簡短的「證明」，任何人（verifier）看到這份證明後就能確信計算結果是正確的，同時——這是最神奇的部分——verifier 從證明中<strong>學不到任何秘密資訊</strong>。</p>
+
+<div class="key-insight">
+  <strong>白話說：</strong>零知識證明讓你能證明「我按照規則算了，結果是這個」，而不需要把你的秘密資料攤開來給別人看。Verifier 只需要花很少的時間就能確認，不需要自己重算。
+</div>
+
+<p>這個技術已經從學術走向工業應用：隱私機器學習推論（證明模型輸出正確但不洩漏模型參數）、DeFi 與金融（證明資產滿足條件但不公開具體數字）、可驗證計算（雲端證明計算結果正確，客戶端不需重算）。這些場景都需要在 ZK 電路中計算複雜的數學函數。</p>
+
+<hr>
+
+<!-- ====== Section 2 ====== -->
+<h2><span class="section-num">&sect;2</span>ZK 電路的根本限制：只有加法和乘法</h2>
+
+<p>ZKP 的數學基礎是「算術電路」（arithmetic circuit）。你可以把它想像成一種極度簡化的程式語言——<strong>基本運算只有整數加法和整數乘法</strong>（以及由此衍生的減法和除法）。沒有浮點數，沒有條件判斷，沒有迴圈，更沒有任何內建的數學函數。</p>
+
+<p>為什麼這麼限制？因為 ZKP 的底層數學（橢圓曲線密碼學）運作在「有限域」上。有限域本質上就是一個超大的整數集合（大約 2<sup>254</sup>，一個 77 位數），裡面只定義了加法和乘法。這不是工程上的偷懶，而是數學結構決定的根本限制。</p>
+
+<p>不過，並非所有「複雜函數」都同等困難。部分<strong>代數函數</strong>——像是平方根 <span class="math">&radic;x</span>——可以透過代數約束精確計算（只需約束 <span class="math">y</span><sup>2</sup> = <span class="math">x</span>）。真正困難的是<strong>超越函數</strong>（transcendental function）——像是指數函數 <span class="math">exp</span>、自然對數 <span class="math">ln</span>、誤差函數 <span class="math">erf</span>——它們在定義上無法表示為有限次代數運算的根，因此無法用代數約束精確計算，只能用近似方法來處理。</p>
+
+<div class="problem-box">
+  <strong>根本挑戰：</strong>你日常寫程式時用的 <code>math.exp(x)</code>，背後是 CPU 的硬體指令或軟體程式庫中高度最佳化的演算法。但在 ZK 電路裡，你沒有這些——你只有加法和乘法，必須從頭開始「重新發明」這些函數。而且，因為所有數值都是巨大的整數（不是浮點數），連「0.5」這種簡單的小數都必須用特殊的方式編碼。
+</div>
+
+<hr>
+
+<!-- ====== Section 3 ====== -->
+<h2><span class="section-num">&sect;3</span>現有解法一：查表法——簡單但昂貴</h2>
+
+<p>既然算不出來，那就乾脆不算——事先把所有答案算好，存成一張表。電路只需要「查表」，把輸入值去表裡找到對應的輸出。這就是<strong>查表法（lookup-based method）</strong>。</p>
+
+<p>查表法的精度可以做到完美——表裡存的就是正確答案。而且電路結構非常簡單，就是一次查表操作。對於單一函數、標準精度的場景，這是一個非常好的方案，也是目前大多數 ZK 系統（如 ezkl、ZKML 框架）的預設做法。</p>
+
+<h3>那問題在哪裡？</h3>
+
+<p><strong>表格大小會爆炸。</strong>查表法的表格大小取決於「精度」——你的數字有多精細。以目前常用的 16-bit 精度為例，一個函數的表格就需要 65,536 筆資料。如果電路同時用到三個函數（比如 exp、ln、erf），就需要三張表，接近 20 萬筆。</p>
+
+<p>更關鍵的是<strong>精度的可擴展性</strong>。16-bit 精度對很多應用來說是夠的。但如果某個應用需要更高的精度——比如 28-bit——那查表法的表格會從 65,536 筆暴增到 2<sup>28</sup> = <strong>2.68 億筆</strong>。這不是線性增長，而是指數增長。在這個規模下，光是載入這張表就已經不切實際了。</p>
+
+<div class="problem-box">
+  <strong>查表法的結構性限制：</strong>
+  <ul>
+    <li><strong>多函數場景</strong>——每多一個函數就多一張表，成本線性疊加</li>
+    <li><strong>高精度場景</strong>——表格大小隨精度指數增長，超過某個臨界點就不可行</li>
+    <li><strong>通用性差</strong>——有些函數（如 exp）有代數性質可以做分塊查表優化，但大多數函數（如 ln、erf）沒有這種性質，只能用笨辦法存完整的表</li>
+  </ul>
+</div>
+
+<p>換句話說：查表法在「少量函數 + 標準精度」的場景下是最佳選擇。但一旦需求往「多種函數」或「更高精度」的方向延伸，它的成本就會快速上升到不可接受的程度。</p>
+
+<hr>
+
+<!-- ====== Section 4 ====== -->
+<h2><span class="section-num">&sect;4</span>現有解法二：多項式近似——我們的方向</h2>
+
+<p>既然查表法的瓶頸在於「儲存量」，另一條路線就是真的去「算」——用多項式來近似超越函數。多項式本質上就是加法和乘法的組合（例如 3<span class="math">x</span><sup>2</sup> + 5<span class="math">x</span> + 1），正好是 ZK 電路原生支援的運算。</p>
+
+<p>最直覺的選擇是 <strong>Taylor 展開</strong>——大家在微積分課上都學過的方法。但在 ZK 電路中，Taylor 展開的效果非常差。原因很直觀：<strong>在固定次數下</strong>（例如 5 次多項式），Taylor 展開把精度集中在展開點（通常是 <span class="math">x</span> = 0）附近，離展開點越遠，最大誤差就越大。但 ZK 電路需要的是在<strong>整個輸入範圍</strong>上都夠精確——你不能跟 verifier 說「只要輸入值在某個甜蜜點附近，我的結果就是對的」。</p>
+
+<div class="key-insight">
+  <strong>多項式法的吸引力：</strong>不管你要算幾個函數，電路只需要一張很小的共用表格（用於基本的數值驗證）。多一個函數，只需要多一組係數——電路結構完全不用改。這讓多項式法天生適合「多函數」和「高精度」的需求，而這些正好是查表法最弱的地方。
+</div>
+
+<p>但多項式法也有自己的挑戰：要選對多項式的係數、要處理定點數運算帶來的精度損失、要確保整個計算過程是密碼學安全的。這些正是本研究要解決的問題。</p>
+
+<hr>
+
+<!-- ====== Section 5 ====== -->
+<h2><span class="section-num">&sect;5</span>誰需要這個？——應用場景與現實需求</h2>
+
+<p>在討論具體場景之前，有必要先面對一個事實：目前推動 ZK 超越函數計算的最大領域是 ZKML，而該領域的 14 個系統幾乎全部選擇了查表法（詳見 §5.4）。<strong>為什麼沒有人選多項式法？</strong>因為 ZKML 的計算特徵——大批次、低精度、少量函數種類——恰好是查表法的最佳適用場景。</p>
+
+<p>但 ZKML 不是超越函數唯一可能的應用場景。隨著 ZKP 從「驗證交易」擴展到「驗證任意計算」，新的需求類型正在浮現：需要同時使用多種函數的金融模型、涉及隱私的統計推論、精度要求超出查表可行範圍的科學計算。這些場景目前尚無成熟的 ZK 實作——不是因為不需要，而是因為<strong>工具還不存在</strong>。我們的工作正是為這類場景預備方法論基礎。</p>
+
+<p>以下三個場景描述了多項式法具有結構性優勢的計算情境。</p>
+
+<h3><span class="section-num">5.1</span> 可驗證金融計算（Verifiable Finance）</h3>
+
+<div class="scenario-box">
+  <strong>場景：</strong>一個 DeFi 協議需要計算連續複利。利率是公開的，但個別用戶的存款金額可能是隱私資訊。協議想讓任何人都能驗證「利息計算是正確的」，而不需要看到每個人存了多少錢。
+</div>
+
+<p>連續複利的公式是 <span class="math">A</span> = <span class="math">P</span> &middot; <span class="math">exp</span>(<span class="math">rt</span>)，裡面有一個 exp。更複雜的金融模型，像是 Black-Scholes 選擇權定價公式，同時需要 exp、ln、和 erf（因為常態分佈的累積分佈函數包含 erf）。如果一個鏈上合約需要做這類計算，而且要可驗證、可能還要保護隱私，就必須在 ZK 電路裡實作這些函數。</p>
+
+<p>金融計算對精度的要求很高——即使是單一用戶的計算，微小的近似誤差在複利或衍生品定價的數學公式中都可能被放大。這意味著「近似精度」不是學術指標，而是直接影響資金正確性的關鍵參數。而且，金融模型往往同時需要多個超越函數（exp + ln + erf），這正是查表法成本開始疊加的場景。</p>
+
+<h3><span class="section-num">5.2</span> 隱私統計分析（Privacy-Preserving Statistics）</h3>
+
+<div class="scenario-box">
+  <strong>場景：</strong>一家醫院想向保險公司證明「我們的某項治療成功率超過 95%」，但不能透露個別病患的資料。醫院需要在 ZK 電路中計算 p-value 或信賴區間，產生一份任何人都能驗證的統計證明。
+</div>
+
+<p>統計分析的基礎工具——常態分佈的 CDF（累積分佈函數）、對數似然比（log-likelihood ratio）、卡方檢定——全部依賴超越函數。erf 出現在常態分佈的計算中，ln 出現在似然比中，exp 出現在 Poisson 分佈等離散模型中。</p>
+
+<p>隱私統計分析是一個正在成長的領域。除了醫療場景，還有選舉驗證（證明計票結果正確但不洩露個票）、薪資統計（證明公司符合同工同酬法規但不洩露個人薪資）等應用。這些場景的共通特徵是：計算不複雜，但涉及隱私資料，而且需要數學上的可信度。</p>
+
+<h3><span class="section-num">5.3</span> 高精度可驗證計算</h3>
+
+<div class="scenario-box">
+  <strong>場景：</strong>一家太空公司將軌道計算外包給雲端算力提供商。計算完成後，太空公司想驗證結果的正確性，但不想（也沒有算力）重新算一遍整個軌道模擬。
+</div>
+
+<p>科學計算和工程模擬經常需要高精度——不是 16-bit，而是 24-bit、28-bit 甚至更高。前面提到，在這種精度下，查表法的表格會暴增到數億筆，完全不切實際。多項式法的成本隨精度緩慢增長（可能需要略高的多項式次數），遠不及查表法的指數暴增。</p>
+
+<p>這個場景不一定需要「零知識」（計算本身可能不涉及隱私），但需要「可驗證」——外包方需要一份不可偽造的正確性證明。ZKP 技術恰好能提供這種能力，而且驗證成本極低。</p>
+
+<h3><span class="section-num">5.4</span> ZKML——超越函數需求的最大推動力</h3>
+
+<p>ZKML（零知識機器學習）是目前推動「ZK 電路中計算超越函數」這個問題的<strong>最大力量</strong>。機器學習模型的推理過程大量使用非線性激活函數——Softmax 需要 exp，GELU 需要 erf，損失函數需要 ln。一次完整的推理可能呼叫這些函數上千次。過去五年間，至少 14 個學術與產業系統（ezkl、ZKML Compiler、zkLLM、zkGPT、ZKTorch 等）投入了 ZK 超越函數計算的研究，幾乎全部由 ZKML 需求驅動。</p>
+
+<p>然而，ZKML 的計算特徵——<strong>大批次、低精度需求（INT8/16-bit 即可）、函數種類少（通常只有 1-2 種激活函數重複使用）</strong>——恰好是查表法的主場。這 14 個系統中絕大多數選擇了查表法（logUP、CQ2、tlookup 等），少數使用分段線性或整數近似，但<strong>沒有任何一個採用多項式近似</strong>。這不是巧合，而是理性的工程決策：在大批次、低精度的場景中，查表法的攤提成本極低。</p>
+
+<div class="key-insight">
+  <strong>ZKML 告訴我們兩件事：</strong><br>
+  (1) 超越函數在 ZK 電路中的需求是<strong>真實且迫切</strong>的——14 個系統在解決同一個問題。<br>
+  (2) 在 ZKML 的典型場景中，查表法是最佳選擇——我們不需要、也不應該宣稱多項式法在這個場景中更好。
+</div>
+
+<p>但 ZKML 不是超越函數的唯一應用場景。前面三個場景（金融計算需要多種函數同時存在、隱私統計分析需要低頻多樣的函數、高精度計算使查表不可行）代表了查表法力不從心的結構性情境。多項式方法論的價值正是在這些場景中體現——不是取代查表法，而是填補查表法無法覆蓋的空缺。</p>
+
+<hr>
+
+<!-- ====== Section 6 ====== -->
+<h2><span class="section-num">&sect;6</span>多項式法 vs 查表法——各自的適用範圍</h2>
+
+<p>綜合以上分析，我們可以歸納出兩種方法各自的優勢所在：</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>特徵</th>
+      <th>查表法的表現</th>
+      <th>多項式法的表現</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>精度</td>
+      <td class="em">零插值誤差（在表格解析度下）</td>
+      <td>近似誤差（ULP 1–3，≤ 0.005%）</td>
+    </tr>
+    <tr>
+      <td>單一函數、大量重複呼叫</td>
+      <td class="em">最佳選擇</td>
+      <td>成本較高</td>
+    </tr>
+    <tr>
+      <td>多種函數同時存在</td>
+      <td>表格線性疊加，成本上升</td>
+      <td class="em">共用電路，只換係數</td>
+    </tr>
+    <tr>
+      <td>精度需求 > 16-bit</td>
+      <td>表格指數暴增，不可行</td>
+      <td class="em">成本線性成長（增加 lookups），遠低於查表法的指數成長</td>
+    </tr>
+    <tr>
+      <td>出現頻率低的函數</td>
+      <td>整張 table 仍須列入 proving key，增加記憶體與 setup 開銷</td>
+      <td class="em">按需計算，無額外 table 開銷</td>
+    </tr>
+    <tr>
+      <td>函數種類未知（需通用性）</td>
+      <td>每種函數都要建新表</td>
+      <td class="em">同一電路處理所有函數</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="key-insight">
+  <strong>定位：</strong>查表法在精度上無可取代——它達到零誤差。我們提供的是一個<strong>用微小精度損失（ULP ≤ 3）換取巨大 table size 縮減</strong>的替代方案，專門針對查表法力不從心的場景：需要多種函數（每種都要一張大表）、需要更高精度（使查表不可行）、或者電路整體 table 預算有限。
+</div>
+
+<hr>
+
+<!-- ====== Section 7 ====== -->
+<h2><span class="section-num">&sect;7</span>多項式法要解決什麼問題</h2>
+
+<p>決定走多項式路線之後，仍然有幾個必須面對的技術挑戰：</p>
+
+<h3>挑戰一：選什麼樣的多項式？</h3>
+
+<p>同樣次數的多項式，不同的係數會產生完全不同的近似效果。最常見的 Taylor 展開在「單一點附近」表現最好，但我們需要的是「整個輸入範圍都夠好」。存在更好的選擇嗎？答案是肯定的——數值分析領域早在 1934 年就有了理論上的最佳解（Minimax 多項式），但如何把它應用到 ZK 電路的定點數環境中，是一個尚未被系統性研究的問題。</p>
+
+<h3>挑戰二：定點數的精度損失</h3>
+
+<p>ZK 電路中所有數字都是整數。要表達小數，我們用「定點數」——把所有值乘以一個固定的放大倍數（比如 65,536），用整數來模擬小數運算。但每次乘法之後，數字會變得很大，需要「截斷」回正常範圍。每次截斷都會丟失一點精度，多次截斷下來，累積的誤差可能會超出容忍範圍。</p>
+
+<h3>挑戰三：安全性——如何防止作弊</h3>
+
+<p>ZK 電路中有一個微妙的安全問題：計算方（prover）控制著所有中間值。一個惡意的 prover 可以故意填入不合法的輸入值，試圖讓電路產出錯誤但看似正確的結果。傳統的做法是在電路中加入額外的「範圍檢查」來防止這種攻擊。但額外的檢查意味著額外的成本。有沒有更聰明的方式？</p>
+
+<h3>挑戰四：通用性——能不能一勞永逸？</h3>
+
+<p>如果每個超越函數都需要從頭設計一個專用的電路，那維護成本會隨函數數量線性增長。理想情況下，我們希望有一個「通用電路」——電路結構固定不變，切換函數只需要更換幾個參數值。這需要找到一個統一的框架，能夠涵蓋各種不同的超越函數。</p>
+
+<hr>
+
+<!-- ====== Section 8 ====== -->
+<h2><span class="section-num">&sect;8</span>我們的三項核心技術與通用架構</h2>
+
+<p>針對上述四個挑戰，我們提出三項核心技術——分別解決挑戰一至三——並將它們整合為一個以 (pp, d) 為參數的通用電路架構（解決挑戰四）。</p>
+
+<h3>8.1 Minimax (Remez) 最佳係數 &mdash; 解決挑戰一</h3>
+
+<div class="compare">
+  <div class="col before">
+    <div class="col-title">傳統做法：Taylor 係數</div>
+    <p>由微積分公式直接決定。設計者沒有選擇空間。在展開點附近很準，遠離展開點就崩壞。</p>
+  </div>
+  <div class="col after">
+    <div class="col-title">我們的做法：Minimax 係數</div>
+    <p>用 Remez 演算法找出在整個輸入範圍上「最壞情況最好」的係數。同樣的電路結構，只是換了一組更聰明的係數。精度改善顯著（例如 exp 從 ULP 12 降至 1，改善 12 倍）。</p>
+  </div>
+</div>
+
+<p>Minimax 多項式本身不是新發明——它是 1934 年的數學理論。在全同態加密（FHE）領域也早已廣泛使用。但 ZK 電路有自己獨特的約束（定點數量化、有限域運算），據我們的文獻回顧，尚未有人系統性地分析 Minimax 係數在 ZK 定點環境中的表現。我們的貢獻在於：建立從「浮點最佳係數」到「定點 ZK 電路中的實際精度」的完整橋接。</p>
+
+<h3>8.2 輸入範圍驗證（ExplicitRC）&mdash; 解決挑戰三</h3>
+
+<div class="compare">
+  <div class="col before">
+    <div class="col-title">問題：不受限的輸入</div>
+    <p>ZK 電路中所有值都是有限域元素（0 到 ~2<sup>254</sup>）。Prover 可以提供任何值作為輸入 R，包括超出多項式設計範圍的值。超出範圍的輸入會導致多項式<b>外推</b>——產生看似合法但錯誤的結果。</p>
+  </div>
+  <div class="col after">
+    <div class="col-title">我們的做法：Gap Decomposition</div>
+    <p>用一個簡潔的約束驗證 R &le; R_MAX：將差值 gap = R_MAX &minus; R 分解為兩個 byte（共用已有的 256-entry 表格）。若 R 超出範圍，gap 在有限域中 wrap around 為極大數，無法分解為兩個 byte——<b>確定性安全</b>。</p>
+  </div>
+</div>
+
+<p>ExplicitRC 的代價僅為 +1 gate（相對於不做任何檢查的版本），但提供確定性的安全保證——不需要機率論證，不依賴多項式的特定數學性質。這是一個標準的 range check 技術，不是創新本身，但它是電路設計中不可或缺的安全保障。</p>
+
+<h3>8.3 Deferred Truncation（延後截斷）&mdash; 解決挑戰二</h3>
+
+<div class="compare">
+  <div class="col before">
+    <div class="col-title">傳統做法：每步截斷</div>
+    <p>每次乘法後立刻截斷，防止數字太大。計算五次乘法就截斷五次，每次都丟失一點精度。</p>
+  </div>
+  <div class="col after">
+    <div class="col-title">我們的做法：一次截斷</div>
+    <p>利用 ZK 有限域的「免費空間」——數字可以長到 254-bit，而我們的運算只需要約 (d+1)&times;pp bit（例如 d=5, pp=16 時約 96 bit，僅用到域容量的 38%）。所以讓中間值自由增長，最後一次性截斷，避免多次中間截斷的累積誤差。實測精度改善 2 倍，lookup 數量節省約 40%。</p>
+  </div>
+</div>
+
+<p>這個策略之所以可行，是因為 ZK 電路的有限域提供了一個在傳統 CPU 上不存在的「免費資源」：暫存空間。一般的程式語言中，64-bit 暫存器迫使你頻繁截斷；但 ZK 的 254-bit 有限域給了我們足夠的餘裕，可以把所有截斷延後到最後一步。</p>
+
+<h3>組合效果：通用 Horner 求值電路 &mdash; 解決挑戰四</h3>
+
+<div class="result-box">
+  <strong>最終成果：</strong>一個以 (pp, d) 為參數的小型電路，只需要一張 256 筆的共用表格（8-bit byte 範圍表 [0, 255]，用於驗證截斷正確性，與函數種類無關）。要切換函數，只需要替換 d 個係數值（例如 d=5 時為五個）——電路結構完全不變。<br><br>
+  已驗證 13 個函數（exp、ln、sin、arctan、erf、GELU、sigmoid 等），不同函數產生的證明大小完全相同，證明時間差異小於 1.4%。這驗證了「通用電路」的設計目標：不同函數共享同一套基礎設施，差異只在參數選擇。
+</div>
+
+<hr>
+
+<!-- ====== Section 9 ====== -->
+<h2><span class="section-num">&sect;9</span>為什麼這個研究有意義</h2>
+
+<p>總結來說，這個研究的價值在三個層面：</p>
+
+<h3>對 ZK 生態系統</h3>
+
+<p>隨著 ZKP 從學術走向大規模工業應用（隱私推論、可驗證計算、金融合規），「在 ZK 電路中高效計算複雜函數」不再是邊緣問題，而是基礎設施的一部分。我們提供了一個在查表法之外的替代方案，填補了多函數、高精度、低頻呼叫這三個場景的空缺。</p>
+
+<h3>對密碼學工程</h3>
+
+<p>Deferred truncation 展示了一個重要的設計原則：ZK 電路的有限域不僅是計算的限制，更是可以利用的資源。254-bit 的 BN254 域讓我們可以省略中間截斷，同時提升精度並減少約束數量。這個思路——利用域結構的特性來優化電路——潛在地也可以應用到其他 ZK 電路設計中。</p>
+
+<h3>對數值分析與密碼學的交叉</h3>
+
+<p>Minimax 多項式在數值分析中是教科書知識，在 FHE 中也已經是標準工具。但在 ZK 領域，這兩個社群之間的知識轉移尚未充分發生。我們的工作建立了從數值分析的最佳化理論到 ZK 電路實作的完整橋樑，包括定點量化的誤差分析、電路結構的設計空間探索、以及安全性的形式化證明。</p>
+
+<div class="key-insight">
+  <strong>一句話總結：</strong>我們用三項互補的技術——最佳化的係數選擇（Minimax）、利用有限域結構的精度保持（Deferred Truncation）、以及通用的 (pp, d) 參數化設計——整合為一個只需 256 entries 共用表格的通用多項式求值架構，為 ZK 生態系統在查表法之外提供了一條可行的替代路線。
+</div>
+
+<hr>
+
+<p style="text-align: center; color: #718096; font-size: 14px; margin-top: 40px;">
+  詳細的技術比較與文獻分析請見《差異比較》文件
+</p>
+
+</body>
+</html>

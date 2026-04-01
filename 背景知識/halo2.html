@@ -1,0 +1,1546 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ch.8 Halo2 &mdash; ZK Handbook</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>ZK Handbook</h1>
+      <div class="subtitle">Zero-Knowledge Proof Systems</div>
+    </div>
+    <nav>
+      <div class="section-label">總覽</div>
+      <a href="index.html"><span class="page-num">0.</span> Home</a>
+
+      <div class="section-label">基礎</div>
+      <a href="foundations.html"><span class="page-num">1.</span> Mathematical Foundations</a>
+      <a href="zkp-basics.html"><span class="page-num">2.</span> ZKP: Basics &amp; Properties</a>
+
+      <div class="section-label">構建模組</div>
+      <a href="polynomial-commitments.html"><span class="page-num">3.</span> Polynomial Commitments</a>
+      <a href="arithmetization.html"><span class="page-num">4.</span> Arithmetization</a>
+      <a href="fft-domains.html"><span class="page-num">5.</span> FFT &amp; Evaluation Domains</a>
+
+      <div class="section-label">證明系統</div>
+      <a href="groth16.html"><span class="page-num">6.</span> Groth16</a>
+      <a href="plonk.html"><span class="page-num">7.</span> PLONK</a>
+      <a href="halo2.html" class="active"><span class="page-num">8.</span> Halo2</a>
+
+      <div class="section-label">進階主題</div>
+      <a href="lookup-arguments.html"><span class="page-num">9.</span> Lookup Arguments</a>
+      <a href="polynomial-method.html"><span class="page-num">10.</span> Polynomial Method</a>
+      <a href="security-proofs.html"><span class="page-num">11.</span> Security Proofs</a>
+
+      <div class="section-label">論文方法論</div>
+      <a href="fixed-point.html"><span class="page-num">12.</span> 有限域定點運算</a>
+      <a href="approximation-theory.html"><span class="page-num">13.</span> 多項式逼近理論</a>
+      <a href="horner-evaluation.html"><span class="page-num">14.</span> Horner 求值</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>第八章：Halo2</h1>
+      <p class="page-subtitle">
+        Zcash 的 PLONKish 證明系統 &mdash; 透過 IPA 承諾實現透明設置、自定義閘、查找論證、
+        基於區域的電路佈局，以及利用橢圓曲線循環進行遞迴證明組合。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  DEFINITIONS SECTION                                         -->
+    <!-- ============================================================ -->
+    <div class="definitions-section">
+      <h2>關鍵定義</h2>
+
+      <div class="def-item">
+        <div class="def-term">Halo2 <span class="zh">Halo2</span></div>
+        <div class="def-body">
+          Zcash 的 PLONKish 證明系統，建立在 <strong>Inner Product Argument (IPA)</strong>
+          多項式承諾方案之上，<em>不需要可信設置</em>。Halo2 在核心 PLONK 協議基礎上擴展了三大功能：
+          <strong>自定義閘</strong>（任意多項式約束）、<strong>查找論證</strong>（證明值存在於預計算表中），
+          以及<strong>基於區域的電路佈局</strong>（透過晶片實現模組化電路組合）。
+          它是原始 <em>Halo</em> 方案（Bowe、Grigg、Hopwood，2019 年）的後繼者，該方案透過對 IPA 承諾使用「累積方案」
+          而非直接驗證，首次實現了無需可信設置的遞迴證明組合。Halo2 是驅動 Zcash Orchard 隱蔽池的證明系統。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Halo2 Domain <span class="zh">Halo2 域</span></div>
+        <div class="def-body">
+          電路定義所在的求值域：
+          $H = \{\omega^0, \omega^1, \ldots, \omega^{2^k - 1}\}$，其中 $\omega$ 是純量場中
+          $2^k$ 次本原單位根。參數 $k$ 的選取需確保
+          $2^k \geq$ 電路所需的行數（包含盲化行）。此域決定了最大電路規模並影響證明時間。在程式碼中：
+          <code>EvaluationDomain::new(k, j)</code>，其中 $k$ 是以 $\log_2$ 表示的行數，$j$ 是擴展域倍增器的次數。
+          擴展域 $H' = \{\omega'^0, \omega'^1, \ldots, \omega'^{2^{k+j} - 1}\}$ 用於求值商多項式，
+          因為閘約束使其次數高於 $2^k - 1$。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Region <span class="zh">區域</span></div>
+        <div class="def-body">
+          電路表中一塊連續的矩形區域。區域內的單元格可透過<em>相對偏移量</em>互相引用，
+          使區域與位置無關。區域由<strong>佈局器</strong>分配至特定行。一個電路可包含許多區域 &mdash;
+          每個區域通常由一個<em>晶片</em>建立，以實現一項邏輯操作
+          （例如一次乘法、一輪雜湊運算）。核心優勢在於：晶片以相對定址定義區域，
+          佈局器將其解析為絕對位置，從而實現模組化電路組合。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Column Types <span class="zh">欄位類型</span></div>
+        <div class="def-body">
+          Halo2 電路表中的每個單元格都屬於以下三種欄位類型之一：
+          <ul>
+            <li><strong>Advice Column</strong> <span class="zh">(建議欄)</span>：私密見證值，由證明者為每個證明設定。這些是證明者知道但驗證者看不到的「秘密輸入」。每個證明可以有不同的建議值。使用多項式承諾進行提交。</li>
+            <li><strong>Fixed Column</strong> <span class="zh">(固定欄)</span>：在電路配置階段確定的常數。固定欄是<em>驗證金鑰</em>的一部分 &mdash; 對同一電路的每個證明都相同。選擇器是固定欄的特殊情況。</li>
+            <li><strong>Instance Column</strong> <span class="zh">(實例欄)</span>：證明者和驗證者都已知的公開輸入。例如，原像證明中的雜湊輸出，或成員資格證明中的 Merkle 根。實例值同樣由驗證者提供。</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Selector <span class="zh">選擇器</span></div>
+        <div class="def-body">
+          一種值限制為 $\{0, 1\}$ 的固定欄，用於在特定行啟用或停用閘。
+          當 $s_i = 1$ 時（位於第 $i$ 行），關聯的閘約束被強制執行；當 $s_i = 0$ 時，
+          閘多項式乘以零，從而平凡地滿足約束。Halo2 執行<strong>選擇器合併</strong>作為最佳化：
+          多個永遠不會同時啟用的選擇器可以打包到單一固定欄中，減少欄數從而縮小證明大小。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Custom Gate <span class="zh">自定義閘</span></div>
+        <div class="def-body">
+          對電路表中單元格的任意多項式約束。與標準 PLONK 閘
+          （限於 $a \cdot q_L + b \cdot q_R + a \cdot b \cdot q_M + c \cdot q_O + q_C = 0$）不同，
+          自定義閘可以引用<em>不同旋轉量</em>（行）和<em>不同欄</em>的單元格，
+          形成任意的多變量多項式表達式。一般形式：
+          $$\sum_i s_i \cdot \prod_j \text{cell}_{ij}^{e_{ij}} = 0$$
+          閘多項式的次數直接影響證明成本：更高的次數需要更大的擴展求值域。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Rotation <span class="zh">旋轉</span></div>
+        <div class="def-body">
+          在閘定義中查詢單元格時使用的行偏移量。
+          <code>Rotation::cur()</code> 指當前行（偏移 0），
+          <code>Rotation::next()</code> 指下一行（+1），
+          <code>Rotation::prev()</code> 指上一行（&minus;1）。
+          也可使用任意偏移量，如 <code>Rotation(3)</code>。旋轉以域大小 $2^k$ 為模進行環繞，
+          因為約束多項式在循環群 $H$ 上求值。任何閘中使用的最大旋轉偏移量會影響<em>盲化因子</em>。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Layouter <span class="zh">佈局器</span></div>
+        <div class="def-body">
+          將區域分配到電路表中特定行的演算法。
+          <code>SimpleFloorPlanner</code> 是預設佈局器 &mdash; 它按照分配順序，
+          從上到下、逐欄地排列區域。佈局器負責將區域內的相對偏移解析為絕對行位置。
+          良好的佈局器可以最小化浪費的行數（從而最小化 $k$），降低證明時間。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Chip <span class="zh">晶片</span></div>
+        <div class="def-body">
+          一個可重用的電路元件，實現特定的功能。
+          例如 <em>ECC chip</em>（橢圓曲線運算）、<em>Poseidon chip</em>
+          （Poseidon 雜湊）或<em>範圍檢查晶片</em>。一個晶片封裝三個部分：
+          (1) <strong>配置</strong> &mdash; 需要哪些欄和閘，
+          (2) <strong>閘定義</strong> &mdash; 多項式約束，
+          (3) <strong>賦值邏輯</strong> &mdash; 如何為給定輸入填充單元格。
+          晶片可以組合：高層晶片可以使用低層晶片。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Proof Transcript <span class="zh">證明抄本</span></div>
+        <div class="def-body">
+          證明協議中交換的所有承諾和挑戰的有序記錄。
+          在非互動式（Fiat-Shamir）設定中，抄本是一個基於雜湊的物件：
+          每個承諾被吸收進抄本，每個挑戰從中擠出。
+          Halo2 使用 <code>Blake2b</code> 雜湊函數進行抄本雜湊。抄本確保所有挑戰都是從先前的協議訊息中
+          確定性地推導而來，防止證明者選擇有利的挑戰。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Challenge API <span class="zh">挑戰 API</span></div>
+        <div class="def-body">
+          Halo2 的一項功能（在後續版本中加入），允許電路使用驗證者挑戰
+          &mdash; 透過 Fiat-Shamir 推導的值 &mdash; 作為電路內部的建議值。
+          這使得需要電路操作隨機挑戰的協議成為可能，例如 <em>Shuffle 論證</em>和<em>自定義查找方案</em>。
+          挑戰在 <code>configure()</code> 期間請求，並以 <code>Expression::Challenge</code> 的形式在閘中可用。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Cost Model <span class="zh">成本模型</span></div>
+        <div class="def-body">
+          Halo2 中的證明大小和驗證時間取決於多個因素：
+          (1) <strong>建議欄</strong>的數量（每個會在證明中新增一個承諾），
+          (2) <strong>固定欄</strong>的數量（驗證金鑰的一部分），
+          (3) <strong>實例欄</strong>的數量，
+          (4) <strong>閘多項式的次數</strong>（決定擴展域大小），
+          (5) <strong>查找</strong>的數量（每個會新增排列多項式承諾），
+          (6) <strong>排列欄</strong>的數量（用於複製約束）。
+          IPA 開啟證明新增 $O(\log n)$ 個群元素。總證明大小大約為
+          $(\text{num\_advice} + \text{num\_lookups} \cdot 2 + \text{num\_perm\_products}) \cdot 32 + O(\log n) \cdot 64$ 位元組。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Blinding Factor <span class="zh">盲化因子</span></div>
+        <div class="def-body">
+          在求值域末尾保留給隨機盲化值的行數。
+          這些行填入隨機場元素，以確保零知識性（防止驗證者從多項式求值中得知見證值）。盲化因子為：
+          $$\text{blinding\_factors} = \text{max\_query\_degree} + 1$$
+          其中 <code>max_query_degree</code> 是所有閘和查找中使用的最大不同旋轉數。盲化行不可用於電路邏輯。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Minimum Rows <span class="zh">最小行數</span></div>
+        <div class="def-body">
+          電路必須至少有 $\text{blinding\_factors} + 1$ 行。這決定了
+          $k$ 的最小值：即使電路本身使用零行，我們仍需要 $2^k \geq \text{blinding\_factors} + 1$。
+          實際上，最小 $k$ 由以下條件決定：
+          $2^k \geq \max(\text{circuit\_rows}, \text{blinding\_factors} + 1)$。
+          這同時影響求值域的大小和證明時間。
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  8.1 Halo2 Architecture Overview                             -->
+    <!-- ============================================================ -->
+    <h2>8.1 Halo2 架構概覽</h2>
+
+    <p>
+      Halo2 是一個 <strong>PLONKish</strong> 證明系統：它使用與 PLONK 相同的核心框架
+      （在結構化表上進行多項式約束，並透過排列論證強制執行複製約束），但在三個關鍵方向上進行了擴展：
+    </p>
+
+    <ul>
+      <li><strong>IPA 承諾</strong> &mdash; 以 Inner Product Argument 取代 KZG，消除了對可信設置儀式的需求。任何人都可以僅使用公開已知的參數從頭驗證證明。</li>
+      <li><strong>自定義閘</strong> &mdash; 對不同旋轉量和欄位的單元格進行任意多項式約束，遠超 PLONK 固定的 $q_L a + q_R b + q_M ab + q_O c + q_C = 0$ 閘。</li>
+      <li><strong>查找論證</strong> &mdash; 內建支援證明某值存在於預計算表中，對範圍檢查、位元運算和雜湊函數至關重要。</li>
+      <li><strong>基於區域的佈局</strong> &mdash; 電路由模組化的「晶片」組成，每個晶片定義自己的區域。佈局器將這些區域解析為具體的表分配。</li>
+    </ul>
+
+    <div class="callout note">
+      <div class="callout-title">注意：PLONKish 不等於 PLONK</div>
+      <p>
+        「PLONKish」指的是一系列算術化方案，它們共享 PLONK 基於表的結構和排列論證，
+        但在承諾方案、閘類型和額外論證方面可能有所不同。Halo2、HyperPlonk 和各種 zkEVM 系統都屬於 PLONKish。
+      </p>
+    </div>
+
+    <h3>高層資料流</h3>
+
+    <div class="diagram">
+<pre>
+  電路定義                            證明                               驗證
+ +-----------------+            +--------------------+            +-------------------+
+ |   configure()   |            |  提交建議           |            |  讀取實例          |
+ |  - 欄位         |            |  (見證多項式)       |            |  (公開輸入)        |
+ |  - 閘           |---+        +--------+-----------+            +--------+----------+
+ |  - 查找         |   |                 |                                 |
+ +-----------------+   |                 v                                 v
+                       |        +--------------------+            +-------------------+
+                       +------->|  Fiat-Shamir       |            |  從抄本重新計算    |
+                       |        |  挑戰               |            |  挑戰              |
+ +-----------------+   |        |  (beta, gamma,     |            +--------+----------+
+ |  synthesize()   |   |        |   theta, x)        |                     |
+ |  - 分配單元格    |---+        +--------+-----------+                     v
+ |  - 啟用閘       |                     |                        +-------------------+
+ |  - 複製約束     |                     v                        |  在 x 處檢查      |
+ +-----------------+            +--------------------+            |  多項式恆等式      |
+                                |  排列與             |            |  (閘、排列、       |
+                                |  查找乘積           |            |   查找)            |
+                                +--------+-----------+            +--------+----------+
+                                         |                                 |
+                                         v                                 v
+                                +--------------------+            +-------------------+
+                                |  消失論證           |            |  驗證 IPA         |
+                                |  (商多項式)         |            |  開啟              |
+                                +--------+-----------+            +-------------------+
+                                         |
+                                         v
+                                +--------------------+
+                                |  多點開啟與         |
+                                |  IPA 證明           |
+                                +--------------------+
+</pre>
+    </div>
+
+    <p>
+      流程分為兩個階段。<strong>配置</strong>階段對每個電路設計只執行一次：
+      宣告欄位、定義閘的多項式表達式、註冊查找，並指定複製約束。這會產生<em>驗證金鑰</em>
+      （包含固定欄承諾和閘的中繼資料）和<em>證明金鑰</em>。
+      <strong>證明</strong>階段針對每個單獨的證明執行：將見證值分配到建議欄，
+      Fiat-Shamir 抄本生成挑戰，證明者構建承諾和開啟證明。
+    </p>
+
+    <!-- ============================================================ -->
+    <!--  8.2 Circuit API: The Programming Model                      -->
+    <!-- ============================================================ -->
+    <h2>8.2 電路 API：程式設計模型</h2>
+
+    <p>
+      Halo2 的電路 API 以 <code>Circuit</code> trait 為核心，每個電路都必須實作此 trait。
+      該 trait 有兩個核心方法和兩個關聯型別：
+    </p>
+
+    <h3><code>Circuit</code> Trait</h3>
+
+    <ul>
+      <li><code>type Config</code> &mdash; 一個結構體，持有電路所需的所有欄和閘的引用。</li>
+      <li><code>type FloorPlanner</code> &mdash; 佈局策略（通常為 <code>SimpleFloorPlanner</code>）。</li>
+      <li><code>fn configure(meta: &amp;mut ConstraintSystem&lt;F&gt;) -&gt; Self::Config</code> &mdash; 宣告欄位、定義閘、註冊查找。只呼叫一次以建立電路結構。</li>
+      <li><code>fn synthesize(&amp;self, config: Self::Config, layouter: impl Layouter&lt;F&gt;) -&gt; Result&lt;(), Error&gt;</code> &mdash; 在區域內為單元格分配具體值。每個證明呼叫一次。</li>
+    </ul>
+
+    <div class="callout definition">
+      <div class="callout-title">關鍵見解：結構與值的分離</div>
+      <p>
+        <code>configure()</code> 定義電路<em>長什麼樣</em>（欄位、閘、複製約束）。
+        <code>synthesize()</code> 為特定證明填入<em>具體值</em>。
+        相同的配置可重複用於具有不同輸入的多個證明。這種分離使得驗證金鑰保持靜態。
+      </p>
+    </div>
+
+    <h3><code>ConstraintSystem</code> API</h3>
+
+    <p>
+      在 <code>configure()</code> 內部，<code>ConstraintSystem</code> 提供了宣告電路結構的方法：
+    </p>
+
+    <ul>
+      <li><code>meta.advice_column()</code> &mdash; 建立新的建議欄</li>
+      <li><code>meta.fixed_column()</code> &mdash; 建立新的固定欄</li>
+      <li><code>meta.instance_column()</code> &mdash; 建立新的實例欄</li>
+      <li><code>meta.selector()</code> &mdash; 建立新的選擇器（最佳化的固定欄）</li>
+      <li><code>meta.create_gate(name, |meta| { ... })</code> &mdash; 定義自定義閘</li>
+      <li><code>meta.lookup(name, |meta| { ... })</code> &mdash; 註冊查找論證</li>
+      <li><code>meta.enable_equality(column)</code> &mdash; 允許對欄進行複製約束</li>
+    </ul>
+
+    <h3>完整範例：乘法電路</h3>
+
+    <p>
+      以下範例實作了一個證明 $a \times b = c$ 的電路。它展示了欄位、選擇器、自定義閘、區域分配和複製約束。
+    </p>
+
+    <pre><code>use halo2_proofs::{
+    arithmetic::Field,
+    circuit::{AssignedCell, Chip, Layouter, Region, SimpleFloorPlanner, Value},
+    plonk::{Advice, Column, ConstraintSystem, Error, Fixed, Instance, Selector},
+    poly::Rotation,
+};
+
+#[derive(Clone, Debug)]
+struct MulConfig {
+    a: Column&lt;Advice&gt;,
+    b: Column&lt;Advice&gt;,
+    c: Column&lt;Advice&gt;,
+    s_mul: Selector,
+    instance: Column&lt;Instance&gt;,
+}
+
+struct MulCircuit&lt;F: Field&gt; {
+    a: Value&lt;F&gt;,
+    b: Value&lt;F&gt;,
+}
+
+impl&lt;F: Field&gt; Circuit&lt;F&gt; for MulCircuit&lt;F&gt; {
+    type Config = MulConfig;
+    type FloorPlanner = SimpleFloorPlanner;
+
+    fn without_witnesses(&amp;self) -&gt; Self {
+        MulCircuit { a: Value::unknown(), b: Value::unknown() }
+    }
+
+    fn configure(meta: &amp;mut ConstraintSystem&lt;F&gt;) -&gt; Self::Config {
+        // Declare columns
+        let a = meta.advice_column();
+        let b = meta.advice_column();
+        let c = meta.advice_column();
+        let s_mul = meta.selector();
+        let instance = meta.instance_column();
+
+        // Enable equality for copy constraints
+        meta.enable_equality(a);
+        meta.enable_equality(b);
+        meta.enable_equality(c);
+        meta.enable_equality(instance);
+
+        // Define the multiplication gate:
+        //   s_mul * (a * b - c) = 0
+        // When s_mul = 1: enforces a * b = c
+        // When s_mul = 0: no constraint (gate is "off")
+        meta.create_gate("mul", |meta| {
+            let a = meta.query_advice(a, Rotation::cur());
+            let b = meta.query_advice(b, Rotation::cur());
+            let c = meta.query_advice(c, Rotation::cur());
+            let s = meta.query_selector(s_mul);
+            vec![s * (a * b - c)]
+        });
+
+        MulConfig { a, b, c, s_mul, instance }
+    }
+
+    fn synthesize(
+        &amp;self,
+        config: Self::Config,
+        mut layouter: impl Layouter&lt;F&gt;,
+    ) -&gt; Result&lt;(), Error&gt; {
+        // Assign a region for the multiplication
+        let c_cell = layouter.assign_region(
+            || "mul_region",
+            |mut region: Region&lt;'_, F&gt;| {
+                // Enable the selector at row 0
+                config.s_mul.enable(&amp;mut region, 0)?;
+
+                // Assign advice values
+                let a_cell = region.assign_advice(
+                    || "a", config.a, 0, || self.a,
+                )?;
+                let b_cell = region.assign_advice(
+                    || "b", config.b, 0, || self.b,
+                )?;
+                let c_val = self.a.and_then(|a| self.b.map(|b| a * b));
+                let c_cell = region.assign_advice(
+                    || "c", config.c, 0, || c_val,
+                )?;
+
+                Ok(c_cell)
+            },
+        )?;
+
+        // Constrain output to equal public instance
+        layouter.constrain_instance(c_cell.cell(), config.instance, 0)?;
+
+        Ok(())
+    }
+}</code></pre>
+
+    <div class="callout example">
+      <div class="callout-title">範例：執行時發生了什麼</div>
+      <p>
+        假設證明者設定 $a = 3$，$b = 7$。電路填入：
+      </p>
+      <table>
+        <thead><tr><th>行</th><th>a (建議)</th><th>b (建議)</th><th>c (建議)</th><th>s_mul (選擇器)</th></tr></thead>
+        <tbody>
+          <tr><td>0</td><td>3</td><td>7</td><td>21</td><td>1</td></tr>
+          <tr><td>1</td><td><em>盲化</em></td><td><em>盲化</em></td><td><em>盲化</em></td><td>0</td></tr>
+          <tr><td>...</td><td><em>盲化</em></td><td><em>盲化</em></td><td><em>盲化</em></td><td>0</td></tr>
+        </tbody>
+      </table>
+      <p>
+        在第 0 行，閘檢查：$1 \cdot (3 \cdot 7 - 21) = 0$。複製約束將第 0 行的 $c$ 綁定到實例欄的值 21。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  8.3 Custom Gates in Detail                                  -->
+    <!-- ============================================================ -->
+    <h2>8.3 自定義閘詳解</h2>
+
+    <p>
+      自定義閘是 Halo2 的核心表達能力。每個閘都定義為一個回傳
+      <code>Vec&lt;Expression&lt;F&gt;&gt;</code> 的閉包。向量中的每個表達式必須在閘的選擇器啟用的每一行都求值為零。
+    </p>
+
+    <h3>表達式類型</h3>
+
+    <p>
+      <code>Expression&lt;F&gt;</code> 由以下原語構建：
+    </p>
+
+    <ul>
+      <li><code>Constant(F)</code> &mdash; 場元素字面值</li>
+      <li><code>Selector(Selector)</code> &mdash; 查詢當前行的選擇器</li>
+      <li><code>Fixed(FixedQuery)</code> &mdash; 以旋轉量查詢固定欄</li>
+      <li><code>Advice(AdviceQuery)</code> &mdash; 以旋轉量查詢建議欄</li>
+      <li><code>Instance(InstanceQuery)</code> &mdash; 以旋轉量查詢實例欄</li>
+      <li><code>Challenge(Challenge)</code> &mdash; Fiat-Shamir 挑戰值</li>
+      <li><code>Negated(Box&lt;Expression&gt;)</code>、<code>Sum(..)</code>、<code>Product(..)</code>、<code>Scaled(..)</code> &mdash; 算術組合子</li>
+    </ul>
+
+    <h3>閘的範例</h3>
+
+    <h4>布林約束</h4>
+    <p>
+      強制單元格值為 0 或 1：
+    </p>
+    <pre><code>meta.create_gate("boolean", |meta| {
+    let a = meta.query_advice(col_a, Rotation::cur());
+    let s = meta.query_selector(s_bool);
+    // s * a * (1 - a) = 0
+    // Satisfied only when a = 0 or a = 1
+    vec![s * a.clone() * (Expression::Constant(F::ONE) - a)]
+});</code></pre>
+
+    <p>
+      閘多項式：$s \cdot a \cdot (1 - a) = 0$。這是 3 次（選擇器乘以 $a$ 的兩個因子）。
+    </p>
+
+    <h4>範圍檢查（4 位元）</h4>
+    <p>
+      透過位元分解證明一個值在 $[0, 15]$ 範圍內：
+    </p>
+    <pre><code>// Advice columns: value, b0, b1, b2, b3
+meta.create_gate("range_4bit", |meta| {
+    let v = meta.query_advice(value, Rotation::cur());
+    let b0 = meta.query_advice(bit0, Rotation::cur());
+    let b1 = meta.query_advice(bit1, Rotation::cur());
+    let b2 = meta.query_advice(bit2, Rotation::cur());
+    let b3 = meta.query_advice(bit3, Rotation::cur());
+    let s = meta.query_selector(s_range);
+    let one = Expression::Constant(F::ONE);
+
+    vec![
+        // Decomposition: v = b0 + 2*b1 + 4*b2 + 8*b3
+        s.clone() * (v - (b0.clone()
+            + b1.clone() * Expression::Constant(F::from(2))
+            + b2.clone() * Expression::Constant(F::from(4))
+            + b3.clone() * Expression::Constant(F::from(8)))),
+        // Each bit is boolean
+        s.clone() * b0.clone() * (one.clone() - b0),
+        s.clone() * b1.clone() * (one.clone() - b1),
+        s.clone() * b2.clone() * (one.clone() - b2),
+        s * b3.clone() * (one - b3),
+    ]
+});</code></pre>
+
+    <h4>條件等式</h4>
+    <p>
+      若 <code>cond = 1</code>，強制 $a = b$；若 <code>cond = 0</code>，則無約束：
+    </p>
+    <pre><code>meta.create_gate("conditional_eq", |meta| {
+    let a = meta.query_advice(col_a, Rotation::cur());
+    let b = meta.query_advice(col_b, Rotation::cur());
+    let cond = meta.query_advice(col_cond, Rotation::cur());
+    let s = meta.query_selector(s_cond);
+    // s * cond * (a - b) = 0
+    vec![s * cond * (a - b)]
+});</code></pre>
+
+    <h4>跨行閘（Fibonacci）</h4>
+    <p>
+      使用旋轉量強制 $a_{n+2} = a_{n+1} + a_n$：
+    </p>
+    <pre><code>meta.create_gate("fibonacci", |meta| {
+    let a_cur  = meta.query_advice(col_a, Rotation::cur());   // row i
+    let a_next = meta.query_advice(col_a, Rotation::next());  // row i+1
+    let a_next2 = meta.query_advice(col_a, Rotation(2));      // row i+2
+    let s = meta.query_selector(s_fib);
+    // s * (a[i+2] - a[i+1] - a[i]) = 0
+    vec![s * (a_next2 - a_next - a_cur)]
+});</code></pre>
+
+    <h3>閘的次數與成本</h3>
+
+    <div class="callout warning">
+      <div class="callout-title">警告：閘的次數影響一切</div>
+      <p>
+        閘多項式的<strong>次數</strong>決定了擴展求值域的大小。更高的次數意味著更多的求值點、
+        更多的 FFT 運算和更慢的證明。擴展域大小為 $2^{k+j}$，其中 $j = \lceil \log_2(d) \rceil$，
+        $d$ 是最大閘次數。
+      </p>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>閘次數</th><th>擴展域因子 $j$</th><th>影響</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>2</td><td>1</td><td>最小 &mdash; 線性約束（例如 $s \cdot (a + b - c)$）</td></tr>
+        <tr><td>3</td><td>2</td><td>標準 &mdash; 乘法閘（$s \cdot (a \cdot b - c)$）</td></tr>
+        <tr><td>4</td><td>2</td><td>常見 &mdash; 條件檢查、帶選擇器的布林</td></tr>
+        <tr><td>5</td><td>3</td><td>昂貴 &mdash; 複雜的多變量約束</td></tr>
+        <tr><td>$d$</td><td>$\lceil \log_2 d \rceil$</td><td>每增加 2 的因子，FFT 工作量加倍</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ============================================================ -->
+    <!--  8.4 Regions, Layouter, and Floor Planning                   -->
+    <!-- ============================================================ -->
+    <h2>8.4 區域、佈局器與平面規劃</h2>
+
+    <p>
+      區域是 Halo2 電路中模組化的基本單位。區域是行和欄的連續區塊，其中的單元格以
+      區域內的<em>相對偏移</em>定址，而非絕對行號。
+    </p>
+
+    <h3>為什麼需要區域？</h3>
+    <ul>
+      <li><strong>模組化</strong>：每個晶片獨立定義自己的區域。晶片作者不需要知道哪些行號可用。</li>
+      <li><strong>可組合性</strong>：多個晶片可在同一電路中使用。佈局器處理放置。</li>
+      <li><strong>可重用性</strong>：一個晶片可被多次實例化（例如 100 輪雜湊），每次建立一個新區域。</li>
+    </ul>
+
+    <h3>區域分配</h3>
+
+    <pre><code>layouter.assign_region(
+    || "my_region",     // debug name
+    |mut region| {
+        // Row 0 within this region (absolute row determined by layouter)
+        region.assign_advice(|| "x", config.a, 0, || value_x)?;
+        // Row 1 within this region
+        region.assign_advice(|| "y", config.a, 1, || value_y)?;
+        // Enable selector at row 0 of this region
+        config.s.enable(&amp;mut region, 0)?;
+        Ok(())
+    },
+)?;</code></pre>
+
+    <div class="callout note">
+      <div class="callout-title">注意：偏移量是相對的</div>
+      <p>
+        當你寫 <code>region.assign_advice(..., 0, ...)</code> 時，<code>0</code> 是<em>區域內</em>的偏移量。
+        佈局器可能將此區域從絕對第 42 行開始放置，因此該單元格實際位於第 42 行。你永遠不需要自己指定絕對行號。
+      </p>
+    </div>
+
+    <h3>SimpleFloorPlanner</h3>
+
+    <p>
+      預設的 <code>SimpleFloorPlanner</code> 工作方式如下：
+    </p>
+
+    <ol>
+      <li>區域按照呼叫 <code>assign_region</code> 的順序進行分配。</li>
+      <li>每個區域被放置在下一個有足夠空閒空間的可用行。</li>
+      <li>使用不同欄位集合的區域可以在行上重疊（規劃器追蹤每行中哪些欄正在使用）。</li>
+      <li>若兩個區域使用相同的欄位，它們不能重疊，將被垂直堆疊。</li>
+    </ol>
+
+    <div class="diagram">
+<pre>
+  欄位：  a       b       c       fixed
+         +-------+-------+-------+-------+
+  第 0 行 | 區域 1         | 區域 2         |  （區域使用不同欄位，
+  第 1 行 | (a, b 欄)      | (c, fixed)    |   所以可以共享行）
+  第 2 行 |               |               |
+         +-------+-------+-------+-------+
+  第 3 行 | 區域 3 (使用 a, b, c)            |  （需要所有欄位，獨佔行）
+  第 4 行 |                               |
+         +-------+-------+-------+-------+
+  第 5 行 |          盲化行                  |
+  第 6 行 |        （隨機值）                |
+  第 7 行 |                               |
+         +-------+-------+-------+-------+
+</pre>
+    </div>
+
+    <h3>區域間的複製約束</h3>
+
+    <p>
+      區域是獨立的 &mdash; 但通常一個區域的輸出必須等於另一個區域的輸入。
+      這透過<strong>複製約束</strong>（排列論證的一部分）來處理：
+    </p>
+
+    <pre><code>// In region 1: compute a * b = c, return c_cell
+let c_cell = layouter.assign_region(|| "mul", |mut region| {
+    // ... assign a, b, c ...
+    Ok(c_cell)
+})?;
+
+// In region 2: use c_cell as input
+layouter.assign_region(|| "add", |mut region| {
+    // Copy c from region 1 into this region's row 0, column a
+    let c_copy = c_cell.copy_advice(|| "c_in", &amp;mut region, config.a, 0)?;
+    // ... continue with c_copy ...
+    Ok(())
+})?;</code></pre>
+
+    <p>
+      <code>copy_advice</code> 方法同時分配值並建立複製約束，排列論證將強制執行此約束。
+    </p>
+
+    <!-- ============================================================ -->
+    <!--  8.5 IPA Commitment in Halo2                                 -->
+    <!-- ============================================================ -->
+    <h2>8.5 Halo2 中的 IPA 承諾</h2>
+
+    <p>
+      Halo2 使用 <strong>Inner Product Argument (IPA)</strong> 作為其多項式承諾方案。
+      這是消除可信設置需求的關鍵設計選擇。
+    </p>
+
+    <h3>承諾</h3>
+
+    <p>
+      給定多項式 $f(X) = \sum_{i=0}^{n-1} a_i X^i$，其係數向量為
+      $\mathbf{a} = (a_0, a_1, \ldots, a_{n-1})$，以及公開已知的生成元
+      $\mathbf{G} = (G_0, G_1, \ldots, G_{n-1})$，承諾是一個 Pedersen 向量承諾：
+    </p>
+
+    $$C = \langle \mathbf{a}, \mathbf{G} \rangle + r \cdot H = \sum_{i=0}^{n-1} a_i G_i + r H$$
+
+    <p>
+      其中 $r$ 是隨機盲化因子，$H$ 是用於隱藏的附加生成元。
+    </p>
+
+    <h3>開啟（求值證明）</h3>
+
+    <p>
+      為了證明 $f(z) = v$（其中 $z$ 為挑戰點），IPA 協議使用遞迴二分法。
+      核心思想：將長度為 $n$ 的內積聲明歸約為長度 $n/2$ 的聲明，再歸約為 $n/4$，
+      如此進行 $\log_2 n$ 輪。
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <h4>初始設置</h4>
+        <p>
+          證明者持有 $\mathbf{a}$（係數），驗證者知道 $C$（承諾）、
+          $z$（求值點）和 $v = f(z)$（聲明的值）。定義
+          $\mathbf{b} = (1, z, z^2, \ldots, z^{n-1})$ 使得 $\langle \mathbf{a}, \mathbf{b} \rangle = v$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>遞迴二分（重複 $\log_2 n$ 次）</h4>
+        <p>
+          將 $\mathbf{a} = (\mathbf{a}_L \| \mathbf{a}_R)$、
+          $\mathbf{b} = (\mathbf{b}_L \| \mathbf{b}_R)$、
+          $\mathbf{G} = (\mathbf{G}_L \| \mathbf{G}_R)$ 分成兩半。
+          證明者傳送：
+          $$L = \langle \mathbf{a}_L, \mathbf{G}_R \rangle + \langle \mathbf{a}_L, \mathbf{b}_R \rangle \cdot U$$
+          $$R = \langle \mathbf{a}_R, \mathbf{G}_L \rangle + \langle \mathbf{a}_R, \mathbf{b}_L \rangle \cdot U$$
+          驗證者傳送挑戰 $u_j$。雙方計算：
+          $\mathbf{a}' = \mathbf{a}_L + u_j \mathbf{a}_R$，
+          $\mathbf{b}' = \mathbf{b}_L + u_j^{-1} \mathbf{b}_R$，
+          $\mathbf{G}' = \mathbf{G}_L + u_j^{-1} \mathbf{G}_R$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>最終檢查</h4>
+        <p>
+          經過 $\log_2 n$ 輪後，雙方都有純量值 $a'$、$b'$ 和單一生成元 $G'$。
+          驗證者檢查：$C' = a' G' + a' b' U$，其中 $C'$ 是從所有 $L$ 和 $R$ 值累積的承諾。
+        </p>
+      </div>
+    </div>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理：IPA 的健全性</div>
+      <p>
+        在離散對數假設下，IPA 方案具有<em>計算綁定性</em>：
+        沒有 PPT 對手能以超過可忽略的機率，產生兩個不同的多項式 $f \neq f'$ 且具有相同的承諾 $C$。
+        證明大小為 $O(\log n)$ 個群元素（具體為 $2 \log_2 n$ 個元素：每輪一個 $L$ 和一個 $R$）。
+      </p>
+    </div>
+
+    <h3>IPA 與 KZG：權衡取捨</h3>
+
+    <table>
+      <thead>
+        <tr><th>性質</th><th>IPA (Halo2)</th><th>KZG (PLONK)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>可信設置</td><td>無（透明）</td><td>需要（SRS 儀式）</td></tr>
+        <tr><td>每次開啟的證明大小</td><td>$O(\log n)$ 個群元素</td><td>$O(1)$ &mdash; 單一群元素</td></tr>
+        <tr><td>驗證時間</td><td>$O(n)$ &mdash; 需要 MSM</td><td>$O(1)$ &mdash; 配對檢查</td></tr>
+        <tr><td>假設</td><td>離散對數 (DLog)</td><td>$q$-SDH 或 AGM</td></tr>
+        <tr><td>曲線要求</td><td>任何素數階曲線</td><td>配對友好曲線</td></tr>
+        <tr><td>聚合</td><td>累積方案</td><td>透過隨機線性組合的批次驗證</td></tr>
+        <tr><td>後量子安全</td><td>否（DLog 被 Shor 破解）</td><td>否（配對被 Shor 破解）</td></tr>
+        <tr><td>批次開啟</td><td>透過累積攤銷</td><td>高效的批次配對</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">注意：Halo2 也可以使用 KZG</div>
+      <p>
+        Halo2 程式碼庫在承諾方案上是參數化的。Privacy Scaling Explorations (PSE) 的
+        <code>halo2_proofs</code> crate 同時支援 IPA 和 KZG 後端。以 Ethereum 為目標的分支
+        （用於 Scroll、Taiko）使用 KZG 以獲得鏈上驗證效率。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  8.6 The Proving Process                                     -->
+    <!-- ============================================================ -->
+    <h2>8.6 證明流程</h2>
+
+    <p>
+      Halo2 證明者遵循一系列結構化的多項式承諾和 Fiat-Shamir 挑戰步驟。每一步都建立在前一步之上。
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <h4>步驟一：提交見證多項式</h4>
+        <p>
+          對每個建議欄，將分配的值在域 $H$ 上進行插值以獲得多項式 $a_i(X)$。
+          在盲化行中加入隨機盲化值。承諾：$A_i = \mathsf{Com}(a_i(X))$。將所有 $A_i$ 送入抄本。
+        </p>
+      </div>
+      <div class="step">
+        <h4>步驟二：生成挑戰</h4>
+        <p>
+          從 Fiat-Shamir 抄本中擠出挑戰：
+        </p>
+        <ul>
+          <li>$\theta$ &mdash; 用於壓縮查找表欄</li>
+          <li>$\beta, \gamma$ &mdash; 用於排列論證和查找論證</li>
+        </ul>
+      </div>
+      <div class="step">
+        <h4>步驟三：查找排列</h4>
+        <p>
+          對每個查找論證，計算排列後的輸入和表欄 $A'(X)$ 和 $S'(X)$，
+          使得 $A'$ 是輸入表達式的排列，$S'$ 是對應的排序表。提交 $A'_i$ 和 $S'_i$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>步驟四：排列乘積</h4>
+        <p>
+          計算排列論證的大乘積多項式 $Z(X)$：
+          $$Z(\omega^0) = 1, \quad Z(\omega^{i+1}) = Z(\omega^i) \cdot \prod_j \frac{a_j(\omega^i) + \beta \cdot \delta^j \cdot \omega^i + \gamma}{a_j(\omega^i) + \beta \cdot \sigma_j(\omega^i) + \gamma}$$
+          同理，計算查找乘積多項式。提交所有乘積多項式。
+        </p>
+      </div>
+      <div class="step">
+        <h4>步驟五：消失論證</h4>
+        <p>
+          將所有閘約束、排列約束和查找約束合併為單一多項式 $h(X)$：
+          $$h(X) = \frac{\text{gate\_constraints}(X) + \text{perm\_constraints}(X) + \text{lookup\_constraints}(X)}{Z_H(X)}$$
+          由於分子在 $H$ 上消失，$h(X)$ 是一個多項式（無餘數）。
+          將 $h(X)$ 分割為次數 $n$ 的區塊 $h_0, h_1, \ldots$ 並分別提交。
+        </p>
+      </div>
+      <div class="step">
+        <h4>步驟六：多點開啟</h4>
+        <p>
+          從抄本中擠出隨機求值點 $x$。在 $x$ 處（以及需要下一行查詢時在 $x\omega$ 處）
+          求值所有已提交的多項式。按求值點分組開啟，並使用多點開啟方案進行批次處理。
+        </p>
+      </div>
+      <div class="step">
+        <h4>步驟七：IPA 證明</h4>
+        <p>
+          為所有批次多項式開啟產生 Inner Product Argument 證明。
+          這會在證明中新增 $2 \log_2 n$ 個群元素。驗證者可透過單次 IPA 驗證檢查所有開啟。
+        </p>
+      </div>
+    </div>
+
+    <div class="callout warning">
+      <div class="callout-title">警告：順序至關重要</div>
+      <p>
+        Fiat-Shamir 抄本必須以與證明者產生承諾完全相同的順序吸收它們。
+        任何不匹配 &mdash; 即使是在 $A_1$ 之前吸收 $A_2$ &mdash; 都會產生不同的挑戰，
+        導致證明無法驗證。這是自定義協議實作中常見的錯誤來源。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  8.7 Halo2 Domain Configuration                              -->
+    <!-- ============================================================ -->
+    <h2>8.7 Halo2 域配置</h2>
+
+    <p>
+      域參數 $k$ 是最重要的配置選擇：它決定了電路的容量並直接影響證明時間。
+    </p>
+
+    <h3>選擇 $k$</h3>
+
+    <p>
+      參數 $k$ 必須滿足：
+    </p>
+
+    $$2^k \geq \text{num\_circuit\_rows} + \text{blinding\_factors} + 1$$
+
+    <p>
+      其中 <code>blinding_factors</code> 取決於最大旋轉偏移量和階段數。實際上：
+    </p>
+
+    <pre><code>// Determine minimum k for a circuit
+let min_rows = circuit_rows + blinding_factors + 1;
+let k = (min_rows as f64).log2().ceil() as u32;
+
+// Example: 1000 circuit rows + 5 blinding rows + 1 = 1006
+// k = ceil(log2(1006)) = 10  (gives 1024 rows)</code></pre>
+
+    <h3>可用行數</h3>
+
+    <p>
+      並非所有 $2^k$ 行都可用於電路邏輯：
+    </p>
+
+    $$\text{usable\_rows} = 2^k - \text{blinding\_factors} - 1$$
+
+    <p>
+      最後幾行保留用於盲化，另有一行保留作為「不可用」的邊界行。
+    </p>
+
+    <h3>擴展域</h3>
+
+    <p>
+      商多項式 $h(X)$ 的次數高於 $n - 1$（其中 $n = 2^k$），因為它是閘多項式的乘積除以消失多項式。
+      為了高效求值 $h(X)$，Halo2 使用<strong>擴展域</strong>：
+    </p>
+
+    $$|H'| = 2^{k+j}$$
+
+    <p>
+      其中 $j$ 由最大閘次數 $d$ 決定。具體而言，在一般情況下
+      $j = \lceil \log_2(d - 1) \rceil + 1$，確保擴展域足夠大，
+      能夠無混疊地表示所有中間多項式。
+    </p>
+
+    <h3>單位根</h3>
+
+    <p>
+      單位根 $\omega$ 是純量場 $\mathbb{F}_q$ 中 $2^k$ 階乘法子群的生成元。
+      對於 Pallas 曲線：
+    </p>
+
+    <pre><code>// For Pallas scalar field (Fp of Vesta base field):
+// The field has a large power-of-two subgroup.
+// For k = 10: omega = g^(2^S / 2^10) where g is the generator
+// and S is the two-adicity of the field.
+//
+// Pasta curves have two-adicity S = 32, meaning
+// we can support k up to 32 (4 billion rows).</code></pre>
+
+    <div class="callout definition">
+      <div class="callout-title">定義：二進位適性 (Two-Adicity)</div>
+      <p>
+        若質數 $p$ 滿足 $p - 1 = 2^S \cdot t$（其中 $t$ 為奇數），則稱其具有<strong>二進位適性</strong> $S$。
+        這意味著 $\mathbb{F}_p^*$ 包含一個 $2^S$ 階的乘法子群。
+        對於 Pasta 曲線，$S = 32$，因此最大域大小為 $2^{32} \approx 4 \times 10^9$ 行。
+      </p>
+    </div>
+
+    <h3>實際 $k$ 值</h3>
+
+    <table>
+      <thead>
+        <tr><th>$k$</th><th>行數 ($2^k$)</th><th>可用行數（約）</th><th>典型用途</th><th>證明時間（粗估）</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>10</td><td>1,024</td><td>~1,018</td><td>簡單電路、測試</td><td>&lt; 1s</td></tr>
+        <tr><td>14</td><td>16,384</td><td>~16,378</td><td>Poseidon 雜湊、小型 ECC</td><td>~5s</td></tr>
+        <tr><td>17</td><td>131,072</td><td>~131,066</td><td>Merkle 樹證明</td><td>~30s</td></tr>
+        <tr><td>20</td><td>1,048,576</td><td>~1,048,570</td><td>複雜 DeFi 電路</td><td>~5 分鐘</td></tr>
+        <tr><td>23</td><td>8,388,608</td><td>~8,388,602</td><td>zkEVM（逐區塊）</td><td>~30 分鐘</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ============================================================ -->
+    <!--  8.8 Pallas and Vesta Curves                                 -->
+    <!-- ============================================================ -->
+    <h2>8.8 Pallas 與 Vesta 曲線</h2>
+
+    <p>
+      Halo2 設計為與 <strong>Pasta</strong> 曲線循環配合使用：一對名為 <strong>Pallas</strong>
+      和 <strong>Vesta</strong> 的橢圓曲線，專門為遞迴證明組合而設計。
+    </p>
+
+    <h3>什麼是曲線循環？</h3>
+
+    <p>
+      當兩條曲線的底場等於另一條的純量場（反之亦然）時，它們構成<em>循環</em>：
+    </p>
+
+    <ul>
+      <li><strong>Pallas</strong>：定義在底場 $\mathbb{F}_p$ 上，純量場為 $\mathbb{F}_q$</li>
+      <li><strong>Vesta</strong>：定義在底場 $\mathbb{F}_q$ 上，純量場為 $\mathbb{F}_p$</li>
+    </ul>
+
+    <div class="diagram">
+<pre>
+           Pallas (E_p)                     Vesta (E_q)
+        底場: F_p                        底場: F_q
+        純量場: F_q                      純量場: F_p
+               |                                |
+               |   純量場 = 底場                 |
+               +------------ 循環 --------------+
+               |   底場 = 純量場                 |
+               |                                |
+
+   Pallas 點的算術                    Vesta 點的算術
+   座標使用 F_p                       座標使用 F_q
+   純量使用 F_q                       純量使用 F_p
+</pre>
+    </div>
+
+    <h3>為什麼這對遞迴很重要</h3>
+
+    <p>
+      在遞迴證明組合中，Pallas 上證明的驗證電路必須執行橢圓曲線算術
+      （$\mathbb{F}_q$ 中的純量乘法）。若我們將此驗證器作為 Vesta 上的電路執行，
+      電路的原生場是 $\mathbb{F}_p$（Vesta 的純量場），而 Pallas 的純量運算在
+      $\mathbb{F}_q$ 中 &mdash; 即 Vesta 的<em>底</em>場，而非其純量場。
+      如果沒有循環，這將需要昂貴的非原生場算術。有了循環：
+    </p>
+
+    <ul>
+      <li>Pallas 證明在 Vesta 電路中驗證（Vesta 純量場 = $\mathbb{F}_p$ = Pallas 底場）</li>
+      <li>Vesta 證明在 Pallas 電路中驗證（Pallas 純量場 = $\mathbb{F}_q$ = Vesta 底場）</li>
+      <li>每一步「活躍」曲線交替，但所有算術都是原生場算術</li>
+    </ul>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理：透過累積的遞迴組合</div>
+      <p>
+        Halo 不在電路內完整驗證 IPA 證明（這需要 $O(n)$ 的 MSM），而是使用
+        <strong>累積方案</strong>：電路將 IPA 實例累積到一個執行中的累加器中。
+        只有在最後（電路外部）才檢查累積的實例。這將電路內的驗證成本從
+        $O(n)$ 降低到 $O(\log n)$ 群運算。
+      </p>
+    </div>
+
+    <h3>曲線參數</h3>
+
+    <table>
+      <thead>
+        <tr><th>參數</th><th>Pallas</th><th>Vesta</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>方程式</td>
+          <td>$y^2 = x^3 + 5$ over $\mathbb{F}_p$</td>
+          <td>$y^2 = x^3 + 5$ over $\mathbb{F}_q$</td>
+        </tr>
+        <tr>
+          <td>底場 $p$</td>
+          <td colspan="2">$p = 2^{254} + 45560315531506369815346746415080538113$（Pallas 底場 = Vesta 純量場）</td>
+        </tr>
+        <tr>
+          <td>純量場 $q$</td>
+          <td colspan="2">$q = 2^{254} + 45560315531506369815346746415080538113 + \delta$（Pallas 純量場 = Vesta 底場）</td>
+        </tr>
+        <tr>
+          <td>二進位適性</td>
+          <td>$S = 32$</td>
+          <td>$S = 32$</td>
+        </tr>
+        <tr>
+          <td>安全等級</td>
+          <td colspan="2">~126 位元（兩條曲線）</td>
+        </tr>
+        <tr>
+          <td>餘因子</td>
+          <td>1</td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <td>自同態</td>
+          <td>無（素數階，無 CM）</td>
+          <td>無（素數階，無 CM）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">注意：Pasta 與 BN254</div>
+      <p>
+        當 Halo2 搭配 KZG 後端使用時（例如用於 Ethereum L2 證明），使用的是 BN254 曲線而非 Pasta。
+        BN254 是配對友好曲線，可透過配對實現 $O(1)$ 驗證，但需要可信設置。
+        曲線的選擇取決於部署目標：Pasta 用於透明/遞迴場景，BN254 用於 EVM 相容場景。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  8.9 Halo2 vs PLONK Comparison                              -->
+    <!-- ============================================================ -->
+    <h2>8.9 Halo2 與 PLONK 比較</h2>
+
+    <p>
+      Halo2 繼承了 PLONK 的核心架構，但做出了不同的權衡取捨。
+      以下比較突顯了關鍵差異。
+    </p>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>Halo2 (IPA)</h4>
+        <ul>
+          <li><strong>設置：</strong>透明 &mdash; 無需可信設置儀式。參數是確定性的。</li>
+          <li><strong>自定義閘：</strong>完整支援 &mdash; 對任何旋轉量的單元格進行任意多項式表達式。</li>
+          <li><strong>查找：</strong>內建 &mdash; 約束系統 API 中的一等查找論證。</li>
+          <li><strong>證明大小：</strong>$O(\log n)$ &mdash; IPA 為每次開啟增加對數開銷。</li>
+          <li><strong>驗證：</strong>$O(n)$ &mdash; 驗證者必須計算 MSM（多純量乘法）。</li>
+          <li><strong>遞迴：</strong>原生 &mdash; 在 Pasta 曲線循環上的累積方案。</li>
+          <li><strong>曲線：</strong>Pallas/Vesta（或搭配 KZG 後端使用 BN254）。</li>
+        </ul>
+      </div>
+      <div class="comparison-card">
+        <h4>PLONK (KZG)</h4>
+        <ul>
+          <li><strong>設置：</strong>通用可信設置 (SRS) &mdash; 一次儀式，可重用於所有大小至 $n$ 的電路。</li>
+          <li><strong>自定義閘：</strong>原始規範中受限 &mdash; 固定閘形式 $q_L a + q_R b + q_M ab + q_O c + q_C = 0$。</li>
+          <li><strong>查找：</strong>擴展功能 &mdash; 透過 PLONKup 或類似方案添加，不在原始協議中。</li>
+          <li><strong>證明大小：</strong>$O(1)$ &mdash; KZG 開啟各為單一群元素。</li>
+          <li><strong>驗證：</strong>$O(1)$ &mdash; 常數次配對運算。</li>
+          <li><strong>遞迴：</strong>可行但更困難 &mdash; 電路內的配對驗證成本高昂。</li>
+          <li><strong>曲線：</strong>BN254、BLS12-381（需要配對友好曲線）。</li>
+        </ul>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>維度</th><th>Halo2 (IPA)</th><th>PLONK (KZG)</th><th>勝出</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>信任假設</td>
+          <td>僅 DLog</td>
+          <td>DLog + 可信設置</td>
+          <td>Halo2</td>
+        </tr>
+        <tr>
+          <td>證明大小</td>
+          <td>~10&ndash;20 KB</td>
+          <td>~1&ndash;2 KB</td>
+          <td>PLONK</td>
+        </tr>
+        <tr>
+          <td>驗證時間</td>
+          <td>~100 ms（取決於 $n$）</td>
+          <td>~5 ms（常數）</td>
+          <td>PLONK</td>
+        </tr>
+        <tr>
+          <td>證明者表達能力</td>
+          <td>自定義閘 + 查找</td>
+          <td>固定閘（可擴展）</td>
+          <td>Halo2</td>
+        </tr>
+        <tr>
+          <td>鏈上驗證 (EVM)</td>
+          <td>昂貴（$O(n)$ gas）</td>
+          <td>便宜（配對預編譯）</td>
+          <td>PLONK</td>
+        </tr>
+        <tr>
+          <td>遞迴組合</td>
+          <td>原生（累積）</td>
+          <td>可行（電路內成本高）</td>
+          <td>Halo2</td>
+        </tr>
+        <tr>
+          <td>部署複雜度</td>
+          <td>較簡單（無儀式）</td>
+          <td>需要 MPC 儀式</td>
+          <td>Halo2</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout example">
+      <div class="callout-title">範例：在 Halo2-IPA 和 Halo2-KZG 之間選擇</div>
+      <p>
+        <strong>使用 IPA</strong> 的情境：不需要可信設置（法規/去中心化要求），
+        需要遞迴證明組合（Zcash Orchard），或驗證在鏈下進行（桌面/行動錢包）。
+      </p>
+      <p>
+        <strong>使用 KZG</strong> 的情境：證明必須在 Ethereum 上驗證
+        （位址 0x08 的 EVM 配對預編譯成本低），證明大小重要（rollup calldata 成本），
+        或不需要電路內遞迴。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  8.10 Lookups in Halo2                                       -->
+    <!-- ============================================================ -->
+    <h2>8.10 Halo2 中的查找</h2>
+
+    <p>
+      Halo2 的查找論證是約束系統的一等功能。它證明一組表達式（「輸入」）全部包含在一個表
+      （「表欄」）中。
+    </p>
+
+    <h3>定義查找</h3>
+
+    <pre><code>// In configure():
+let input = meta.advice_column();
+let table = meta.lookup_table_column();  // a special fixed column
+
+meta.lookup("range_check", |meta| {
+    let input_expr = meta.query_advice(input, Rotation::cur());
+    let table_expr = meta.query_lookup_table(table);
+    vec![(input_expr, table_expr)]
+});</code></pre>
+
+    <p>
+      這宣告了：對於每個活躍行，<code>input</code> 中的值必須存在於 <code>table</code> 的某處。
+      可使用多個輸入/表的表達式對來進行多欄查找。
+    </p>
+
+    <h3>查找的內部運作</h3>
+
+    <p>
+      Halo2 中的查找論證遵循 Plookup 協議的一般結構：
+    </p>
+
+    <ol>
+      <li>證明者將輸入值和表值排序為合併的排序順序，產生排列後的欄 $A'$ 和 $S'$。</li>
+      <li>大乘積論證使用隨機挑戰 $\theta$、$\beta$、$\gamma$ 檢查輸入值的多重集合是表值多重集合的子集。</li>
+      <li>額外的約束確保 $A'$ 和 $S'$ 正確排序（$A'$ 中相鄰的不同元素必須出現在 $S'$ 中表值組的邊界處）。</li>
+    </ol>
+
+    <div class="callout note">
+      <div class="callout-title">注意：查找的成本</div>
+      <p>
+        每個查找新增 2 個建議欄（用於排列後的輸入和表）、1 個乘積多項式和數個約束。
+        這大約相當於證明中額外的 5 個承諾。對於具有許多查找的電路
+        （例如 zkEVM 的字節碼、記憶體、儲存查找），查找成本可能主導整體證明時間。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  8.11 Chip Composition Pattern                               -->
+    <!-- ============================================================ -->
+    <h2>8.11 晶片組合模式</h2>
+
+    <p>
+      實際的 Halo2 電路由可組合的<strong>晶片</strong>構建。晶片是一個自包含的模組，
+      配置自己的欄和閘，並提供將值分配到區域中的方法。
+    </p>
+
+    <h3>晶片結構</h3>
+
+    <pre><code>// 1. Configuration struct (holds column references)
+#[derive(Clone, Debug)]
+struct AddConfig {
+    a: Column&lt;Advice&gt;,
+    b: Column&lt;Advice&gt;,
+    c: Column&lt;Advice&gt;,
+    s_add: Selector,
+}
+
+// 2. Chip struct (holds config + any state)
+struct AddChip&lt;F: Field&gt; {
+    config: AddConfig,
+    _marker: PhantomData&lt;F&gt;,
+}
+
+impl&lt;F: Field&gt; AddChip&lt;F&gt; {
+    // 3. Configure: define columns and gates
+    fn configure(
+        meta: &amp;mut ConstraintSystem&lt;F&gt;,
+        a: Column&lt;Advice&gt;,
+        b: Column&lt;Advice&gt;,
+        c: Column&lt;Advice&gt;,
+    ) -&gt; AddConfig {
+        let s_add = meta.selector();
+        meta.create_gate("add", |meta| {
+            let a = meta.query_advice(a, Rotation::cur());
+            let b = meta.query_advice(b, Rotation::cur());
+            let c = meta.query_advice(c, Rotation::cur());
+            let s = meta.query_selector(s_add);
+            vec![s * (a + b - c)]
+        });
+        AddConfig { a, b, c, s_add }
+    }
+
+    // 4. Assign: fill in values for one operation
+    fn add(
+        &amp;self,
+        layouter: &amp;mut impl Layouter&lt;F&gt;,
+        a: Value&lt;F&gt;,
+        b: Value&lt;F&gt;,
+    ) -&gt; Result&lt;AssignedCell&lt;F, F&gt;, Error&gt; {
+        layouter.assign_region(
+            || "add",
+            |mut region| {
+                self.config.s_add.enable(&amp;mut region, 0)?;
+                region.assign_advice(|| "a", self.config.a, 0, || a)?;
+                region.assign_advice(|| "b", self.config.b, 0, || b)?;
+                let c_val = a.and_then(|a| b.map(|b| a + b));
+                region.assign_advice(|| "c", self.config.c, 0, || c_val)
+            },
+        )
+    }
+}</code></pre>
+
+    <h3>組合晶片</h3>
+
+    <p>
+      高層電路透過共享欄位來組合晶片。例如，一個「算術晶片」可能結合一個 <code>AddChip</code>
+      和一個 <code>MulChip</code>，它們共享相同的建議欄但擁有不同的選擇器：
+    </p>
+
+    <pre><code>fn configure(meta: &amp;mut ConstraintSystem&lt;F&gt;) -&gt; Self::Config {
+    let a = meta.advice_column();
+    let b = meta.advice_column();
+    let c = meta.advice_column();
+
+    // Both chips share columns a, b, c
+    let add_config = AddChip::configure(meta, a, b, c);
+    let mul_config = MulChip::configure(meta, a, b, c);
+
+    ArithConfig { add_config, mul_config }
+}</code></pre>
+
+    <div class="callout definition">
+      <div class="callout-title">設計模式：欄位共享</div>
+      <p>
+        永遠不會在同一行啟用選擇器的晶片可以<em>共享欄位</em>。
+        這減少了欄的總數，從而減少多項式承諾的數量。
+        <code>SimpleFloorPlanner</code> 確保不同晶片的區域被放置在不重疊的行中，
+        使選擇器衝突不可能發生。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  8.12 Debugging and MockProver                               -->
+    <!-- ============================================================ -->
+    <h2>8.12 除錯與 MockProver</h2>
+
+    <p>
+      Halo2 提供了 <code>MockProver</code>，這是一個測試工具，可以在不生成實際證明的情況下
+      檢查所有約束。這對電路開發至關重要。
+    </p>
+
+    <pre><code>use halo2_proofs::dev::MockProver;
+
+let k = 4;  // small domain for testing
+let circuit = MulCircuit { a: Value::known(Fp::from(3)), b: Value::known(Fp::from(7)) };
+let public_inputs = vec![Fp::from(21)];
+
+let prover = MockProver::run(k, &amp;circuit, vec![public_inputs]).unwrap();
+
+// Check all constraints
+prover.assert_satisfied();
+
+// Or get detailed errors
+match prover.verify() {
+    Ok(()) =&gt; println!("All constraints satisfied!"),
+    Err(errors) =&gt; {
+        for error in errors {
+            println!("Constraint failure: {:?}", error);
+            // Prints: gate name, row number, which expression failed
+        }
+    }
+}</code></pre>
+
+    <div class="callout warning">
+      <div class="callout-title">警告：MockProver 不是安全性檢查</div>
+      <p>
+        <code>MockProver</code> 驗證的是<em>誠實證明者的</em>賦值是否滿足所有約束。
+        它<strong>不</strong>檢查健全性 &mdash; 可能存在其他滿足約束但代表錯誤計算的有效賦值。
+        務必另外推理約束不足的電路。
+      </p>
+    </div>
+
+    <h3>電路佈局視覺化</h3>
+
+    <p>
+      Halo2 還透過 <code>CircuitLayout</code> 提供佈局視覺化工具：
+    </p>
+
+    <pre><code>use halo2_proofs::dev::CircuitLayout;
+use plotters::prelude::*;
+
+let root = BitMapBackend::new("layout.png", (1024, 768))
+    .into_drawing_area();
+root.fill(&amp;WHITE).unwrap();
+
+CircuitLayout::default()
+    .render(k, &amp;circuit, &amp;root)
+    .unwrap();</code></pre>
+
+    <p>
+      這會生成一張圖片，顯示哪些單元格被哪些區域使用、選擇器在哪裡啟用，
+      以及盲化行從何處開始。對於除錯佈局效率低落的問題極為有用。
+    </p>
+
+    <!-- ============================================================ -->
+    <!--  8.13 Real-World Deployments                                 -->
+    <!-- ============================================================ -->
+    <h2>8.13 實際部署</h2>
+
+    <p>
+      Halo2（及其分支）驅動了多個主要的生產系統：
+    </p>
+
+    <table>
+      <thead>
+        <tr><th>專案</th><th>Halo2 變體</th><th>承諾方案</th><th>用途</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Zcash Orchard</strong></td>
+          <td>zcash/halo2（原版）</td>
+          <td>IPA (Pallas/Vesta)</td>
+          <td>隱蔽交易、遞迴證明</td>
+        </tr>
+        <tr>
+          <td><strong>Scroll</strong></td>
+          <td>PSE halo2 分支</td>
+          <td>KZG (BN254)</td>
+          <td>zkEVM &mdash; Ethereum L2 rollup</td>
+        </tr>
+        <tr>
+          <td><strong>Taiko</strong></td>
+          <td>PSE halo2 分支</td>
+          <td>KZG (BN254)</td>
+          <td>Type 1 zkEVM</td>
+        </tr>
+        <tr>
+          <td><strong>Axiom</strong></td>
+          <td>PSE halo2 分支</td>
+          <td>KZG (BN254)</td>
+          <td>Ethereum 資料存取的 ZK 協處理器</td>
+        </tr>
+        <tr>
+          <td><strong>Privacy &amp; Scaling Explorations</strong></td>
+          <td>PSE halo2</td>
+          <td>兩者皆有</td>
+          <td>研究電路（Semaphore、MACI）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">注意：兩大主要分支</div>
+      <p>
+        Halo2 生態系統有兩個主要程式碼庫：(1) <code>zcash/halo2</code> &mdash;
+        原版，僅支援 IPA，用於 Zcash；(2) <code>privacy-scaling-explorations/halo2</code>
+        (PSE) &mdash; 社群分支，新增了 KZG 支援、Challenge API 和許多最佳化。
+        大多數以 Ethereum 為目標的專案使用 PSE 分支。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  8.14 Summary of Key Formulas                                -->
+    <!-- ============================================================ -->
+    <h2>8.14 關鍵公式摘要</h2>
+
+    <div class="callout definition">
+      <div class="callout-title">參考：Halo2 公式</div>
+
+      <p><strong>域大小：</strong> $n = 2^k$</p>
+
+      <p><strong>可用行數：</strong> $n_{\text{usable}} = 2^k - \text{blinding\_factors} - 1$</p>
+
+      <p><strong>盲化因子：</strong> $\text{bf} = \max(\text{rotations across all queries}) + 1$</p>
+
+      <p><strong>擴展域：</strong> $|H'| = 2^{k + j}$，其中 $j$ 取決於閘次數</p>
+
+      <p><strong>IPA 承諾：</strong> $C = \langle \mathbf{a}, \mathbf{G} \rangle + r H$</p>
+
+      <p><strong>IPA 證明大小：</strong> $2 \log_2 n$ 個群元素</p>
+
+      <p><strong>閘約束（一般形式）：</strong> $\sum_i s_i \cdot \prod_j \text{cell}_{ij}^{e_{ij}} = 0$</p>
+
+      <p><strong>排列乘積：</strong>
+        $Z(\omega^{i+1}) = Z(\omega^i) \cdot \prod_j \frac{a_j(\omega^i) + \beta \delta^j \omega^i + \gamma}{a_j(\omega^i) + \beta \sigma_j(\omega^i) + \gamma}$
+      </p>
+
+      <p><strong>消失論證：</strong>
+        $h(X) = \frac{\text{constraints}(X)}{Z_H(X)}$，其中 $Z_H(X) = X^n - 1$
+      </p>
+    </div>
+
+    <h2>對本研究的意義</h2>
+    <div class="callout theorem">
+      <div class="callout-title">設計選擇：為何選擇 Halo2</div>
+      <p>
+        Halo2 是本論文的實作框架。以下從五個面向說明為何它是多項式方法的最佳選擇：
+      </p>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>需求</th><th>Halo2 的支援</th><th>替代方案的不足</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>無可信設置</strong></td>
+          <td style="color: green;">IPA 承諾 — 只需公開隨機基點</td>
+          <td>Groth16 需要電路特定 MPC 儀式；PLONK+KZG 需要 Powers-of-Tau</td>
+        </tr>
+        <tr>
+          <td><strong>自定義閘</strong></td>
+          <td style="color: green;"><code>meta.create_gate()</code> API</td>
+          <td>Groth16/R1CS 僅支援 $a \cdot b = c$</td>
+        </tr>
+        <tr>
+          <td><strong>查找表</strong></td>
+          <td style="color: green;"><code>meta.lookup_any()</code> 原生支援</td>
+          <td>Groth16 無原生查找；需用約束模擬</td>
+        </tr>
+        <tr>
+          <td><strong>高效能實作</strong></td>
+          <td style="color: green;">Rust，原生效能</td>
+          <td>Circom/snarkjs (JS) 較慢</td>
+        </tr>
+        <tr>
+          <td><strong>遞迴潛力</strong></td>
+          <td style="color: green;">Pallas/Vesta 曲線循環</td>
+          <td>BN254 無曲線循環；STARK 不用曲線但證明更大</td>
+        </tr>
+        <tr>
+          <td><strong>除錯工具</strong></td>
+          <td style="color: green;"><code>MockProver</code> + 電路佈局視覺化</td>
+          <td>多數框架缺乏互動式除錯</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">Halo2 的具體 API 與論文電路的對應</div>
+      <p>以下是論文多項式方法電路使用的核心 Halo2 API：</p>
+      <ul>
+        <li><code>ConstraintSystem::advice_column()</code> — 建立 Horner 中間值列（$R$, $H_i$, $w$）</li>
+        <li><code>ConstraintSystem::fixed_column()</code> — 建立預計算係數列（$D_1, \ldots, D_d$）</li>
+        <li><code>meta.create_gate("horner", |meta| { ... })</code> — 定義 Horner 乘加約束</li>
+        <li><code>meta.lookup_any("byte_check", |meta| { ... })</code> — ByteTable range check</li>
+        <li><code>region.assign_advice()</code> — Prover 在區域中填入見證值</li>
+        <li><code>MockProver::run(k, &circuit, instances)</code> — 除錯模式驗證</li>
+      </ul>
+    </div>
+
+    <div class="callout warning">
+      <div class="callout-title">選擇 Halo2 的代價</div>
+      <p>
+        Halo2 的 IPA 承諾導致驗證時間為 $O(n)$（而非 KZG 的 $O(1)$），證明大小為 $O(\log n)$（而非 Groth16 的 $O(1)$）。
+        這意味著：
+      </p>
+      <ul>
+        <li><strong>鏈上驗證成本較高</strong>：在以太坊上驗證 Halo2 證明比驗證 Groth16 證明更貴。</li>
+        <li><strong>證明較大</strong>：對 $n = 2^{17}$ 的電路，IPA 證明約 1-2 KB，Groth16 僅 128 bytes。</li>
+        <li><strong>解決方案</strong>：若需要部署到以太坊，可使用 PSE 分支的 KZG 後端，或透過遞迴壓縮後再送上鏈。</li>
+      </ul>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  Page Navigation                                             -->
+    <!-- ============================================================ -->
+    <div class="page-nav">
+      <a href="plonk.html">
+        <span class="nav-label">上一章</span>
+        <span class="nav-title">&larr; 7. PLONK</span>
+      </a>
+      <a href="lookup-arguments.html">
+        <span class="nav-label">下一章</span>
+        <span class="nav-title">9. Lookup Arguments &rarr;</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

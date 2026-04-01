@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ch.11 安全性證明 &mdash; ZK Handbook</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+  <aside class="sidebar">
+    <div class="sidebar-header"><h1>ZK Handbook</h1><div class="subtitle">Zero-Knowledge Proof Systems</div></div>
+    <nav>
+      <div class="section-label">總覽</div>
+      <a href="index.html"><span class="page-num">0.</span> Home</a>
+      <div class="section-label">基礎</div>
+      <a href="foundations.html"><span class="page-num">1.</span> Mathematical Foundations</a>
+      <a href="zkp-basics.html"><span class="page-num">2.</span> ZKP: Basics &amp; Properties</a>
+      <div class="section-label">構建模組</div>
+      <a href="polynomial-commitments.html"><span class="page-num">3.</span> Polynomial Commitments</a>
+      <a href="arithmetization.html"><span class="page-num">4.</span> Arithmetization</a>
+      <a href="fft-domains.html"><span class="page-num">5.</span> FFT &amp; Evaluation Domains</a>
+      <div class="section-label">證明系統</div>
+      <a href="groth16.html"><span class="page-num">6.</span> Groth16</a>
+      <a href="plonk.html"><span class="page-num">7.</span> PLONK</a>
+      <a href="halo2.html"><span class="page-num">8.</span> Halo2</a>
+      <div class="section-label">進階主題</div>
+      <a href="lookup-arguments.html"><span class="page-num">9.</span> Lookup Arguments</a>
+      <a href="polynomial-method.html"><span class="page-num">10.</span> Polynomial Method</a>
+      <a href="security-proofs.html" class="active"><span class="page-num">11.</span> Security Proofs</a>
+
+      <div class="section-label">論文方法論</div>
+      <a href="fixed-point.html"><span class="page-num">12.</span> 有限域定點運算</a>
+      <a href="approximation-theory.html"><span class="page-num">13.</span> 多項式逼近理論</a>
+      <a href="horner-evaluation.html"><span class="page-num">14.</span> Horner 求值</a>
+    </nav>
+  </aside>
+  <main class="main-content">
+
+    <!-- ============================================================
+         PAGE HEADER
+         ============================================================ -->
+    <div class="page-header">
+      <h1>第十一章：安全性證明</h1>
+      <p class="page-subtitle">
+        零知識證明系統的形式化安全性分析。
+        本章針對 PLONK 與 Polynomial Method 嚴格證明完備性、可靠性與零知識性
+        &mdash; 這三個性質共同保證一個證明系統是可用的、安全的且保護隱私的。
+      </p>
+    </div>
+
+    <!-- ============================================================
+         DEFINITIONS SECTION
+         ============================================================ -->
+    <div class="definitions-section">
+      <h2>關鍵定義</h2>
+
+      <!-- 1. Completeness -->
+      <div class="def-item">
+        <div class="def-term">Completeness <span class="zh">完備性</span></div>
+        <div class="def-body">
+          持有有效見證的誠實證明者總能說服驗證者。
+          形式化地，對所有 $x \in L$ 及所有 $w \in R_L(x)$：
+          $$\Pr\!\Big[\mathsf{Verify}\!\big(\mathsf{vk},\; x,\; \mathsf{Prove}(\mathsf{pk}, x, w)\big) = 1\Big] \;\geq\; 1 - \mathrm{negl}(\lambda)$$
+          具有<em>完美完備性</em>的系統使此機率恰好等於 $1$。
+          大多數 SNARK 及基於 Halo2 的系統皆具備完美完備性：驗證者總是接受誠實產生的證明。若完備性失敗，系統會拒絕合法使用者。
+        </div>
+      </div>
+
+      <!-- 2. Soundness -->
+      <div class="def-item">
+        <div class="def-term">Soundness <span class="zh">可靠性</span></div>
+        <div class="def-body">
+          沒有任何高效的對手能使驗證者相信一個錯誤的陳述。
+          形式化地，對所有 PPT 對手 $\mathcal{A}$：
+          $$\Pr\!\Big[x \notin L \;\wedge\; \mathsf{Verify}(\mathsf{vk}, x, \pi) = 1 \;:\; (x, \pi) \leftarrow \mathcal{A}(\mathsf{vk})\Big] \;\leq\; \mathrm{negl}(\lambda)$$
+          可靠性確保證明承載真正的資訊：接受一個證明即保證（以壓倒性機率）該陳述為真。若缺乏可靠性，整個證明系統將毫無意義 &mdash; 任何人都可以偽造任意虛假聲明的證明。
+        </div>
+      </div>
+
+      <!-- 3. Knowledge Soundness -->
+      <div class="def-item">
+        <div class="def-term">Knowledge Soundness <span class="zh">知識可靠性</span></div>
+        <div class="def-body">
+          比普通可靠性更強：不僅陳述為真，證明者還必須<em>知道</em>一個見證。形式化地，存在一個 PPT 提取器 $\mathcal{E}$，使得對所有 PPT 對手 $\mathcal{A}$：若 $\mathcal{A}$ 產生一個被接受的證明 $(x, \pi)$，則 $\mathcal{E}^{\mathcal{A}}$ 可提取一個有效見證 $w \in R_L(x)$。
+          $$\Pr\!\Big[\mathsf{Verify}(\mathsf{vk}, x, \pi) = 1 \;\wedge\; w \notin R_L(x) \;:\; (x, \pi) \leftarrow \mathcal{A}(\mathsf{vk}),\; w \leftarrow \mathcal{E}^{\mathcal{A}}(\mathsf{vk})\Big] \;\leq\; \mathrm{negl}(\lambda)$$
+          這是 SNARK（簡潔非互動式<em>知識</em>論證）的標準安全性概念。提取器 $\mathcal{E}$ 具有對 $\mathcal{A}$ 的預言機存取權限（可以回溯並重新執行）。
+        </div>
+      </div>
+
+      <!-- 4. Zero-Knowledge -->
+      <div class="def-item">
+        <div class="def-term">Zero-Knowledge (ZK) <span class="zh">零知識性</span></div>
+        <div class="def-body">
+          證明除了陳述的真實性之外不洩露任何資訊。形式化地，存在一個 PPT 模擬器 $\mathcal{S}$，使得對所有 PPT 區分器 $\mathcal{D}$：
+          $$\Big|\Pr\!\big[\mathcal{D}(\mathsf{Real}(x, w)) = 1\big] - \Pr\!\big[\mathcal{D}(\mathcal{S}(x)) = 1\big]\Big| \;\leq\; \mathrm{negl}(\lambda)$$
+          其中 $\mathsf{Real}(x, w)$ 是誠實產生的證明分布（使用見證 $w$），而 $\mathcal{S}(x)$ 是模擬器的輸出（<strong>僅</strong>使用陳述 $x$，不使用任何見證）。模擬器必須產生與真實證明在計算上不可區分的「假」證明。
+        </div>
+      </div>
+
+      <!-- 5. Perfect Zero-Knowledge -->
+      <div class="def-item">
+        <div class="def-term">Perfect Zero-Knowledge <span class="zh">完美零知識</span></div>
+        <div class="def-body">
+          最強形式的零知識性：模擬器的輸出與真實證明具有<em>完全相同的分布</em>。
+          沒有任何區分器 &mdash; 即使計算能力無限 &mdash; 能分辨模擬證明與真實證明：
+          $$\mathsf{Real}(x, w) \;\equiv\; \mathcal{S}(x)$$
+          某些互動式協定（如經典的圖同構零知識證明）可以達成此性質，但對實用的非互動式系統而言通常過於嚴格。
+        </div>
+      </div>
+
+      <!-- 6. Statistical Zero-Knowledge -->
+      <div class="def-item">
+        <div class="def-term">Statistical Zero-Knowledge <span class="zh">統計零知識</span></div>
+        <div class="def-body">
+          真實證明與模擬證明的分布在統計距離上接近（統計距離可忽略），即使面對計算能力無限的對手亦然：
+          $$\Delta\!\big(\mathsf{Real}(x, w),\; \mathcal{S}(x)\big) \;\leq\; \mathrm{negl}(\lambda)$$
+          其中 $\Delta$ 表示統計距離：$\Delta(X, Y) = \frac{1}{2}\sum_z |Pr[X=z] - Pr[Y=z]|$。
+          比計算零知識更強，但弱於完美零知識。
+          某些基於格與基於雜湊的協定可達成此性質。
+        </div>
+      </div>
+
+      <!-- 7. Computational Zero-Knowledge -->
+      <div class="def-item">
+        <div class="def-term">Computational Zero-Knowledge <span class="zh">計算零知識</span></div>
+        <div class="def-body">
+          SNARK 的標準概念：真實證明與模擬證明僅對<em>高效</em>（多項式時間）對手不可區分。計算能力無限的對手原則上可以區分兩者。這是最弱的零知識概念，但對所有實際應用而言已足夠，因為現實世界的攻擊者在計算上是有界的。
+          PLONK、Groth16 和 Halo2 皆達成計算零知識。
+        </div>
+      </div>
+
+      <!-- 8. Simulation Extractability -->
+      <div class="def-item">
+        <div class="def-term">Simulation Extractability <span class="zh">模擬可提取性</span></div>
+        <div class="def-body">
+          最強的組合安全性概念：<em>即使對手擁有模擬證明的存取權限</em>，可靠性仍然成立。形式化地，存在一個提取器 $\mathcal{E}$，使得對所有具有模擬器 $\mathcal{S}$ 預言機存取權限的 PPT 對手 $\mathcal{A}^{\mathcal{S}}$：若 $\mathcal{A}^{\mathcal{S}}$ 產生一個<em>新鮮的</em>被接受證明 $(x^*, \pi^*)$（並非模擬證明之一），則 $\mathcal{E}$ 可提取一個有效見證。
+          這防止對手「回收」或「篡改」模擬證明以產生針對不同陳述的新有效證明。在更大協定中實現可組合安全性時需要此性質。
+        </div>
+      </div>
+
+      <!-- 9. Rewinding -->
+      <div class="def-item">
+        <div class="def-term">Rewinding <span class="zh">回溯</span></div>
+        <div class="def-body">
+          一種用於安全性歸約的證明技巧。提取器（或模擬器）執行對手，在特定時點記錄其內部狀態，然後「回溯」至該狀態，並以不同的挑戰重新執行對手。從兩個具有相同承諾但不同挑戰的接受轉錄中，提取器可以恢復見證。
+          <br><br>
+          <strong>經典範例：</strong>Schnorr 簽章提取。證明者傳送承諾 $R = rG$。
+          挑戰 $c_1$ 產生回應 $s_1 = r + c_1 x$。以挑戰 $c_2$ 回溯後得到
+          $s_2 = r + c_2 x$。則 $x = (s_1 - s_2)/(c_1 - c_2)$，恢復了私鑰。
+          <br><br>
+          回溯是證明互動式協定知識可靠性的主要技巧，並透過「分叉引理」論證適用於 ROM 中經 Fiat-Shamir 轉換的協定。
+        </div>
+      </div>
+
+      <!-- 10. Random Oracle Model (ROM) -->
+      <div class="def-item">
+        <div class="def-term">Random Oracle Model (ROM) <span class="zh">隨機預言機模型</span></div>
+        <div class="def-body">
+          一種理想化模型，其中雜湊函數 $H: \{0,1\}^* \to \{0,1\}^\lambda$ 被建模為一個真正的隨機函數：對每個新輸入，輸出均勻隨機且獨立，而重複查詢則回傳相同答案（一致性）。在 ROM 中，模擬器可以<em>編程</em>隨機預言機 &mdash; 在對手查詢之前選擇雜湊輸出。這種額外能力使得非互動式協定（Fiat-Shamir 轉換）的零知識模擬成為可能。ROM 無法由任何具體的雜湊函數實現，因此 ROM 證明提供的是啟發式（非無條件的）安全性。
+        </div>
+      </div>
+
+      <!-- 11. Algebraic Group Model (AGM) -->
+      <div class="def-item">
+        <div class="def-term">Algebraic Group Model (AGM) <span class="zh">代數群模型</span></div>
+        <div class="def-body">
+          對對手的一種限制：對手輸出的每個群元素 $[Y]$ 必須附帶其以先前接收到的群元素 $[G_1], \ldots, [G_n]$ 表示的顯式線性表示：
+          $$Y = \sum_{i=1}^n \alpha_i G_i$$
+          對手必須提供係數 $\alpha_i$。這模擬了實際攻擊者以代數方式（透過加法與純量乘法）使用群的事實，而非利用位元層級的表示。AGM 位於通用群模型（GGM）與標準模型之間。PLONK 的知識可靠性在 AGM + ROM 中得到證明。
+        </div>
+      </div>
+
+      <!-- 12. Reduction -->
+      <div class="def-item">
+        <div class="def-term">Reduction <span class="zh">歸約</span></div>
+        <div class="def-body">
+          密碼學中的基本證明技巧。歸約表明，破壞一個密碼方案意味著解決一個困難的數學問題。形式化地：
+          若存在一個 PPT 對手 $\mathcal{A}$ 破壞方案 $\Pi$ 的性質 $P$，則存在一個 PPT 演算法 $\mathcal{B}$（<em>歸約器</em>），以 $\mathcal{A}$ 作為子程式來解決困難問題 $\mathsf{HP}$：
+          $$\mathcal{A} \text{ breaks } \Pi \;\;\Longrightarrow\;\; \mathcal{B}^{\mathcal{A}} \text{ solves } \mathsf{HP}$$
+          由逆否命題：若 $\mathsf{HP}$ 是困難的，則 $\Pi$ 是安全的。歸約的品質由其<em>緊密度</em>衡量：在從 $\mathcal{A}$ 到 $\mathcal{B}$ 的轉換中，成功機率衰減了多少。
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ============================================================
+         11.1 THE THREE PROPERTIES: WHY ALL THREE MATTER
+         ============================================================ -->
+    <h2>11.1 三個性質：為何缺一不可</h2>
+
+    <p>
+      一個零知識證明系統必須同時滿足三個安全性質：
+      <strong>完備性</strong>、<strong>可靠性</strong>與<strong>零知識性</strong>。
+      每個性質針對不同的威脅，移除其中任何一個都會使系統從根本上崩壞。
+    </p>
+
+    <div class="diagram">
+      <pre>
+  +-------------------------------------------------------------------+
+  |                    ZK 證明系統安全性                                |
+  +-------------------------------------------------------------------+
+  |                                                                   |
+  |   完備性                可靠性                零知識性              |
+  |   （可用性）            （安全性）            （隱私性）            |
+  |                                                                   |
+  |   持有有效見證的        無見證的欺騙          試圖學習資訊的        |
+  |   誠實證明者            證明者                惡意驗證者            |
+  |   總是能說服            永遠無法說服          什麼都學不到          |
+  |                                                                   |
+  |   威脅模型：            威脅模型：            威脅模型：            |
+  |   系統必須可供          系統必須抵抗          系統必須保護          |
+  |   合法使用              偽造                  隱私                  |
+  |                                                                   |
+  +-------------------------------------------------------------------+
+      </pre>
+    </div>
+
+    <h3>為何每個性質都不可或缺</h3>
+
+    <ul>
+      <li>
+        <strong>完備性（可用性）：</strong>若缺乏完備性，即使誠實的使用者持有有效見證，驗證者也可能拒絕他們。系統將變得無法使用。
+        想像一條區塊鏈上合法的交易被隨機拒絕 &mdash; 沒有人會使用這樣的系統。
+      </li>
+      <li>
+        <strong>可靠性（安全性）：</strong>若缺乏可靠性，任何對手都能為虛假陳述偽造證明。證明系統不提供任何保證。在區塊鏈上，這意味著偽造交易、雙重花費或鑄造任意代幣。
+      </li>
+      <li>
+        <strong>零知識性（隱私性）：</strong>若缺乏零知識性，證明會洩露關於見證的資訊。
+        對金融應用而言，這意味著暴露交易金額、發送方/接收方身份或帳戶餘額。證明將從工具變為負擔。
+      </li>
+    </ul>
+
+    <div class="callout warning">
+      <div class="callout-title">缺少任一性質都會破壞系統</div>
+      <table>
+        <thead>
+          <tr>
+            <th>缺少的性質</th>
+            <th>後果</th>
+            <th>現實世界類比</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>無完備性</td>
+            <td>誠實證明者被拒絕；系統無法使用</td>
+            <td>用正確的鑰匙有時打不開的鎖</td>
+          </tr>
+          <tr>
+            <td>無可靠性</td>
+            <td>任何人都能偽造證明；系統不提供保證</td>
+            <td>任何鑰匙都能打開的鎖</td>
+          </tr>
+          <tr>
+            <td>無零知識性</td>
+            <td>證明洩露隱私資料；隱私受到侵犯</td>
+            <td>透明的保險箱 &mdash; 能上鎖，但所有人都看得到裡面</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>性質之間的形式化關係</h3>
+
+    <p>
+      這三個性質是獨立的：任何一個都不蘊含另一個。然而，它們之間存在交互作用：
+    </p>
+    <ul>
+      <li>
+        <strong>可靠性與零知識性之間存在張力：</strong>可靠性要求證明「包含」足夠的資訊以令人信服，而零知識性要求證明不洩露任何資訊。零知識協定設計的藝術正在於解決這個張力。
+      </li>
+      <li>
+        <strong>知識可靠性蘊含可靠性：</strong>若我們能從任何被接受的證明中提取見證，則陳述必為真（因為見證證實了 $L$ 的成員資格）。
+      </li>
+      <li>
+        <strong>Perfect ZK $\subset$ Statistical ZK $\subset$ Computational ZK：</strong>
+        每一層都是嚴格更弱的要求。大多數實用系統達成的是 Computational ZK。
+      </li>
+    </ul>
+
+
+    <!-- ============================================================
+         11.2 PROVING COMPLETENESS
+         ============================================================ -->
+    <h2>11.2 證明完備性</h2>
+
+    <h3>一般策略</h3>
+
+    <p>
+      完備性證明是三者中最直接的。其策略為：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <strong>步驟 1：</strong>假設證明者是誠實的，且持有有效見證 $w \in R_L(x)$。
+      </div>
+      <div class="step">
+        <strong>步驟 2：</strong>追蹤證明演算法的每一個步驟，表明每個中間值都被正確計算。
+      </div>
+      <div class="step">
+        <strong>步驟 3：</strong>表明當證明者誠實地遵循協定時，每個驗證方程式在代數上成立。
+      </div>
+      <div class="step">
+        <strong>步驟 4：</strong>結論：$\mathsf{Verify}(\mathsf{vk}, x, \pi) = 1$ 以機率 $1$（完美完備性）或 $\geq 1 - \mathrm{negl}(\lambda)$ 成立。
+      </div>
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">為何完備性證明「容易」</div>
+      <p>
+        完備性證明不涉及對手。不需要考慮對抗策略、回溯或模擬。你只需驗證代數運算是否正確。實際上的困難在於記帳：現代證明系統涉及數十個多項式和驗證方程式，因此完備性證明雖然冗長，但概念上是簡單的。
+      </p>
+    </div>
+
+    <h3>範例：PLONK 完備性</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 11.1（PLONK 完備性）</div>
+      <p>
+        若證明者持有滿足 PLONK 電路所有閘約束與複製約束的有效見證 $(a_i, b_i, c_i)_{i=0}^{n-1}$，則 PLONK 驗證者以機率 $1$ 接受。
+      </p>
+    </div>
+
+    <p><strong>證明概要。</strong>我們驗證四項主要檢查：</p>
+
+    <ol>
+      <li>
+        <strong>閘約束檢查。</strong>對每個閘 $i$，見證滿足：
+        $$q_{L,i} \cdot a_i + q_{R,i} \cdot b_i + q_{M,i} \cdot a_i b_i + q_{O,i} \cdot c_i + q_{C,i} = 0$$
+        證明者構造閘約束多項式 $p(X)$，在求值域 $H = \{\omega^0, \omega^1, \ldots, \omega^{n-1}\}$ 上內插這些值。
+        由於每個值均為零，$p(\omega^i) = 0$ 對所有 $i$ 成立，因此 $Z_H(X) \mid p(X)$，商 $t(X) = p(X)/Z_H(X)$ 是一個定義良好的多項式。驗證者在隨機點 $\zeta$ 檢查 $p(\zeta) = t(\zeta) \cdot Z_H(\zeta)$，此等式根據構造成立。
+      </li>
+      <li>
+        <strong>置換（複製約束）檢查。</strong>大乘積多項式 $Z(X)$ 被定義為 $Z(\omega^0) = 1$ 且：
+        $$Z(\omega^{i+1}) = Z(\omega^i) \cdot \prod_{j} \frac{f_j(\omega^i) + \beta \cdot \mathrm{id}_j(\omega^i) + \gamma}{f_j(\omega^i) + \beta \cdot \sigma_j(\omega^i) + \gamma}$$
+        當見證正確地遵循置換時，分子與分母在重排序下相等，因此累積乘積折疊為 $Z(\omega^n) = Z(\omega^0) = 1$。
+        驗證者在隨機點 $\zeta$ 檢查此等式。
+      </li>
+      <li>
+        <strong>商多項式的存在性。</strong>組合約束多項式 $p(X)$ 在 $H$ 上消失（所有約束成立），因此除以 $Z_H(X)$ 可得到一個多項式（無餘數）。證明者將 $t(X)$ 拆分為度數有界的片段 $t_1, t_2, \ldots$ 以便承諾。
+      </li>
+      <li>
+        <strong>KZG 求值證明。</strong>配對方程式
+        $e(\pi, [s-z]_2) = e(C - [v]_1, [1]_2)$ 根據 KZG 方案的正確性成立：
+        證明者計算 $\pi = [q(s)]_1$，其中 $q(X) = (f(X) - v)/(X - z)$，而配對方程式在代數上等價於 $q(s)(s - z) = f(s) - v$，此等式根據多項式除法成立。$\square$
+      </li>
+    </ol>
+
+    <h3>範例：Polynomial Method 完備性</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 11.2（Polynomial Method 完備性）</div>
+      <p>
+        若證明者持有有效的輸入-輸出對 $(x, y)$，其中 $y = f(x)$，且位元組分解 $(b_0, \ldots, b_{k-1})$ 滿足 $x = \sum_{i=0}^{k-1} b_i \cdot 256^i$ 是正確的，則 Halo2 驗證者以機率 $1$ 接受 Polynomial Method 電路的證明。
+      </p>
+    </div>
+
+    <p><strong>證明。</strong>我們驗證電路的每個約束區域：</p>
+
+    <ol>
+      <li>
+        <strong>ByteTable 查詢。</strong>電路定義了一個固定欄位，包含所有 256 個位元組值 $\{0, 1, 2, \ldots, 255\}$。分解中的每個位元組 $b_i$ 透過查詢論證被約束為屬於此表。由於 $b_i \in [0, 255]$（根據假設，有效的位元組分解），每個查詢都匹配某個表項。根據底層查詢論證的完備性（第九章），查詢約束被滿足。
+      </li>
+      <li>
+        <strong>位元組分解約束。</strong>電路強制：
+        $$x = \sum_{i=0}^{k-1} b_i \cdot 256^i = b_0 + 256 \cdot b_1 + 256^2 \cdot b_2 + \cdots + 256^{k-1} \cdot b_{k-1}$$
+        這透過一連串加法閘（或等價地，一個累加器）來實現。由於分解根據假設是正確的，此鏈中的每個閘都求值為正確的中間值，最終的閘產生 $x$。所有加法閘約束被滿足。
+      </li>
+      <li>
+        <strong>多項式求值閘。</strong>對每個位元組 $b_i$，電路計算
+        $P_f(b_i) = \sum_{j=0}^{d} c_j \cdot b_i^j$，其中 $c_0, \ldots, c_d$ 是內插多項式 $P_f$ 的固定係數。這透過一系列乘法和加法閘（Horner 法）來實現：
+        $$P_f(b_i) = c_0 + b_i(c_1 + b_i(c_2 + \cdots + b_i \cdot c_d)\cdots)$$
+        每個閘計算一次乘法和一次加法，均為確定性的算術運算。由於輸入（$b_i$ 和固定係數 $c_j$）是正確的，每個中間閘約束都被滿足，輸出為 $P_f(b_i)$。
+      </li>
+      <li>
+        <strong>輸出重建。</strong>電路將逐位元組的多項式求值結合以產生最終輸出：
+        $$y = \mathrm{combine}\!\big(P_f(b_0),\; P_f(b_1),\; \ldots,\; P_f(b_{k-1})\big)$$
+        由於每個 $P_f(b_i)$ 被正確計算（步驟 3），且組合邏輯忠實地實現了函數 $f$，最終的閘產生 $y = f(x)$，與公開輸出一致。輸出約束被滿足。
+      </li>
+    </ol>
+
+    <p>
+      由於所有閘約束、查詢約束和輸出約束均被滿足，Halo2 證明系統產生一個有效的證明，驗證者以機率 $1$ 接受。$\square$
+    </p>
+
+
+    <!-- ============================================================
+         11.3 PROVING SOUNDNESS
+         ============================================================ -->
+    <h2>11.3 證明可靠性</h2>
+
+    <h3>一般策略</h3>
+
+    <p>
+      可靠性證明是零知識安全性分析的核心。一般策略是<strong>歸約</strong>：假設某個對手能為一個錯誤陳述產生被接受的證明，並表明這意味著解決一個計算上困難的問題（與困難性假設矛盾）。三種主要技巧如下：
+    </p>
+
+    <h3>技巧 1：Schwartz-Zippel 論證</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">Schwartz-Zippel 引理</div>
+      <p>
+        令 $p(X) \in \mathbb{F}[X]$ 為有限體 $\mathbb{F}$ 上次數 $\leq d$ 的非零多項式。對均勻隨機的 $\zeta \gets \mathbb{F}$：
+        $$\Pr[p(\zeta) = 0] \;\leq\; \frac{d}{|\mathbb{F}|}$$
+      </p>
+    </div>
+
+    <p>
+      在零知識證明系統中，驗證者在隨機點 $\zeta$ 檢查多項式恆等式。若該恆等式作為多項式恆等式<em>不</em>成立（即約束多項式 $p(X)$ 不恆等於零），則 $p(\zeta) = 0$ 的機率至多為 $d / |\mathbb{F}|$。對於密碼學體而言，$|\mathbb{F}| \approx 2^{256}$ 且多項式次數 $d \leq 2^{30}$，此機率可忽略：$d / |\mathbb{F}| \leq 2^{30} / 2^{256} = 2^{-226}$。
+    </p>
+
+    <p>
+      Schwartz-Zippel 引理應用於：
+    </p>
+    <ul>
+      <li><strong>閘約束：</strong>若任何閘被違反，閘約束多項式 $p(X) \neq 0$，因此以壓倒性機率 $p(\zeta) \neq 0$。</li>
+      <li><strong>置換檢查：</strong>若複製約束被違反，置換多項式恆等式失敗，在隨機 $\zeta$ 處被偵測到。</li>
+      <li><strong>消失論證：</strong>若 $p(X)$ 在 $H$ 上不消失，則 $t(X) = p(X)/Z_H(X)$ 不是多項式，驗證者的檢查將失敗。</li>
+    </ul>
+
+    <h3>技巧 2：透過 AGM 的提取</h3>
+
+    <p>
+      在 Algebraic Group Model 中，對手輸出的每個群元素 $[A]_1$ 都有已知的線性表示：
+    </p>
+    $$[A]_1 = \sum_{i=0}^{d} \alpha_i [s^i]_1 \quad\Longrightarrow\quad A = \sum_{i=0}^d \alpha_i s^i = A(s)$$
+    <p>
+      對應某個多項式 $A(X) = \sum \alpha_i X^i$，其係數 $\alpha_i$ 對提取器是已知的。這意味著：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <strong>步驟 1：</strong>對手產生證明元素 $[a(s)]_1$、$[b(s)]_1$、$[c(s)]_1$ 等。在 AGM 中，提取器獲取完整的多項式 $a(X)$、$b(X)$、$c(X)$。
+      </div>
+      <div class="step">
+        <strong>步驟 2：</strong>由於驗證方程式在隨機點 $\zeta$ 成立，且提取器知道完整的多項式，因此可以在所有點求值。
+      </div>
+      <div class="step">
+        <strong>步驟 3：</strong>提取器在域 $H$ 上對見證多項式求值，恢復見證值：$a_i = a(\omega^i)$、$b_i = b(\omega^i)$、$c_i = c(\omega^i)$。
+      </div>
+      <div class="step">
+        <strong>步驟 4：</strong>根據 Schwartz-Zippel，在隨機 $\zeta$ 成立的驗證方程式必須作為多項式恆等式成立（以壓倒性機率），因此提取的見證滿足所有電路約束。
+      </div>
+    </div>
+
+    <h3>技巧 3：回溯（用於互動式協定）</h3>
+
+    <p>
+      對於互動式零知識協定（在應用 Fiat-Shamir 之前），知識可靠性透過回溯來證明：
+    </p>
+
+    <div class="diagram">
+      <pre>
+   證明者（對手）                         提取器
+   ─────────────                        ─────────
+         │                                  │
+         │─── 承諾 R ─────────────────────>│
+         │                                  │ （記錄狀態）
+         │<── 挑戰 c₁ ────────────────────│
+         │                                  │
+         │─── 回應 s₁ ────────────────────>│
+         │                                  │ （回溯至記錄狀態）
+         │<── 挑戰 c₂ ────────────────────│  c₂ ≠ c₁
+         │                                  │
+         │─── 回應 s₂ ────────────────────>│
+         │                                  │
+         │                    提取：見證 = (s₁ - s₂)/(c₁ - c₂)
+      </pre>
+    </div>
+
+    <p>
+      關鍵洞察：相同的承諾 $R$ 搭配兩個不同的挑戰 $c_1 \neq c_2$
+      及兩個被接受的回應 $s_1, s_2$，產生一個有兩個未知數（隨機數與見證）的兩方程組，可以求解。<strong>分叉引理</strong>將此形式化用於經 Fiat-Shamir 轉換的協定：若對手以不可忽略的機率 $\epsilon$ 成功，則在正確的點回溯並以新鮮的隨機預言機重播，可以以機率 $\geq \epsilon^2 / q$ 產生第二個被接受的轉錄（其中 $q$ 是隨機預言機查詢的數量）。
+    </p>
+
+    <h3>範例：PLONK 可靠性概要</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 11.3（PLONK 知識可靠性，非正式）</div>
+      <p>
+        在 AGM + ROM 中，PLONK 在 $q$-Strong Bilinear Diffie-Hellman ($q$-SBDH) 假設下滿足知識可靠性。具體而言，對任何產生被接受 PLONK 證明的 PPT 對手 $\mathcal{A}$，存在一個 PPT 提取器 $\mathcal{E}$，以壓倒性機率恢復一個有效見證。
+      </p>
+    </div>
+
+    <p><strong>證明概要。</strong></p>
+
+    <ol>
+      <li>
+        <strong>AGM 多項式提取。</strong>對手輸出證明元素（線多項式、置換多項式、商多項式的承諾）。在 AGM 中，提取器以係數形式獲取所有這些多項式。
+      </li>
+      <li>
+        <strong>隨機 $\zeta$ 處的閘約束。</strong>驗證者檢查：
+        $$q_L(\zeta) a(\zeta) + q_R(\zeta) b(\zeta) + q_M(\zeta) a(\zeta) b(\zeta) + q_O(\zeta) c(\zeta) + q_C(\zeta) = t(\zeta) \cdot Z_H(\zeta)$$
+        根據 Schwartz-Zippel，這蘊含多項式恆等式成立：$p(X) \equiv 0 \pmod{Z_H(X)}$。
+        因此提取的線值滿足每個閘約束。
+      </li>
+      <li>
+        <strong>隨機 $\zeta$ 處的置換乘積。</strong>驗證者檢查大乘積多項式 $Z(X)$ 滿足 $Z(\omega^0) = 1$ 及遞推關係。同樣根據 Schwartz-Zippel，多項式恆等式成立，蘊含提取的見證遵循所有複製約束。
+      </li>
+      <li>
+        <strong>KZG 綁定性。</strong>對手無法在同一點將承諾打開為不同的值，除非它能破壞 $q$-SBDH 假設。這確保對手傳送的多項式求值與承諾的多項式一致。
+      </li>
+      <li>
+        <strong>組合。</strong>提取的多項式滿足所有閘約束和複製約束。在域 $H$ 上求值即得到有效見證。$\square$
+      </li>
+    </ol>
+
+    <h3>範例：Polynomial Method 可靠性</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 11.4（Polynomial Method 可靠性）</div>
+      <p>
+        在離散對數假設下，Polynomial Method 電路（以 Halo2 基於 IPA 的證明系統實例化）滿足知識可靠性。若一個 PPT 對手為陳述 $(x, y)$ 產生一個被接受的證明，則以壓倒性機率 $y = f(x)$。
+      </p>
+    </div>
+
+    <p><strong>證明。</strong>我們表明電路的每個組件都是可靠的，且其組合保持可靠性。</p>
+
+    <ol>
+      <li>
+        <strong>查詢可靠性（ByteTable）。</strong>查詢論證（第九章）保證每個被查詢的值都出現在 ByteTable $\{0, 1, \ldots, 255\}$ 中。若對手使用一個位元組 $b_i \notin [0, 255]$，查詢約束多項式非零，根據 Schwartz-Zippel，驗證者以機率 $\geq 1 - d/|\mathbb{F}|$ 偵測到此情況，此機率是壓倒性的。
+        <br><br>
+        <em>蘊含：</em>提取的值 $b_0, \ldots, b_{k-1}$ 都是 $[0, 255]$ 中的有效位元組。
+      </li>
+      <li>
+        <strong>分解約束可靠性。</strong>電路透過算術閘強制 $x = \sum b_i \cdot 256^i$。若此恆等式不成立，則閘約束多項式 $p_{\mathrm{decomp}}(X)$ 非零。驗證者在隨機 $\zeta$ 處求值並根據 Schwartz-Zippel 偵測到違反。
+        <br><br>
+        <em>蘊含：</em>提取的位元組 $b_0, \ldots, b_{k-1}$ 是 $x$ 的正確 base-256 分解。
+      </li>
+      <li>
+        <strong>多項式求值可靠性。</strong>$P_f$ 的係數 $c_0, \ldots, c_d$ 是固定的（在電路中硬編碼為常數或固定欄位）。Horner 求值 $P_f(b_i) = c_0 + b_i(c_1 + \cdots)$ 由確定性的乘法和加法閘鏈強制。若對手提供錯誤的中間值，約束多項式非零，在隨機 $\zeta$ 處被偵測到。
+        <br><br>
+        <em>蘊含：</em>提取的值精確滿足 $P_f(b_i) = \sum c_j b_i^j$。
+      </li>
+      <li>
+        <strong>輸出正確性。</strong>最終輸出 $y$ 被約束為等於逐位元組求值的組合。根據組合閘的可靠性：
+        $$y = \mathrm{combine}(P_f(b_0), \ldots, P_f(b_{k-1})) = f(x)$$
+      </li>
+      <li>
+        <strong>IPA 綁定性。</strong>IPA 中使用的 Pedersen 向量承諾在離散對數假設下是計算上綁定的：將承諾打開為兩個不同的多項式意味著找到一個離散對數。這確保對手無法在承諾的多項式值上含糊其辭。
+      </li>
+    </ol>
+
+    <p>
+      <strong>組合論證。</strong>每個約束區域都是獨立可靠的：違反任何單一約束被偵測到的機率 $\geq 1 - d/|\mathbb{F}|$。
+      電路有 $m$ 個約束區域，因此根據聯合界，任何約束違反未被偵測到的機率為：
+    </p>
+    $$\Pr[\text{any violation undetected}] \;\leq\; m \cdot \frac{d}{|\mathbb{F}|} \;\leq\; \mathrm{negl}(\lambda)$$
+    <p>
+      因為對所有實際電路大小而言 $m \cdot d \ll |\mathbb{F}|$。因此，若驗證者接受，則以壓倒性機率所有約束成立且 $y = f(x)$。$\square$
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">歸約至離散對數</div>
+      <p>
+        形式化歸約如下：假設對手 $\mathcal{A}$ 破壞可靠性（為 $(x, y)$ 產生被接受的證明，其中 $y \neq f(x)$）。則：
+      </p>
+      <ol>
+        <li>某約束多項式 $p(X)$ 非零但 $p(\zeta) = 0$ 在隨機挑戰處成立（機率 $\leq d/|\mathbb{F}|$），或</li>
+        <li>IPA 承諾被打開為不一致的值，意味著我們可以從結果方程中提取一個離散對數（破壞 DLog），或</li>
+        <li>查詢論證被破壞（這也透過 IPA 綁定性歸約至 DLog）。</li>
+      </ol>
+      <p>
+        在所有情況下，事件要麼具有可忽略的機率，要麼我們破壞了 DLog。在 DLog 假設下，可靠性成立。
+      </p>
+    </div>
+
+
+    <!-- ============================================================
+         11.4 PROVING ZERO-KNOWLEDGE
+         ============================================================ -->
+    <h2>11.4 證明零知識性</h2>
+
+    <h3>一般策略：模擬</h3>
+
+    <p>
+      零知識性透過構造一個<strong>模擬器</strong> $\mathcal{S}$ 來證明，該模擬器在不持有任何見證的情況下產生「假」證明。安全性論證如下：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <strong>步驟 1：</strong>構造一個 PPT 演算法 $\mathcal{S}$，它僅接受陳述 $x$（不接受見證 $w$）並輸出一個證明 $\pi^*$。
+      </div>
+      <div class="step">
+        <strong>步驟 2：</strong>表明 $\pi^*$ 的分布與誠實產生的證明分布 $\mathsf{Prove}(\mathsf{pk}, x, w)$ 在計算上不可區分。
+      </div>
+      <div class="step">
+        <strong>步驟 3：</strong>結論：由於模擬證明（不包含關於 $w$ 的資訊）與真實證明看起來完全一致，真實證明也不洩露關於 $w$ 的資訊。
+      </div>
+    </div>
+
+    <div class="callout definition">
+      <div class="callout-title">模擬範式</div>
+      <p>
+        模擬器在 ROM 中的關鍵優勢是能夠<em>編程隨機預言機</em>。
+        在真實協定中，Fiat-Shamir 雜湊 $H$ 被誠實地計算：$\alpha = H(\text{transcript so far})$。但模擬器<em>先</em>選擇挑戰 $\alpha, \beta, \gamma, \zeta$，然後編程 $H$ 使其對相應的輸入返回這些值。這允許模擬器「反向工作」&mdash; 選擇使假證明通過驗證的便利挑戰。
+      </p>
+    </div>
+
+    <h3>盲化如何實現零知識性</h3>
+
+    <p>
+      在基於多項式的證明系統中，實現零知識性的基本機制是<strong>盲化</strong>：添加隨機項以隱藏實際的多項式值，同時不影響約束結構。
+    </p>
+
+    <h4>PLONK 中的盲化</h4>
+
+    <p>
+      見證多項式 $a(X), b(X), c(X)$ 編碼了電路的線值。
+      若不進行盲化，求值 $a(\zeta)$ 將洩露線值的特定線性組合。PLONK 如下進行盲化：
+    </p>
+
+    $$\tilde{a}(X) = a(X) + (r_1 X + r_2) \cdot Z_H(X)$$
+
+    <p>
+      其中 $r_1, r_2 \gets \mathbb{F}$ 為均勻隨機的。由於 $Z_H(\omega^i) = 0$ 對所有 $\omega^i \in H$ 成立，盲化後的多項式在求值域上與 $a(X)$ 一致：$\tilde{a}(\omega^i) = a(\omega^i)$。但在隨機點 $\zeta \notin H$：
+    </p>
+    $$\tilde{a}(\zeta) = a(\zeta) + (r_1 \zeta + r_2) \cdot Z_H(\zeta)$$
+    <p>
+      項 $(r_1 \zeta + r_2) \cdot Z_H(\zeta)$ 是一個均勻隨機的體元素（因為 $r_1, r_2$ 是隨機的且 $Z_H(\zeta) \neq 0$），所以 $\tilde{a}(\zeta)$ 是均勻隨機的，不洩露關於 $a(\zeta)$ 的任何資訊。
+    </p>
+
+    <h4>Halo2 (IPA) 中的盲化</h4>
+
+    <p>
+      Halo2 使用不同的盲化機制：<strong>盲化列</strong>。每個建議欄位的最後 $k$ 列填充隨機體元素（不被任何約束使用）。這產生以下效果：
+    </p>
+    <ul>
+      <li>編碼建議欄位的多項式因這些額外的求值點而被隨機化。</li>
+      <li>Pedersen 承諾包含盲化值：$C = \sum a_i G_i + rH$，其中 $r$ 是盲化純量。在 DLog 假設下，$C$ 是計算上隱藏的。</li>
+      <li>盲化列不參與任何約束，因此不影響完備性或可靠性。</li>
+      <li>盲化列的數量 $k$ 決定了零知識的程度：更多的盲化列提供更多的隨機性。</li>
+    </ul>
+
+    <h3>PLONK 零知識性證明</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 11.5（PLONK 零知識性，非正式）</div>
+      <p>
+        PLONK 在 ROM 中達成計算零知識。存在一個 PPT 模擬器 $\mathcal{S}$，使得對所有 PPT 區分器 $\mathcal{D}$：
+        $$\Big|\Pr[\mathcal{D}(\mathsf{Real}) = 1] - \Pr[\mathcal{D}(\mathsf{Sim}) = 1]\Big| \leq \mathrm{negl}(\lambda)$$
+      </p>
+    </div>
+
+    <p><strong>模擬器構造。</strong></p>
+
+    <ol>
+      <li>
+        <strong>選擇隨機承諾。</strong>模擬器選擇隨機群元素 $[A]_1, [B]_1, [C]_1$ 作為「線多項式承諾」。這些不是任何實際多項式的承諾 &mdash; 僅僅是隨機群元素。
+      </li>
+      <li>
+        <strong>編程隨機預言機。</strong>模擬器選擇挑戰 $\beta, \gamma$（用於置換）、$\alpha$（用於組合）和 $\zeta$（求值點）。它編程雜湊函數 $H$ 使得在正確的轉錄點查詢時返回這些值。
+      </li>
+      <li>
+        <strong>選擇一致的求值。</strong>給定挑戰後，模擬器為 $a(\zeta), b(\zeta), c(\zeta)$ 挑選隨機體元素，並計算所有其他求值（置換多項式、商式）以滿足驗證方程式。由於驗證方程式是在 $\zeta$ 處求值的單一多項式恆等式，模擬器有足夠的自由度來滿足它。
+      </li>
+      <li>
+        <strong>偽造 KZG 開啟證明。</strong>在 ROM 中，模擬器可以偽造開啟證明，因為它控制著隨機預言機。（在標準模型中，這將需要可信設置的模擬陷門。）
+      </li>
+    </ol>
+
+    <p>
+      <strong>不可區分性論證。</strong>在真實證明中，盲化後的求值 $\tilde{a}(\zeta), \tilde{b}(\zeta), \tilde{c}(\zeta)$ 是均勻隨機的體元素（根據上述盲化論證）。在模擬證明中，$a(\zeta), b(\zeta), c(\zeta)$ 也是均勻隨機的（由模擬器選擇）。挑戰具有相同的分布（兩種情況下都是隨機的）。KZG 證明在 DLog 假設下不可區分（KZG 的隱藏性質）。因此，沒有 PPT 區分器能分辨這兩個分布。$\square$
+    </p>
+
+    <h3>Polynomial Method 零知識性</h3>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 11.6（Polynomial Method 零知識性）</div>
+      <p>
+        Polynomial Method 電路以 Halo2 基於 IPA 的證明系統實例化後，在離散對數假設下達成計算零知識。存在一個 PPT 模擬器 $\mathcal{S}$，其輸出與真實證明在計算上不可區分。
+      </p>
+    </div>
+
+    <p><strong>被隱藏的資訊與被揭露的資訊：</strong></p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>資訊</th>
+          <th>狀態</th>
+          <th>原因</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>輸入 $x$</td>
+          <td>隱藏</td>
+          <td>編碼在建議欄位中，由盲化列保護</td>
+        </tr>
+        <tr>
+          <td>位元組 $b_0, \ldots, b_{k-1}$</td>
+          <td>隱藏</td>
+          <td>建議欄位值，以 Pedersen 盲化承諾</td>
+        </tr>
+        <tr>
+          <td>中間值 $P_f(b_i)$</td>
+          <td>隱藏</td>
+          <td>內部電路線路，未作為公開輸入暴露</td>
+        </tr>
+        <tr>
+          <td>輸出 $y$</td>
+          <td>揭露（若為公開）</td>
+          <td>宣告為公開輸入/實例欄位值</td>
+        </tr>
+        <tr>
+          <td>函數 $f$</td>
+          <td>揭露</td>
+          <td>電路結構是公開的（係數 $c_j$ 在固定欄位中）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>形式化論證。</strong></p>
+
+    <ol>
+      <li>
+        <strong>建議欄位隱藏性。</strong>所有建議欄位（位元組 $b_i$、中間求值 $P_f(b_i)$、輸入 $x$）使用帶盲化因子 $r$ 的 Pedersen 向量承諾來承諾：$C = \langle \mathbf{a}, \mathbf{G} \rangle + rH$。在 DLog 假設下，承諾 $C$ 不洩露關於 $\mathbf{a}$ 的資訊。
+      </li>
+      <li>
+        <strong>盲化列。</strong>每個建議欄位的最後 $k$ 列填充均勻隨機的體元素。當欄位多項式在隨機挑戰點 $\zeta$ 處求值時，求值結果是真實見證值與盲化值的線性組合。盲化值引入足夠的熵，使求值結果均勻隨機（在足夠多的盲化列下，資訊理論上成立）。
+      </li>
+      <li>
+        <strong>IPA 求值證明。</strong>「$p(\zeta) = v$」的 IPA 求值證明由交叉項對 $(L_j, R_j)$ 和一個最終純量組成。每個 $L_j, R_j$ 是一個 Pedersen 承諾（在 DLog 下隱藏）。最終純量由協定決定，但除了已由 $v$（因盲化而隨機）洩露的資訊外，不攜帶關於原始多項式值的額外資訊。
+      </li>
+      <li>
+        <strong>模擬器構造。</strong>模擬器：
+        <ul>
+          <li>為所有建議欄位選擇隨機 Pedersen 承諾。</li>
+          <li>編程 Fiat-Shamir 雜湊以產生一致的挑戰。</li>
+          <li>在 $\zeta$ 處計算隨機求值，並利用 Pedersen 承諾的 DLog 隱藏性質偽造 IPA 證明。</li>
+        </ul>
+        模擬證明與真實證明不可區分，因為：(a) 承諾在兩種情況下都是隨機的（隱藏性），(b) 在 $\zeta$ 處的求值在兩種情況下都是隨機的（盲化），(c) 挑戰在兩種情況下都是隨機的（Fiat-Shamir / 編程的隨機預言機）。
+      </li>
+    </ol>
+
+    <p>
+      綜合以上觀察，沒有 PPT 區分器能區分真實證明分布 $\mathsf{Real}(x, w)$ 與模擬分布 $\mathcal{S}(x, y)$。因此，Polynomial Method 電路達成計算零知識。$\square$
+    </p>
+
+
+    <!-- ============================================================
+         11.5 PLONK SECURITY: FULL PROOF OUTLINE
+         ============================================================ -->
+    <h2>11.5 PLONK 安全性：完整證明綱要</h2>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 11.7（PLONK 安全性，Gabizon-Williamson-Ciobotaru 2019）</div>
+      <p>
+        令 $\mathsf{PLONK}$ 為使用 KZG 多項式承諾的 PLONK 證明系統。
+        在 Algebraic Group Model (AGM) 與 Random Oracle Model (ROM) 中，$\mathsf{PLONK}$ 是一個在 $q$-Strong Bilinear Diffie-Hellman ($q$-SBDH) 假設下對 NP 的<strong>知識可靠、零知識論證</strong>。
+      </p>
+    </div>
+
+    <p>
+      完整的安全性證明有三部分，分別處理一個安全性質：
+    </p>
+
+    <h3>第一部分：完備性</h3>
+    <p>
+      （見上述定理 11.1。）該證明是一個系統性的代數驗證，確認當證明者誠實地遵循協定時每個驗證方程式成立。關鍵洞察是約束多項式 $p(X)$ 在 $H$ 上消失（因為所有閘約束被滿足），因此商 $t(X) = p(X)/Z_H(X)$ 是一個定義良好的多項式，而驗證者的檢查 $p(\zeta) \stackrel{?}{=} t(\zeta) \cdot Z_H(\zeta)$ 在每個點都成立。
+    </p>
+
+    <h3>第二部分：知識可靠性</h3>
+    <p>
+      證明經由以下主要步驟進行：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <strong>AGM 多項式提取：</strong>從對手的群元素中，以係數形式提取所有多項式 $a(X), b(X), c(X), Z(X), t(X)$。
+      </div>
+      <div class="step">
+        <strong>Schwartz-Zippel 提升：</strong>驗證方程式在隨機 $\zeta$ 成立。根據 Schwartz-Zippel，它們以機率 $\geq 1 - d/|\mathbb{F}|$ 作為多項式恆等式成立。
+      </div>
+      <div class="step">
+        <strong>見證恢復：</strong>在 $H$ 上對提取的多項式求值以恢復線值 $(a_i, b_i, c_i)_{i=0}^{n-1}$。
+      </div>
+      <div class="step">
+        <strong>約束驗證：</strong>多項式恆等式蘊含提取的線值滿足所有閘約束和複製約束。
+      </div>
+      <div class="step">
+        <strong>KZG 綁定性：</strong>$q$-SBDH 假設確保對手無法將 KZG 承諾打開為不一致的值。
+      </div>
+    </div>
+
+    <p>
+      歸約是緊密的：提取器的成功機率為 $\geq \Pr[\mathcal{A} \text{ succeeds}] - \mathrm{negl}(\lambda)$，其中可忽略項來自 Schwartz-Zippel 誤差和 $q$-SBDH 優勢。
+    </p>
+
+    <h3>第三部分：零知識性</h3>
+    <p>
+      （見上述定理 11.5。）模擬器編程隨機預言機並利用見證多項式的盲化。不可區分性依賴於 KZG 承諾的隱藏性質（基於 DLog）和盲化求值的均勻性。
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">參考文獻</div>
+      <p>
+        完整的形式化證明見 Gabizon, Williamson, and Ciobotaru 所著
+        "PLONK: Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of Knowledge,"
+        2019 (ePrint 2019/953), 第 5 節。該證明約 15 頁，處理了包括線性化技巧、多點開啟協定和公開輸入處理在內的眾多邊界情況。
+      </p>
+    </div>
+
+
+    <!-- ============================================================
+         11.6 POLYNOMIAL METHOD SECURITY: FULL PROOF OUTLINE
+         ============================================================ -->
+    <h2>11.6 Polynomial Method 安全性：完整證明綱要</h2>
+
+    <p>
+      本節為第十章所描述的 Polynomial Method 電路提供形式化安全性分析。這是本論文的核心安全性結果。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理 11.8（Polynomial Method 安全性 &mdash; 主定理）</div>
+      <p>
+        Polynomial Method 電路以 Halo2 基於 IPA 的證明系統實例化後，滿足以下三個性質：
+      </p>
+      <ol>
+        <li>
+          <strong>完美完備性：</strong>若 $f(x) = y$ 且位元組分解 $(b_0, \ldots, b_{k-1})$ 正確，則證明者總是成功：
+          $$\Pr[\mathsf{Verify}(\mathsf{vk}, (x, y), \pi) = 1] = 1$$
+        </li>
+        <li>
+          <strong>知識可靠性：</strong>在離散對數假設下，存在一個 PPT 提取器 $\mathcal{E}$，給定任何產生被接受證明的 PPT 對手 $\mathcal{A}$，可恢復一個有效見證 $(x, y, b_0, \ldots, b_{k-1})$，滿足 $y = f(x)$ 且 $x = \sum b_i \cdot 256^i$。
+        </li>
+        <li>
+          <strong>計算零知識：</strong>在離散對數假設下，存在一個 PPT 模擬器 $\mathcal{S}$，其輸出與真實證明在計算上不可區分。
+        </li>
+      </ol>
+    </div>
+
+    <h3>完美完備性的證明</h3>
+
+    <p>
+      完備性證明（定理 11.2）追蹤了 Polynomial Method 電路所有四個約束區域。我們重述關鍵的代數論證：
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <strong>ByteTable 查詢：</strong>每個 $b_i \in \{0, 1, \ldots, 255\}$ 出現在固定的 ByteTable 欄位中。根據 Halo2 查詢論證的完備性，查詢閘接受。查詢論證使用對數導數技巧：當每個被查詢的值 $b_i$ 出現在表中時（$m_j$ 計算重數），總和 $\sum_i \frac{1}{b_i + \beta} = \sum_j \frac{m_j}{j + \beta}$ 成立。由於表包含所有 256 個位元組，任何有效位元組都有匹配的表項。
+      </div>
+      <div class="step">
+        <strong>分解鏈：</strong>累加器 $\mathrm{acc}_0 = b_0$，$\mathrm{acc}_{i+1} = \mathrm{acc}_i + b_{i+1} \cdot 256^{i+1}$ 終止於 $\mathrm{acc}_{k-1} = x$。每一步是一個加法閘：$\mathrm{acc}_{i+1} - \mathrm{acc}_i - b_{i+1} \cdot 256^{i+1} = 0$。這些根據直接算術成立。
+      </div>
+      <div class="step">
+        <strong>Horner 求值：</strong>對每個位元組 $b_i$，鏈 $h_d = c_d$，$h_{j-1} = h_j \cdot b_i + c_{j-1}$ 終止於 $h_0 = P_f(b_i)$。每一步是一個乘法-加法閘：$h_{j-1} - h_j \cdot b_i - c_{j-1} = 0$。這些根據 Horner 法的定義成立。
+      </div>
+      <div class="step">
+        <strong>輸出組合：</strong>最終的閘計算 $y = \mathrm{combine}(P_f(b_0), \ldots, P_f(b_{k-1}))$。由於每個 $P_f(b_i)$ 正確且組合邏輯忠實實現 $f$，輸出等於 $f(x) = y$。輸出被指派到一個實例（公開輸入）欄位，並被約束為等於證明者聲稱的 $y$。
+      </div>
+    </div>
+
+    <p>
+      所有約束確定性地被滿足（誠實證明者的執行中沒有機率步驟），因此驗證者以恰好為 $1$ 的機率接受。$\square$
+    </p>
+
+    <h3>知識可靠性的證明</h3>
+
+    <p>
+      知識可靠性證明（基於定理 11.4 的擴展）構造一個顯式提取器，並將可靠性歸約至離散對數假設。
+    </p>
+
+    <div class="callout definition">
+      <div class="callout-title">提取器構造</div>
+      <p>
+        給定一個為陳述 $(x, y)$ 產生被接受證明 $\pi$ 的 PPT 對手 $\mathcal{A}$，提取器 $\mathcal{E}$ 按如下步驟進行：
+      </p>
+      <ol>
+        <li>執行 $\mathcal{A}$ 以獲取證明 $\pi$，包括所有 IPA 承諾和求值證明。</li>
+        <li>使用 IPA 提取程序（基於回溯或 IPA 的代數結構）以係數形式提取承諾的多項式。</li>
+        <li>在求值域 $H$ 上對提取的建議欄位多項式求值，恢復線值：位元組 $b_i$、中間值 $P_f(b_i)$、累加器值等。</li>
+        <li>輸出見證 $w = (x, y, b_0, \ldots, b_{k-1})$。</li>
+      </ol>
+    </div>
+
+    <p><strong>提取器的正確性。</strong>我們必須表明提取的見證是有效的（即所有電路約束被滿足）。論證對每個約束區域採用反證法：</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>約束區域</th>
+          <th>若被違反...</th>
+          <th>後果</th>
+          <th>機率</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>查詢（$b_i \notin [0,255]$）</td>
+          <td>查詢約束多項式 $\neq 0$</td>
+          <td>在隨機 $\zeta$ 處根據 Schwartz-Zippel 偵測</td>
+          <td>$\leq d/|\mathbb{F}|$</td>
+        </tr>
+        <tr>
+          <td>分解（$x \neq \sum b_i 256^i$）</td>
+          <td>閘約束多項式 $\neq 0$</td>
+          <td>在隨機 $\zeta$ 處根據 Schwartz-Zippel 偵測</td>
+          <td>$\leq d/|\mathbb{F}|$</td>
+        </tr>
+        <tr>
+          <td>Horner 求值（錯誤的 $P_f(b_i)$）</td>
+          <td>閘約束多項式 $\neq 0$</td>
+          <td>在隨機 $\zeta$ 處根據 Schwartz-Zippel 偵測</td>
+          <td>$\leq d/|\mathbb{F}|$</td>
+        </tr>
+        <tr>
+          <td>輸出（$y \neq f(x)$）</td>
+          <td>實例約束多項式 $\neq 0$</td>
+          <td>在隨機 $\zeta$ 處根據 Schwartz-Zippel 偵測</td>
+          <td>$\leq d/|\mathbb{F}|$</td>
+        </tr>
+        <tr>
+          <td>IPA 綁定性（含糊其辭）</td>
+          <td>同一承諾的兩個有效開啟</td>
+          <td>蘊含 DLog 解</td>
+          <td>破壞 DLog</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      <strong>形式化歸約。</strong>定義歸約器 $\mathcal{B}$，給定一個 DLog 挑戰 $(G, xG)$，為 $\mathcal{A}$ 模擬 Polynomial Method 驗證環境：
+    </p>
+
+    <ol>
+      <li>$\mathcal{B}$ 使用 DLog 挑戰產生 Halo2 證明密鑰，將 DLog 實例嵌入 IPA 生成元中。</li>
+      <li>$\mathcal{B}$ 執行 $\mathcal{A}$，$\mathcal{A}$ 產生一個被接受的證明。</li>
+      <li>$\mathcal{B}$ 執行提取器以獲取承諾的多項式。</li>
+      <li>若提取的多項式與證明不一致（IPA 綁定性被破壞），$\mathcal{B}$ 從兩個不同的開啟中恢復離散對數 $x$：
+      $C = \langle \mathbf{a}, \mathbf{G} \rangle + r_1 H = \langle \mathbf{a'}, \mathbf{G} \rangle + r_2 H$
+      蘊含 $(r_1 - r_2) H = \langle \mathbf{a'} - \mathbf{a}, \mathbf{G} \rangle$，由此得到一個 DLog 關係。</li>
+      <li>若提取的見證無效但一致（某約束被違反但證明被接受），此事件發生的機率 $\leq md/|\mathbb{F}|$，此為可忽略的。</li>
+    </ol>
+
+    <p>
+      因此：$\Pr[\mathcal{E} \text{ fails}] \leq \Pr[\text{break DLog}] + md/|\mathbb{F}| \leq \mathrm{negl}(\lambda)$。$\square$
+    </p>
+
+    <h3>計算零知識的證明</h3>
+
+    <p>
+      零知識性證明（基於定理 11.6 的擴展）構造一個顯式模擬器。
+    </p>
+
+    <div class="callout definition">
+      <div class="callout-title">Polynomial Method 的模擬器構造</div>
+      <p>
+        模擬器 $\mathcal{S}$ 僅給定公開輸入 $(y)$ 和電路描述（多項式係數 $c_j$、電路佈局），按如下步驟進行：
+      </p>
+      <ol>
+        <li><strong>採樣隨機建議：</strong>對每個建議欄位，為所有列（包括盲化列）選擇均勻隨機的體元素。</li>
+        <li><strong>承諾：</strong>以隨機盲化因子計算每個建議欄位的 Pedersen 承諾。這些承諾與誠實承諾具有相同的分布（兩者在 DLog 隱藏下都是隨機群元素）。</li>
+        <li><strong>編程 Fiat-Shamir：</strong>均勻隨機地選擇挑戰 $\theta, \beta, \gamma, y_{\mathrm{ch}}, \zeta$。編程雜湊函數 $H$ 使其對相應的轉錄前綴輸出這些值。</li>
+        <li><strong>計算求值：</strong>為在 $\zeta$ 處的求值選擇隨機體元素。由於真實的求值因盲化列而均勻隨機，隨機的模擬求值具有相同的分布。</li>
+        <li><strong>偽造 IPA 證明：</strong>利用隨機預言機編程，構造與承諾和求值一致的 IPA 求值證明。模擬器利用 Pedersen 承諾的隱藏性質來產生計算上不可區分的開啟證明。</li>
+        <li><strong>輸出：</strong>返回模擬證明 $\pi^* = (\text{commitments}, \text{evaluations}, \text{IPA proofs})$。</li>
+      </ol>
+    </div>
+
+    <p><strong>透過混合賽局的不可區分性論證：</strong></p>
+
+    <ol>
+      <li>
+        <strong>Game 0（真實）：</strong>誠實證明者使用真實見證 $(x, y, b_0, \ldots, b_{k-1})$ 產生證明。
+      </li>
+      <li>
+        <strong>Game 1：</strong>將 Fiat-Shamir 挑戰替換為真正隨機的值（在 ROM 中不可區分，因為雜湊輸出是隨機的）。
+        $|\Pr[G_0] - \Pr[G_1]| = 0$（在 ROM 中）。
+      </li>
+      <li>
+        <strong>Game 2：</strong>將建議欄位承諾替換為對隨機多項式的承諾（相同的盲化）。在 Pedersen 承諾的 DLog 隱藏下不可區分。$|\Pr[G_1] - \Pr[G_2]| \leq \mathrm{Adv}_{\mathrm{DLog}}$。
+      </li>
+      <li>
+        <strong>Game 3：</strong>將在 $\zeta$ 處的求值替換為隨機體元素。在 Game 2 中，承諾的多項式已經是隨機的，且隨機多項式在隨機點的求值是均勻隨機的。因此 Game 2 與 Game 3 具有相同的分布。$|\Pr[G_2] - \Pr[G_3]| = 0$。
+      </li>
+      <li>
+        <strong>Game 4（模擬）：</strong>將 IPA 證明替換為模擬證明（使用編程的隨機預言機）。在 DLog 下不可區分。$|\Pr[G_3] - \Pr[G_4]| \leq \mathrm{Adv}_{\mathrm{DLog}}$。
+      </li>
+    </ol>
+
+    <p>
+      總區分優勢：
+    </p>
+    $$|\Pr[\mathcal{D}(\mathsf{Real}) = 1] - \Pr[\mathcal{D}(\mathsf{Sim}) = 1]| \;\leq\; 2 \cdot \mathrm{Adv}_{\mathrm{DLog}}(\lambda) \;\leq\; \mathrm{negl}(\lambda)$$
+    <p>
+      在離散對數假設下成立。$\square$
+    </p>
+
+    <div class="callout note">
+      <div class="callout-title">論文意涵</div>
+      <p>
+        Polynomial Method 達成與任何 Halo2 電路相同的安全性保證：完美完備性、DLog 下的知識可靠性和 DLog 下的計算零知識。安全性不取決於被計算的特定函數 $f$ &mdash; 它對任何可由 Polynomial Method 電路表示的函數都成立。這種通用性是該方法的關鍵優勢之一：一個單一的安全性證明涵蓋所有實例化。
+      </p>
+    </div>
+
+
+    <!-- ============================================================
+         11.7 COMMON PITFALLS IN SECURITY PROOFS
+         ============================================================ -->
+    <h2>11.7 安全性證明中的常見陷阱</h2>
+
+    <p>
+      零知識系統的安全性證明非常微妙。以下是導致現實世界漏洞和錯誤證明的最常見錯誤。
+    </p>
+
+    <div class="callout warning">
+      <div class="callout-title">陷阱 1：忘記盲化</div>
+      <p>
+        若見證多項式在承諾時未進行盲化，它們在挑戰點 $\zeta$ 處的求值將洩露資訊。這完全破壞了零知識性。
+      </p>
+      <p>
+        <strong>歷史案例：</strong>某些 SNARK 實作的早期版本為了「效率」省略了盲化，後來發現證明洩露了關於見證的部分資訊。修復方法始終是添加在求值域上消失的盲化項：$\tilde{a}(X) = a(X) + r(X) \cdot Z_H(X)$。
+      </p>
+    </div>
+
+    <div class="callout warning">
+      <div class="callout-title">陷阱 2：薄弱的 Fiat-Shamir 轉換</div>
+      <p>
+        Fiat-Shamir 雜湊<strong>必須包含轉錄中所有先前的訊息</strong>。若遺漏任何訊息，對手將獲得選擇本應在挑戰之前承諾之值的自由度，從而實現<strong>可塑性攻擊</strong>。
+      </p>
+      <p>
+        <strong>具體攻擊：</strong>若挑戰 $\alpha$ 的雜湊不包含線承諾 $[A]_1, [B]_1, [C]_1$，對手可以：
+      </p>
+      <ol>
+        <li>看到挑戰 $\alpha$（因為它不依賴於承諾）。</li>
+        <li>選擇針對此特定 $\alpha$ 最佳化的線承諾。</li>
+        <li>產生通過驗證的偽造證明。</li>
+      </ol>
+      <p>
+        <strong>預防措施：</strong>使用順序雜湊每則訊息的轉錄協定：$\alpha = H(C_1 \| C_2 \| C_3 \| \ldots)$。如 Merlin (Rust) 等函式庫強制執行此模式。
+      </p>
+    </div>
+
+    <div class="callout warning">
+      <div class="callout-title">陷阱 3：缺少邊界檢查</div>
+      <p>
+        置換論證要求 $Z(\omega^0) = 1$（大乘積從 1 開始）。若驗證者未明確檢查此條件，對手可以選擇任意起始值 $Z(\omega^0) = c$，此值在乘積中抵消，允許在維持 $Z(\omega^n) = c$ 的同時違反複製約束。
+      </p>
+      <p>
+        <strong>一般原則：</strong>每個應「環繞」或具有特定邊界值的多項式約束都必須被明確驗證。對初始條件的隱式假設是可靠性漏洞的常見來源。
+      </p>
+    </div>
+
+    <div class="callout warning">
+      <div class="callout-title">陷阱 4：未經證明即假設查詢可靠性</div>
+      <p>
+        查詢論證（Plookup、LogUp 等）有自己的可靠性證明，依賴於特定的代數性質。僅在電路中加入查詢閘並不自動保證可靠性 &mdash; 查詢論證的可靠性必須在證明系統的框架內得到驗證。
+      </p>
+      <p>
+        <strong>可能出錯之處：</strong>若表多項式未被正確約束（例如對手可修改表），則查詢不提供任何保證。在 Polynomial Method 中，ByteTable 必須是一個對手無法更改的<em>固定</em>欄位。
+      </p>
+    </div>
+
+    <div class="callout warning">
+      <div class="callout-title">陷阱 5：混淆零知識的類型</div>
+      <p>
+        Perfect ZK、Statistical ZK 和 Computational ZK 是<strong>不同的性質</strong>。宣稱「零知識」而不指定哪種類型是不精確的。特別是：
+      </p>
+      <ul>
+        <li>Groth16 達成<strong>Perfect ZK</strong>（給定模擬陷門，模擬器的輸出與真實證明具有完全相同的分布）。</li>
+        <li>PLONK 在 ROM 中達成<strong>Computational ZK</strong>（依賴承諾的 DLog 隱藏性）。</li>
+        <li>Polynomial Method (Halo2) 達成<strong>Computational ZK</strong>（依賴 Pedersen 承諾的 DLog 隱藏性）。</li>
+      </ul>
+      <p>
+        聲稱比實際達成的更強的零知識類型會使安全性證明無效。
+      </p>
+    </div>
+
+
+    <!-- ============================================================
+         11.8 HARDNESS ASSUMPTIONS SUMMARY
+         ============================================================ -->
+    <h2>11.8 困難性假設總結</h2>
+
+    <p>
+      每個密碼學安全性證明最終都建立在一個<strong>困難性假設</strong>之上：一個被認為計算上不可解的數學問題。下表總結了本手冊中討論的零知識證明系統所依賴的假設。
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>假設</th>
+          <th>形式化陳述</th>
+          <th>使用者</th>
+          <th>後量子？</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>DLog</strong><br>（離散對數）</td>
+          <td>給定 $(g, g^x)$（其中 $x \gets \mathbb{Z}_p$ 隨機），求 $x$。<br>
+          $\Pr[\mathcal{A}(g, g^x) = x] \leq \mathrm{negl}(\lambda)$ 對所有 PPT $\mathcal{A}$ 成立。</td>
+          <td>IPA, Bulletproofs, Halo2, Schnorr</td>
+          <td>否（被 Shor 演算法破壞）</td>
+        </tr>
+        <tr>
+          <td><strong>CDH</strong><br>（計算 Diffie-Hellman）</td>
+          <td>給定 $(g, g^a, g^b)$（其中 $a, b$ 隨機），計算 $g^{ab}$。<br>
+          比 DLog 更強：CDH $\Rightarrow$ DLog（若你能計算 DLog，就能解 CDH）。</td>
+          <td>Schnorr 簽章, ElGamal 加密</td>
+          <td>否（被 Shor 演算法破壞）</td>
+        </tr>
+        <tr>
+          <td><strong>$q$-SBDH</strong><br>（$q$-Strong Bilinear Diffie-Hellman）</td>
+          <td>在具有配對的群中，給定 $(g, g^s, g^{s^2}, \ldots, g^{s^q})$，對任何 $c$ 求 $(c, e(g,g)^{1/(s+c)})$。<br>
+          $q$-SDH 假設的雙線性群變體。</td>
+          <td>KZG 承諾, Groth16, PLONK (搭配 KZG)</td>
+          <td>否（配對群被 Shor 破壞）</td>
+        </tr>
+        <tr>
+          <td><strong>AGM</strong><br>（Algebraic Group Model）</td>
+          <td>非困難性假設，而是一種<em>對手限制</em>：
+          所有輸出的群元素必須具有以接收到的群元素表示的已知線性表示。
+          $[Y] = \sum \alpha_i [G_i]$，其中 $\alpha_i$ 已知。</td>
+          <td>PLONK 可靠性證明, Marlin</td>
+          <td>不適用（計算模型，非假設）</td>
+        </tr>
+        <tr>
+          <td><strong>ROM</strong><br>（Random Oracle Model）</td>
+          <td>雜湊函數 $H$ 被建模為真正的隨機函數：
+          對每個新 $x$，$H(x)$ 均勻隨機，重複查詢回傳一致結果。
+          模擬器可以「編程」$H$（選擇輸出）。</td>
+          <td>Fiat-Shamir 轉換（所有從互動式到非互動式的 ZK）</td>
+          <td>不適用（理想化模型，非假設）</td>
+        </tr>
+        <tr>
+          <td><strong>CRHF</strong><br>（抗碰撞雜湊函數）</td>
+          <td>對一個帶鍵雜湊族 $\{H_k\}$，找到 $x \neq x'$ 使得 $H_k(x) = H_k(x')$ 是計算上困難的。<br>
+          $\Pr[\mathcal{A}(k) = (x, x') : x \neq x' \wedge H_k(x) = H_k(x')] \leq \mathrm{negl}(\lambda)$。</td>
+          <td>STARKs, FRI, Merkle trees</td>
+          <td>是（除 Grover 的 $O(\sqrt{N})$ 加速外無已知量子攻擊）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>假設層次結構</h3>
+
+    <div class="diagram">
+      <pre>
+  較弱（假設較少）                              較強（假設較多）
+  ←──────────────────────────────────────────────────────────────────────→
+
+  僅 CRHF              DLog            CDH              q-SBDH + 配對
+  (STARKs, FRI)        (IPA, Halo2)    (Schnorr)        (KZG, Groth16, PLONK)
+                                                          + 可信設置
+
+  後量子安全             非後量子安全    非後量子安全      非後量子安全
+
+  ─────────────────────────────────────────────────────────────────────────
+  模型：                ROM              AGM              AGM + ROM
+                       (Fiat-Shamir)    （代數            (PLONK 安全性)
+                                         證明）
+      </pre>
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">對 Polynomial Method 的意涵</div>
+      <p>
+        Polynomial Method (Halo2 + IPA) 依賴 <strong>DLog + ROM</strong>：
+      </p>
+      <ul>
+        <li><strong>DLog</strong> 提供：IPA 綁定性（可靠性）、Pedersen 隱藏性（零知識性）。</li>
+        <li><strong>ROM</strong> 提供：Fiat-Shamir 可靠性（非互動性）、模擬器編程雜湊輸出的能力（零知識模擬）。</li>
+      </ul>
+      <p>
+        這將 Polynomial Method 置於假設光譜的中間位置：比 STARKs（僅需 CRHF 且為後量子安全）需要更強的假設，但比基於 KZG 的系統（額外需要配對、$q$-SBDH 和可信設置）需要更弱的假設。Polynomial Method <strong>不需要可信設置</strong>，也<strong>不需要配對</strong>。
+      </p>
+    </div>
+
+    <h3>後量子考量</h3>
+
+    <p>
+      所有基於 DLog 和基於配對的方案都會被運行 Shor 演算法的足夠大型量子電腦破壞。零知識證明系統的後量子遷移路徑如下：
+    </p>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>當前（前量子）</h4>
+        <ul>
+          <li><strong>Groth16：</strong>$q$-SBDH + 配對</li>
+          <li><strong>PLONK + KZG：</strong>$q$-SBDH + 配對</li>
+          <li><strong>Halo2 + IPA：</strong>DLog</li>
+          <li><strong>Bulletproofs：</strong>DLog</li>
+          <li>以上所有方案均被 Shor 演算法破壞</li>
+        </ul>
+      </div>
+      <div class="comparison-card">
+        <h4>後量子</h4>
+        <ul>
+          <li><strong>STARKs：</strong>僅 CRHF（基於雜湊）</li>
+          <li><strong>基於 FRI 的系統：</strong>僅 CRHF</li>
+          <li><strong>基於格的 ZK：</strong>Learning With Errors (LWE)</li>
+          <li>證明較大，但抗量子</li>
+          <li>活躍的研究領域（截至 2025 年）</li>
+        </ul>
+      </div>
+    </div>
+
+
+    <!-- ============================================================
+         CHAPTER SUMMARY
+         ============================================================ -->
+    <h2>本章總結</h2>
+
+    <ol>
+      <li>
+        <strong>三個性質不可或缺：</strong>完備性（可用性）、可靠性（安全性）和零知識性（隱私性）。缺少任何一個都會破壞系統。這些是獨立的性質，必須分別證明。
+      </li>
+      <li>
+        <strong>完備性證明</strong>是代數驗證：以誠實證明者追蹤協定，表明每個驗證方程式成立。不涉及對手。
+      </li>
+      <li>
+        <strong>可靠性證明</strong>使用歸約：假設對手偽造了一個證明，然後提取見證（知識可靠性）或解決一個困難問題。關鍵技巧包括 Schwartz-Zippel（多項式恆等式測試）、AGM 提取和回溯。
+      </li>
+      <li>
+        <strong>零知識性證明</strong>構造一個在沒有見證的情況下產生假證明的模擬器。在 ROM 中，模擬器編程隨機預言機。盲化（見證多項式中的隨機項）使真實的求值均勻隨機，與模擬器的隨機輸出匹配。
+      </li>
+      <li>
+        <strong>PLONK 安全性</strong>在 AGM + ROM 中基於 $q$-SBDH 被證明。完整證明涵蓋所有三個性質，在原始論文中約佔 15 頁。
+      </li>
+      <li>
+        <strong>Polynomial Method 安全性</strong>（本論文的主要結果）達成完美完備性、DLog 下的知識可靠性和 DLog 下的計算零知識。安全性證明是組合式的：每個約束區域（查詢、分解、Horner 求值、輸出）獨立可靠，其組合透過聯合界保持可靠性。
+      </li>
+      <li>
+        <strong>常見陷阱</strong>包括缺少盲化、薄弱的 Fiat-Shamir 轉錄、缺少邊界檢查、未經證明的查詢可靠性，以及零知識類型之間的混淆。
+      </li>
+      <li>
+        <strong>困難性假設</strong>形成一個從最弱（CRHF，後量子安全）到最強（$q$-SBDH + 配對 + 可信設置）的層次結構。Polynomial Method 處於中間位置（DLog + ROM），不需要可信設置，也不需要配對。
+      </li>
+    </ol>
+
+    <p>
+      本章完結了 ZK Handbook。本章的形式化安全性證明與第十章的電路構造一起，為論文提供了理論基礎：Polynomial Method 是一種<em>完備、可靠且零知識的</em>可驗證計算方法，其安全性可歸約至離散對數假設。
+    </p>
+
+
+    <h2>對本研究的意義</h2>
+    <div class="callout theorem">
+      <div class="callout-title">安全性證明在論文中的角色</div>
+      <p>
+        本章的形式化證明為論文提供了<strong>理論正確性保證</strong>——多項式方法不只是「看起來能用」，而是在密碼學意義上被嚴格證明為安全的：
+      </p>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>安全性質</th><th>論文中的意義</th><th>依賴的技術</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>完備性</strong></td>
+          <td>正確的 Minimax 係數 + 正確的 Horner 求值 → 驗證者一定接受</td>
+          <td>Horner 鏈的代數正確性，各 scale 對齊</td>
+        </tr>
+        <tr>
+          <td><strong>知識可靠性</strong></td>
+          <td>攻擊者無法偽造函數求值結果（不能聲稱 $\exp(0.5) = 42$）</td>
+          <td>Schwartz-Zippel + AGM + 排列論證</td>
+        </tr>
+        <tr>
+          <td><strong>零知識性</strong></td>
+          <td>驗證者不會得知輸入 $R$（隱私保護——例如在 ZKML 中保護模型輸入）</td>
+          <td>盲化行 + 隨機多項式（Halo2 IPA 的盲化因子）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">完整的安全性歸約鏈</div>
+      <p>
+        論文的安全性歸約鏈為：多項式方法的安全性 → PLONK/Halo2 的安全性 → 離散對數假設。
+        具體地：若攻擊者能以不可忽略的機率欺騙多項式方法的驗證者，則可以構造一個攻擊者破解
+        Pallas 曲線上的離散對數問題（254 位安全性）。在當前的計算能力下，這被認為是不可行的。
+      </p>
+    </div>
+
+    <!-- ============================================================
+         PAGE NAVIGATION
+         ============================================================ -->
+    <div class="page-nav">
+      <a href="polynomial-method.html"><span class="nav-label">上一章</span><span class="nav-title">&larr; 10. Polynomial Method</span></a>
+    </div>
+  </main>
+</body>
+</html>

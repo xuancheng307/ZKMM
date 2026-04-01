@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ch.5 FFT &amp; Evaluation Domains — ZK Handbook</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>ZK Handbook</h1>
+      <div class="subtitle">Zero-Knowledge Proof Systems</div>
+    </div>
+    <nav>
+      <div class="section-label">總覽</div>
+      <a href="index.html"><span class="page-num">0.</span> 首頁</a>
+
+      <div class="section-label">基礎</div>
+      <a href="foundations.html"><span class="page-num">1.</span> 數學基礎</a>
+      <a href="zkp-basics.html"><span class="page-num">2.</span> ZKP：基本概念與性質</a>
+
+      <div class="section-label">構建模組</div>
+      <a href="polynomial-commitments.html"><span class="page-num">3.</span> 多項式承諾</a>
+      <a href="arithmetization.html"><span class="page-num">4.</span> 算術化</a>
+      <a href="fft-domains.html" class="active"><span class="page-num">5.</span> FFT 與求值域</a>
+
+      <div class="section-label">證明系統</div>
+      <a href="groth16.html"><span class="page-num">6.</span> Groth16</a>
+      <a href="plonk.html"><span class="page-num">7.</span> PLONK</a>
+      <a href="halo2.html"><span class="page-num">8.</span> Halo2</a>
+
+      <div class="section-label">進階主題</div>
+      <a href="lookup-arguments.html"><span class="page-num">9.</span> 查找論證</a>
+      <a href="polynomial-method.html"><span class="page-num">10.</span> 多項式方法</a>
+      <a href="security-proofs.html"><span class="page-num">11.</span> 安全性證明</a>
+
+      <div class="section-label">論文方法論</div>
+      <a href="fixed-point.html"><span class="page-num">12.</span> 有限域定點運算</a>
+      <a href="approximation-theory.html"><span class="page-num">13.</span> 多項式逼近理論</a>
+      <a href="horner-evaluation.html"><span class="page-num">14.</span> Horner 求值</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>第五章：FFT 與求值域</h1>
+      <p class="page-subtitle">
+        單位根、數論變換、陪集求值，以及讓 ZK 證明系統中多項式運算從 $O(n^2)$ 加速到
+        $O(n \log n)$ 的域結構。
+      </p>
+    </div>
+
+    <!-- ===== Definitions ===== -->
+    <div class="definitions-section">
+      <h2>關鍵定義</h2>
+
+      <div class="def-item">
+        <div class="def-term">Evaluation Domain <span class="zh">求值域</span></div>
+        <div class="def-body">
+          一組點的集合 $H \subset \mathbb{F}_p$，多項式在這些點上被求值。
+          在 ZK 系統中，通常 $H = \{1, \omega, \omega^2, \ldots, \omega^{n-1}\}$，
+          其中 $\omega$ 是一個原始 $n$ 次單位根。$H$ 的代數結構（它是
+          $\mathbb{F}_p^*$ 的乘法子群）正是使基於 FFT 的快速多項式運算成為可能的關鍵。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">PLONK / Halo2 Domain <span class="zh">Halo2 域</span></div>
+        <div class="def-body">
+          具體而言，是 $\mathbb{F}_p^*$ 中階為 $n = 2^k$ 的乘法子群 $H \leq \mathbb{F}_p^*$，
+          用作求值域。大小 $n$ 必須是 2 的冪次，以支援 radix-2 FFT。
+          其大小由電路規模（約束系統中的行數）決定。
+          在 Halo2 程式碼中：<code>EvaluationDomain::new(k, j)</code>，其中 $k$ 設定域大小
+          $n = 2^k$，$j$ 是需要擴展求值的欄位數。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Primitive $n$-th Root of Unity <span class="zh">原始 $n$ 次單位根</span></div>
+        <div class="def-body">
+          一個元素 $\omega \in \mathbb{F}_p$，滿足 $\omega^n = 1$ 且
+          $\operatorname{ord}(\omega) = n$（即沒有更小的正整數冪使其等於 1）。
+          $\omega$ 存在的充要條件是 $n \mid (p - 1)$。當其存在時，$n$ 個不同的
+          $n$ 次單位根為 $\{1, \omega, \omega^2, \ldots, \omega^{n-1}\}$，
+          它們構成 $\mathbb{F}_p^*$ 的一個循環子群。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Number Theoretic Transform (NTT) <span class="zh">數論變換</span></div>
+        <div class="def-body">
+          在有限域 $\mathbb{F}_p$ 上（而非 $\mathbb{C}$ 上）計算的離散傅立葉變換。
+          給定係數 $(a_0, \ldots, a_{n-1})$，計算求值結果
+          $\hat{a}_i = \sum_{j=0}^{n-1} a_j \omega^{ij}$，其中 $i = 0, \ldots, n-1$。
+          在 $O(n \log n)$ 次域運算內完成係數形式與求值形式之間的轉換。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Inverse NTT (iNTT) <span class="zh">逆數論變換</span></div>
+        <div class="def-body">
+          NTT 的逆運算：將求值形式轉換回係數形式。
+          公式：$a_j = \frac{1}{n} \sum_{i=0}^{n-1} \hat{a}_i \, \omega^{-ij}$。
+          使用與 NTT 相同的蝶形結構，但以 $\omega^{-1}$ 取代 $\omega$，並在最後
+          乘以 $n^{-1} \pmod{p}$ 進行縮放。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Coefficient Form <span class="zh">係數形式</span></div>
+        <div class="def-body">
+          多項式以其係數向量 $[a_0, a_1, \ldots, a_{n-1}]$ 儲存，
+          其中 $f(X) = \sum_{i=0}^{n-1} a_i X^i$。適合進行多項式承諾
+          （多純量乘法）和次數檢查。在此形式下，逐點乘法的複雜度為 $O(n^2)$。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Evaluation Form <span class="zh">求值形式</span></div>
+        <div class="def-body">
+          多項式以其在 $H$ 上的求值結果儲存：
+          $[f(\omega^0), f(\omega^1), \ldots, f(\omega^{n-1})]$。
+          適合逐點乘法（$O(n)$）和約束檢查。
+          進行承諾時需先轉換為係數形式。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Coset <span class="zh">陪集</span></div>
+        <div class="def-body">
+          一個平移後的域 $gH = \{g, g\omega, g\omega^2, \ldots, g\omega^{n-1}\}$，
+          其中生成元 $g \in \mathbb{F}_p^*$ 且 $g \notin H$。用於對商多項式求值，
+          因為在 $H$ 本身上除以消失多項式 $Z_H(X)$ 會導致除以零。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Extended Domain <span class="zh">擴展域</span></div>
+        <div class="def-body">
+          一個更大的求值域，通常大小為 $4n$ 或 $8n$，用於多項式乘法
+          產生的結果次數超過 $n-1$ 的情況。在更多點上求值可以防止混疊
+          （因繞回域而造成的資訊損失）。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Vanishing Polynomial <span class="zh">消失多項式</span></div>
+        <div class="def-body">
+          $Z_H(X) = X^n - 1 = \prod_{i=0}^{n-1}(X - \omega^i)$。
+          唯一的首一多項式，次數為 $n$，在 $H$ 的每個元素上為零。
+          求值 $Z_H(X)$ 極為高效：計算 $X^n$（透過反覆平方）再減 1。
+          它是 PLONK 約束系統的核心：一個約束在 $H$ 上成立，
+          若且唯若約束多項式可被 $Z_H(X)$ 整除。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Lagrange Basis <span class="zh">拉格朗日基底</span></div>
+        <div class="def-body">
+          一組多項式 $\{L_0(X), L_1(X), \ldots, L_{n-1}(X)\}$，滿足
+          $L_i(\omega^j) = \delta_{ij}$（當 $i = j$ 時為 1，否則為 0）。
+          封閉形式：$L_i(X) = \frac{\omega^i}{n} \cdot \frac{X^n - 1}{X - \omega^i}$。
+          任何滿足 $\deg(f) < n$ 的多項式 $f$ 都可以寫成
+          $f(X) = \sum_{i=0}^{n-1} f(\omega^i) \, L_i(X)$。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Blinding Rows <span class="zh">盲化行</span></div>
+        <div class="def-body">
+          附加在求值域末尾、以隨機域元素填充的額外行。
+          它們不編碼任何計算，但能防止協議中揭示的多項式求值
+          洩漏見證資訊。盲化行的數量取決於驗證者發出的求值查詢次數。
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 5.1 Why Evaluation Domains Matter ===== -->
+    <h2>5.1 為什麼求值域如此重要</h2>
+
+    <p>
+      每個現代 ZK 證明系統 — Groth16、PLONK、Halo2、STARKs — 都將待證明的陳述
+      編譯為多項式等式。證明者隨後需要對這些多項式反覆執行兩個基本操作：
+    </p>
+
+    <ul>
+      <li><strong>多點求值</strong>：給定係數形式的 $f(X)$，計算
+        $f(\alpha_0), f(\alpha_1), \ldots, f(\alpha_{n-1})$。</li>
+      <li><strong>插值</strong>：給定值 $v_0, v_1, \ldots, v_{n-1}$，找到 $f(X)$
+        使得 $f(\alpha_i) = v_i$。</li>
+    </ul>
+
+    <div class="callout warning">
+      <div class="callout-title">複雜度瓶頸</div>
+      <p>
+        對於任意求值點 $\alpha_0, \ldots, \alpha_{n-1}$，兩種運算的成本都是
+        $O(n^2)$ 次域運算。對於擁有 $n = 2^{20} \approx 10^6$ 個閘的電路，
+        這意味著 $\sim 10^{12}$ 次乘法 — 完全不可行。
+      </p>
+    </div>
+
+    <p>
+      解決方案：選擇具有代數結構的求值點。具體而言，使它們構成一個
+      <strong>乘法子群</strong> $H = \{1, \omega, \omega^2, \ldots, \omega^{n-1}\}$，
+      其中 $\omega$ 是一個原始 $n$ 次單位根。在這個選擇下：
+    </p>
+
+    <ul>
+      <li>多點求值變為 <strong>Number Theoretic Transform (NTT)</strong>：$O(n \log n)$。</li>
+      <li>插值變為 <strong>inverse NTT</strong>：$O(n \log n)$。</li>
+      <li>多項式乘法（透過求值-逐點相乘-插值）：$O(n \log n)$。</li>
+    </ul>
+
+    <div class="callout note">
+      <div class="callout-title">FFT 在 PLONK 證明中出現的位置</div>
+      <p>
+        在一次 PLONK 證明過程中，證明者大約需要執行 <strong>10-20 次 FFT/iFFT</strong>，
+        規模從 $n$ 到 $4n$。包括：將見證多項式轉換為係數形式（用於承諾）、
+        在擴展域上對閘多項式求值（用於商多項式）、除以 $Z_H(X)$，
+        以及計算開啟證明。FFT 的效能直接決定了證明者的速度。
+      </p>
+    </div>
+
+    <!-- ===== 5.2 Roots of Unity ===== -->
+    <h2>5.2 有限域中的單位根</h2>
+
+    <h3>存在條件</h3>
+
+    <p>
+      在 $\mathbb{C}$ 上，$n$ 次單位根始終存在：$e^{2\pi i k/n}$，$k = 0, \ldots, n-1$。
+      在有限域 $\mathbb{F}_p$ 上，它們只在滿足整除條件時才存在：
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理：單位根的存在性</div>
+      <p>
+        原始 $n$ 次單位根存在於 $\mathbb{F}_p$ 中的充要條件是 $n \mid (p - 1)$。
+      </p>
+      <p>
+        <em>證明概要。</em> $\mathbb{F}_p^*$ 是階為 $p - 1$ 的循環群。階為 $m$ 的循環群
+        對每個 $d \mid m$ 都有階為 $d$ 的元素，而當 $d \nmid m$ 時不存在階為 $d$ 的元素。
+        $n$ 次單位根是滿足 $x^n = 1$ 的元素，即階整除 $n$ 的元素。
+        原始 $n$ 次根（階恰好為 $n$）存在的充要條件是 $n \mid (p-1)$。
+      </p>
+    </div>
+
+    <h3>構造單位根</h3>
+
+    <div class="steps">
+      <div class="step">
+        <h4>找到 $\mathbb{F}_p^*$ 的生成元 $g$</h4>
+        <p>
+          $\mathbb{F}_p^*$ 是階為 $p-1$ 的循環群。生成元 $g$ 滿足 $\operatorname{ord}(g) = p-1$。
+          尋找生成元需要嘗試：隨機選取 $g$，驗證對 $p-1$ 的所有質因子 $q$，
+          都有 $g^{(p-1)/q} \neq 1$。實際操作中，較小的值如 $g = 5$ 或 $g = 7$ 通常可行。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>計算 $\omega = g^{(p-1)/n}$</h4>
+        <p>
+          由於 $\operatorname{ord}(g) = p-1$ 且 $n \mid (p-1)$，我們有
+          $\omega^n = g^{(p-1)/n \cdot n} = g^{p-1} = 1$，且
+          $\operatorname{ord}(\omega) = n$（因為 $(p-1)/n$ 不會使階降到 $n$ 以下）。
+          因此 $\omega$ 是一個原始 $n$ 次單位根。
+        </p>
+      </div>
+
+      <div class="step">
+        <h4>域 $H = \langle \omega \rangle$</h4>
+        <p>
+          完整的 $n$ 次根集合為 $H = \{1, \omega, \omega^2, \ldots, \omega^{n-1}\}$。
+          這是 $\mathbb{F}_p^*$ 的一個階為 $n$ 的循環子群。$H$ 中的每個元素 $h$
+          都滿足 $h^n = 1$，即 $H$ 是 $X^n - 1$ 的零點集。
+        </p>
+      </div>
+    </div>
+
+    <h3>為什麼 $n = 2^k$？</h3>
+
+    <p>
+      Cooley-Tukey FFT 演算法要求 $n$ 為 2 的冪次（radix-2 變體），
+      更一般地，需要是光滑數（mixed-radix）。在 ZK 系統中，我們總是選擇 $n = 2^k$：
+    </p>
+
+    <ul>
+      <li>遞迴關係 $\text{FFT}(n) = 2 \cdot \text{FFT}(n/2) + O(n)$ 恰好給出 $O(n \log n)$。</li>
+      <li>對於 2 的冪次，「蝶形」結構最為簡潔且最適合 GPU 加速。</li>
+      <li>$\omega^{n/2} = -1$（因為 $(\omega^{n/2})^2 = \omega^n = 1$ 且 $\omega^{n/2} \neq 1$），
+        這簡化了蝶形運算。</li>
+    </ul>
+
+    <div class="callout definition">
+      <div class="callout-title">常見 ZK 域的二進可除性（Two-Adicity）</div>
+      <p>
+        質數 $p$ 的<strong>二進可除性</strong>是滿足 $2^s \mid (p-1)$ 的最大 $s$。
+        這決定了最大的 2 的冪次域大小。
+      </p>
+      <table>
+        <thead>
+          <tr><th>域</th><th>二進可除性 $s$</th><th>最大域大小 $n$</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>BN254 純量域</td>
+            <td>$s = 28$</td>
+            <td>$2^{28} = 268{,}435{,}456$</td>
+          </tr>
+          <tr>
+            <td>BLS12-381 純量域</td>
+            <td>$s = 32$</td>
+            <td>$2^{32} = 4{,}294{,}967{,}296$</td>
+          </tr>
+          <tr>
+            <td>Goldilocks ($p = 2^{64} - 2^{32} + 1$)</td>
+            <td>$s = 32$</td>
+            <td>$2^{32}$</td>
+          </tr>
+          <tr>
+            <td>BabyBear ($p = 2^{31} - 2^{27} + 1$)</td>
+            <td>$s = 27$</td>
+            <td>$2^{27}$</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>計算範例：$\mathbb{F}_{17}$ 中的單位根</h3>
+
+    <div class="callout example">
+      <div class="callout-title">範例：$\mathbb{F}_{17}$，$n = 4$</div>
+      <p>
+        我們有 $p = 17$，所以 $p - 1 = 16 = 2^4$。二進可除性為 $s = 4$，
+        表示域大小最多可達 $n = 16$。
+      </p>
+      <p>
+        <strong>步驟 1：找到 $\mathbb{F}_{17}^*$ 的生成元。</strong><br>
+        嘗試 $g = 3$：計算 3 的冪次模 17。
+      </p>
+      <table>
+        <thead>
+          <tr><th>$k$</th><th>$3^k \bmod 17$</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>3</td></tr>
+          <tr><td>2</td><td>9</td></tr>
+          <tr><td>3</td><td>10</td></tr>
+          <tr><td>4</td><td>13</td></tr>
+          <tr><td>5</td><td>5</td></tr>
+          <tr><td>6</td><td>15</td></tr>
+          <tr><td>7</td><td>11</td></tr>
+          <tr><td>8</td><td>16</td></tr>
+          <tr><td>9</td><td>14</td></tr>
+          <tr><td>10</td><td>8</td></tr>
+          <tr><td>11</td><td>7</td></tr>
+          <tr><td>12</td><td>4</td></tr>
+          <tr><td>13</td><td>12</td></tr>
+          <tr><td>14</td><td>2</td></tr>
+          <tr><td>15</td><td>6</td></tr>
+          <tr><td>16</td><td>1</td></tr>
+        </tbody>
+      </table>
+      <p>
+        $3^{16} \equiv 1$ 且沒有更小的冪次等於 1，因此 $g = 3$ 是
+        $\mathbb{F}_{17}^*$ 的生成元（階為 16）。
+      </p>
+      <p>
+        <strong>步驟 2：計算 $n = 4$ 時的 $\omega$。</strong><br>
+        $\omega = g^{(p-1)/n} = 3^{16/4} = 3^4 = 81 \equiv 13 \pmod{17}$。
+      </p>
+      <p>
+        <strong>步驟 3：驗證。</strong><br>
+        $\omega = 13$。檢查：$13^1 = 13$，$13^2 = 169 \equiv 16 \pmod{17}$，
+        $13^3 = 13 \cdot 16 = 208 \equiv 4 \pmod{17}$，
+        $13^4 = 13 \cdot 4 = 52 \equiv 1 \pmod{17}$。確認：$\operatorname{ord}(13) = 4$。
+      </p>
+      <p>
+        <strong>域：</strong> $H = \{1, 13, 16, 4\}$（即 $\{\omega^0, \omega^1, \omega^2, \omega^3\}$）。
+      </p>
+      <p>
+        <strong>關鍵性質：</strong> $\omega^{n/2} = \omega^2 = 16 \equiv -1 \pmod{17}$。這就是
+        簡化蝶形運算的「$\omega^{n/2} = -1$」性質。
+      </p>
+    </div>
+
+    <div class="callout example">
+      <div class="callout-title">範例：$\mathbb{F}_{17}$，$n = 8$</div>
+      <p>
+        對於 $n = 8$：$\omega = g^{(p-1)/8} = 3^{16/8} = 3^2 = 9$。
+      </p>
+      <p>
+        檢查：$9^1 = 9$，$9^2 = 81 \equiv 13$，$9^3 = 9 \cdot 13 = 117 \equiv 15$，
+        $9^4 = 9 \cdot 15 = 135 \equiv 16$，$9^5 = 9 \cdot 16 = 144 \equiv 8$，
+        $9^6 = 9 \cdot 8 = 72 \equiv 4$，$9^7 = 9 \cdot 4 = 36 \equiv 2$，
+        $9^8 = 9 \cdot 2 = 18 \equiv 1$。
+      </p>
+      <p>
+        域：$H = \{1, 9, 13, 15, 16, 8, 4, 2\}$。階確認為 8。
+      </p>
+      <p>
+        注意：$\omega^4 = 16 = -1$，且 $H$ 的「上半部」是「下半部」的取負：
+        $\{16, 8, 4, 2\} = \{-1, -9, -13, -15\}$。
+      </p>
+    </div>
+
+    <!-- ===== 5.3 NTT ===== -->
+    <h2>5.3 NTT（數論變換）</h2>
+
+    <h3>$\mathbb{F}_p$ 上的 DFT 公式</h3>
+
+    <p>
+      給定係數形式的多項式 $f(X) = \sum_{j=0}^{n-1} a_j X^j$，
+      NTT 計算它在 $H$ 上的求值結果：
+    </p>
+
+    $$\hat{a}_i = f(\omega^i) = \sum_{j=0}^{n-1} a_j \, \omega^{ij}, \quad i = 0, 1, \ldots, n-1$$
+
+    <p>
+      以矩陣形式表示，即 $\hat{\mathbf{a}} = \mathbf{F} \cdot \mathbf{a}$，其中
+      $\mathbf{F}$ 是 DFT 矩陣 $F_{ij} = \omega^{ij}$：
+    </p>
+
+    $$
+    \begin{pmatrix} \hat{a}_0 \\ \hat{a}_1 \\ \hat{a}_2 \\ \vdots \\ \hat{a}_{n-1} \end{pmatrix}
+    =
+    \begin{pmatrix}
+    1 & 1 & 1 & \cdots & 1 \\
+    1 & \omega & \omega^2 & \cdots & \omega^{n-1} \\
+    1 & \omega^2 & \omega^4 & \cdots & \omega^{2(n-1)} \\
+    \vdots & \vdots & \vdots & \ddots & \vdots \\
+    1 & \omega^{n-1} & \omega^{2(n-1)} & \cdots & \omega^{(n-1)^2}
+    \end{pmatrix}
+    \begin{pmatrix} a_0 \\ a_1 \\ a_2 \\ \vdots \\ a_{n-1} \end{pmatrix}
+    $$
+
+    <p>
+      直接計算：$O(n^2)$ 次乘法。FFT 利用 $\omega$ 的結構性質，
+      將其降低為 $O(n \log n)$。
+    </p>
+
+    <h3>Cooley-Tukey 蝶形運算（Radix-2 DIT）</h3>
+
+    <p>
+      核心觀察：將求和式分為偶數索引項和奇數索引項。
+    </p>
+
+    $$
+    f(\omega^i) = \underbrace{\sum_{j=0}^{n/2 - 1} a_{2j} \, (\omega^{2})^{ij}}_{f_{\text{even}}(\omega^{2i})}
+    \;+\; \omega^i \underbrace{\sum_{j=0}^{n/2 - 1} a_{2j+1} \, (\omega^{2})^{ij}}_{f_{\text{odd}}(\omega^{2i})}
+    $$
+
+    <p>
+      由於 $\omega^2$ 是原始 $(n/2)$ 次單位根（因為 $(\omega^2)^{n/2} = \omega^n = 1$
+      且階恰好為 $n/2$），每個子問題都是一個半規模的 NTT。此外，對於輸出的
+      「後半部分」（$i \geq n/2$），利用 $\omega^{i+n/2} = -\omega^i$：
+    </p>
+
+    $$
+    f(\omega^i) = f_{\text{even}}(\omega^{2i}) + \omega^i \cdot f_{\text{odd}}(\omega^{2i})
+    $$
+    $$
+    f(\omega^{i+n/2}) = f_{\text{even}}(\omega^{2i}) - \omega^i \cdot f_{\text{odd}}(\omega^{2i})
+    $$
+
+    <p>
+      這就是<strong>蝶形運算</strong>：由相同的兩個輸入產生兩個輸出，
+      僅在「旋轉因子」$\omega^i$ 的正負號上有所不同。
+    </p>
+
+    <div class="diagram">
+      <pre>
+  Cooley-Tukey Radix-2 Butterfly (n = 8)
+  =======================================
+
+  Input (bit-reversed order):    Stage 1        Stage 2         Stage 3        Output
+       a[0] ─────┬──────── + ────┬──────── + ─────┬──────── + ──── f(w^0)
+                  ├── w^0 ─ + ──┐├── w^0 ─ + ───┐ ├── w^0 ─ + ──
+       a[4] ─────┴──────── - ──┐││          │   │ │          │
+                               │││          │   │ │          │
+       a[2] ─────┬──────── + ──┘│┴──────── - ──┐│ │          │  f(w^1)
+                  ├── w^0 ─ + ──┐│              ││ │          │
+       a[6] ─────┴──────── - ──┘│              ││ │          │
+                                │              ││ │          │
+       a[1] ─────┬──────── + ───┼┬──────── + ──┘│ ┴──────── - ─── f(w^4)
+                  ├── w^0 ─ + ──┐│├── w^0 ─ + ──┐│
+       a[5] ─────┴──────── - ──┘││              ││
+                                ││              ││
+       a[3] ─────┬──────── + ───┘┴──────── - ──┘┴──────── - ─── f(w^7)
+                  ├── w^0 ─ + ──┐
+       a[7] ─────┴──────── - ──┘
+
+  Each "+" node:   out_top    = in_top + w^k * in_bottom
+  Each "-" node:   out_bottom = in_top - w^k * in_bottom
+
+  Total operations per stage: n/2 butterflies = n/2 multiplications + n additions
+  Number of stages: log2(n) = 3
+  Total: (n/2) * log2(n) multiplications = 12 multiplications (vs 64 for naive)
+      </pre>
+    </div>
+
+    <h3>演算法（虛擬碼）</h3>
+
+    <pre><code>function NTT(a[0..n-1], omega):
+    if n == 1: return a
+
+    // Split into even and odd
+    a_even = [a[0], a[2], ..., a[n-2]]
+    a_odd  = [a[1], a[3], ..., a[n-1]]
+
+    // Recurse with omega^2 (primitive n/2-th root)
+    y_even = NTT(a_even, omega^2)
+    y_odd  = NTT(a_odd,  omega^2)
+
+    // Combine (butterfly)
+    twiddle = 1
+    for i in 0..n/2-1:
+        a[i]       = y_even[i] + twiddle * y_odd[i]
+        a[i + n/2] = y_even[i] - twiddle * y_odd[i]
+        twiddle    = twiddle * omega
+
+    return a</code></pre>
+
+    <h3>計算範例：$\mathbb{F}_{17}$ 中 $n = 4$ 的 NTT</h3>
+
+    <div class="callout example">
+      <div class="callout-title">範例：$f(X) = 3 + 2X + X^2 + 4X^3$ 在 $\mathbb{F}_{17}$ 上的 NTT</div>
+      <p>
+        係數：$\mathbf{a} = [3, 2, 1, 4]$。域：$H = \{1, 13, 16, 4\}$，$\omega = 13$。
+      </p>
+      <p><strong>第一步：分為偶數項/奇數項。</strong></p>
+      <ul>
+        <li>偶數：$a_{\text{even}} = [a_0, a_2] = [3, 1]$</li>
+        <li>奇數：$a_{\text{odd}} = [a_1, a_3] = [2, 4]$</li>
+      </ul>
+      <p><strong>第二步：大小為 2 的子 NTT。</strong></p>
+      <p>
+        $\omega^2 = 13^2 = 169 \equiv 16 \equiv -1 \pmod{17}$。因此以 $-1$ 為根的大小為 2 的 NTT 得到：
+      </p>
+      <ul>
+        <li>$y_{\text{even}}[0] = 3 + 1 = 4$，$\quad y_{\text{even}}[1] = 3 - 1 = 2$</li>
+        <li>$y_{\text{odd}}[0] = 2 + 4 = 6$，$\quad y_{\text{odd}}[1] = 2 - 4 = -2 \equiv 15$</li>
+      </ul>
+      <p><strong>第三步：以旋轉因子 $\omega^0 = 1, \omega^1 = 13$ 合併。</strong></p>
+      <ul>
+        <li>$\hat{a}_0 = y_e[0] + \omega^0 \cdot y_o[0] = 4 + 1 \cdot 6 = 10$</li>
+        <li>$\hat{a}_1 = y_e[1] + \omega^1 \cdot y_o[1] = 2 + 13 \cdot 15 = 2 + 195 = 2 + 195 \bmod 17$
+          $= 2 + (195 - 11 \cdot 17) = 2 + (195 - 187) = 2 + 8 = 10$</li>
+        <li>$\hat{a}_2 = y_e[0] - \omega^0 \cdot y_o[0] = 4 - 6 = -2 \equiv 15$</li>
+        <li>$\hat{a}_3 = y_e[1] - \omega^1 \cdot y_o[1] = 2 - 8 = -6 \equiv 11$</li>
+      </ul>
+      <p><strong>結果：</strong> $\hat{\mathbf{a}} = [10, 10, 15, 11]$。</p>
+      <p><strong>驗證：</strong> 在 $H$ 的每個點上求值 $f(X) = 3 + 2X + X^2 + 4X^3$：</p>
+      <ul>
+        <li>$f(1) = 3 + 2 + 1 + 4 = 10$ &#10003;</li>
+        <li>$f(13) = 3 + 26 + 169 + 4 \cdot 2197 = 3 + 26 + 169 + 8788$
+          $\equiv 3 + 9 + 16 + (8788 \bmod 17) \pmod{17}$。
+          $8788 / 17 = 516 \text{ R } 16$，所以 $f(13) \equiv 3 + 9 + 16 + 16 = 44 \equiv 10$ &#10003;</li>
+        <li>$f(16) = 3 + 32 + 256 + 4 \cdot 4096 \equiv 3 + 15 + 1 + 4 \cdot 16 = 3 + 15 + 1 + 13 = 32 \equiv 15$ &#10003;</li>
+        <li>$f(4) = 3 + 8 + 16 + 256 = 283 \equiv 283 - 16 \cdot 17 = 283 - 272 = 11$ &#10003;</li>
+      </ul>
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">複雜度總結</div>
+      <p>
+        對於域大小 $n = 2^k$：
+      </p>
+      <ul>
+        <li><strong>NTT</strong>：$\frac{n}{2} \log_2 n$ 次域乘法 + $n \log_2 n$ 次域加法</li>
+        <li><strong>iNTT</strong>：與 NTT 相同，再加上 $n$ 次乘以 $n^{-1}$ 的運算</li>
+        <li><strong>樸素求值</strong>：$O(n^2)$ — 當 $n > 2^{10}$ 時，NTT 的加速至關重要</li>
+      </ul>
+    </div>
+
+    <!-- ===== 5.4 Coefficient vs Evaluation ===== -->
+    <h2>5.4 係數形式與求值形式</h2>
+
+    <p>
+      次數 $&lt; n$ 的多項式可以用兩種等價方式表示。
+      每種形式有不同的計算權衡：
+    </p>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>係數形式</h4>
+        <p>$f(X) = a_0 + a_1 X + \cdots + a_{n-1} X^{n-1}$</p>
+        <p>儲存為：$[a_0, a_1, \ldots, a_{n-1}]$</p>
+        <ul>
+          <li>加法：$O(n)$</li>
+          <li>乘法：$O(n^2)$（或透過 NTT 為 $O(n \log n)$）</li>
+          <li>單點求值：$O(n)$（Horner 法則）</li>
+          <li>承諾（KZG/IPA）：<strong>直接</strong> — 對係數做 MSM</li>
+          <li>可見次數：是</li>
+        </ul>
+      </div>
+      <div class="comparison-card">
+        <h4>求值形式</h4>
+        <p>$f \leftrightarrow [f(\omega^0), f(\omega^1), \ldots, f(\omega^{n-1})]$</p>
+        <p>儲存為：$[v_0, v_1, \ldots, v_{n-1}]$</p>
+        <ul>
+          <li>加法：$O(n)$</li>
+          <li>乘法：$O(n)$（逐點！）</li>
+          <li>對 $z \notin H$ 的單點求值：需先轉為係數形式</li>
+          <li>承諾：需先做 iNTT</li>
+          <li>可見次數：否</li>
+        </ul>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>運算</th>
+          <th>係數形式</th>
+          <th>求值形式</th>
+          <th>最佳策略</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>$f + g$</td>
+          <td>$O(n)$</td>
+          <td>$O(n)$</td>
+          <td>兩者皆可（成本相同）</td>
+        </tr>
+        <tr>
+          <td>$f \cdot g$</td>
+          <td>$O(n^2)$</td>
+          <td>$O(n)$ 逐點</td>
+          <td>求值形式</td>
+        </tr>
+        <tr>
+          <td>$f \cdot g$（完整流程）</td>
+          <td colspan="2">NTT $\to$ 逐點相乘 $\to$ iNTT：$O(n \log n)$</td>
+          <td>經由 NTT 的係數到係數轉換</td>
+        </tr>
+        <tr>
+          <td>對隨機 $z$ 求值 $f(z)$</td>
+          <td>$O(n)$ Horner</td>
+          <td>$O(n \log n)$（iNTT + Horner）</td>
+          <td>係數形式</td>
+        </tr>
+        <tr>
+          <td>承諾（KZG MSM）</td>
+          <td>直接：$\sum a_i [s^i]_1$</td>
+          <td>需先做 iNTT</td>
+          <td>係數形式</td>
+        </tr>
+        <tr>
+          <td>閘約束檢查</td>
+          <td>$O(n^2)$ 在 $H$ 上逐點</td>
+          <td>$O(n)$ 逐點</td>
+          <td>求值形式</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">PLONK 工作流程</div>
+      <p>
+        在典型的 PLONK 證明者中：
+      </p>
+      <ol>
+        <li><strong>見證賦值</strong>以求值形式產生值
+          （電路表每行一個值）。</li>
+        <li><strong>iNTT</strong> 轉換為係數形式。</li>
+        <li>對係數形式多項式進行<strong>承諾</strong>（使用 SRS 做 MSM）。</li>
+        <li><strong>NTT 到擴展域</strong>（$4n$ 個點）以計算商多項式。</li>
+        <li>在擴展域上<strong>閘多項式求值</strong>（逐點）。</li>
+        <li>在擴展域上<strong>除以 $Z_H$</strong>（逐點）。</li>
+        <li><strong>iNTT</strong> 將商多項式轉回係數形式。</li>
+        <li>對商多項式進行<strong>承諾</strong>。</li>
+      </ol>
+      <p>
+        步驟 2、4 和 7 各自是一次完整的 FFT/iFFT，規模為 $n$ 或 $4n$。
+      </p>
+    </div>
+
+    <!-- ===== 5.5 Cosets and Extended Domains ===== -->
+    <h2>5.5 陪集求值與擴展域</h2>
+
+    <h3>除以零的問題</h3>
+
+    <p>
+      在 PLONK 中，證明者需要證明閘約束多項式 $C(X)$ 在整個 $H$ 上為零。
+      這意味著 $C(X)$ 可被 $Z_H(X) = X^n - 1$ 整除，因此證明者計算：
+    </p>
+
+    $$t(X) = \frac{C(X)}{Z_H(X)}$$
+
+    <p>
+      如果我們嘗試在 $H$ 上以求值形式計算 $t(X)$，會遇到一個問題：
+      $Z_H(\omega^i) = (\omega^i)^n - 1 = 1 - 1 = 0$，對所有 $\omega^i \in H$ 皆成立。
+      我們會在每個點上都除以零！
+    </p>
+
+    <div class="callout warning">
+      <div class="callout-title">無法在 $H$ 上除以 $Z_H$</div>
+      <p>
+        即使 $t(X)$ 是一個定義良好的多項式（因為約束滿足時 $Z_H \mid C$），
+        我們也無法透過逐點除法在 $H$ 上計算其值，因為 $C(\omega^i) = 0$ 且
+        $Z_H(\omega^i) = 0$ — 這是 $0/0$ 不定式。
+      </p>
+    </div>
+
+    <h3>陪集解法</h3>
+
+    <p>
+      修正方法：在<strong>陪集</strong> $gH = \{g, g\omega, g\omega^2, \ldots, g\omega^{n-1}\}$
+      上求值，其中 $g \notin H$。在陪集上，$Z_H(g\omega^i) = (g\omega^i)^n - 1 = g^n \cdot (\omega^i)^n - 1 = g^n - 1 \neq 0$
+      （因為 $g \notin H$ 意味著 $g^n \neq 1$）。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">陪集 NTT</div>
+      <p>
+        要在陪集 $gH$ 上對 $f(X)$ 求值，不需要額外的演算法。
+        只需將係數乘以 $g$ 的冪次：
+      </p>
+      <p>
+        令 $a'_j = a_j \cdot g^j$。則 $\text{NTT}(\mathbf{a'}) = [f(g), f(g\omega), f(g\omega^2), \ldots]$。
+      </p>
+      <p>
+        <em>證明：</em> $\sum_j a'_j \omega^{ij} = \sum_j a_j g^j \omega^{ij} = \sum_j a_j (g\omega^i)^j = f(g\omega^i)$。
+      </p>
+    </div>
+
+    <h3>PLONK 中的陪集生成元</h3>
+
+    <p>
+      PLONK 不僅在商多項式計算中使用陪集，還在置換論證中使用。
+      線路多項式 $a(X), b(X), c(X)$ 在三個不同的陪集
+      $H, k_1 H, k_2 H$ 上被求值，以為複製約束建立不同的「標籤」。
+      生成元 $k_1, k_2$ 必須滿足：
+    </p>
+
+    <ul>
+      <li>$k_1, k_2 \notin H$（陪集與 $H$ 不相交）</li>
+      <li>$k_1 H \cap k_2 H = \emptyset$（兩個陪集互不相交）</li>
+      <li>$H \cup k_1 H \cup k_2 H$ 涵蓋 $3n$ 個不同的元素</li>
+    </ul>
+
+    <h3>擴展域</h3>
+
+    <p>
+      PLONK 中閘約束多項式 $C(X)$ 的形式為：
+    </p>
+
+    $$C(X) = q_L(X) \cdot a(X) + q_R(X) \cdot b(X) + q_O(X) \cdot c(X) + q_M(X) \cdot a(X) \cdot b(X) + q_C(X)$$
+
+    <p>
+      每個因子的次數 $\leq n - 1$，因此如 $q_M \cdot a \cdot b$ 這樣的項次數
+      可達 $3(n-1)$。商 $t(X) = C(X) / Z_H(X)$ 的次數可達 $3(n-1) - n = 2n - 3$。
+      但加上置換論證和其他組成部分後，分子次數可達 $\sim 4n$，
+      使商的次數達到 $\sim 3n$。
+    </p>
+
+    <div class="callout definition">
+      <div class="callout-title">擴展域大小</div>
+      <p>
+        要以求值形式忠實表示一個次數為 $d$ 的多項式，至少需要
+        $d + 1$ 個求值點。由於商多項式的次數可達 $\sim 3n$，
+        證明者使用大小為 $4n$（大於 $3n + 1$ 的最小 2 的冪次）的<strong>擴展域</strong>。
+      </p>
+      <p>
+        擴展域為 $H' = \{1, \omega', (\omega')^2, \ldots, (\omega')^{4n-1}\}$，其中
+        $\omega'$ 是一個原始 $4n$ 次單位根。注意 $(\omega')^4 = \omega$（原始的根），
+        因此 $H \subset H'$。
+      </p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <h4>擴展到更大的域</h4>
+        <p>
+          將每個多項式的係數向量從 $n$ 補零擴展到 $4n$，
+          然後以 $4n$ 次根 $\omega'$ 進行 NTT。
+        </p>
+      </div>
+      <div class="step">
+        <h4>逐點求值約束多項式</h4>
+        <p>
+          對 $i = 0, \ldots, 4n-1$ 計算 $C(\omega'^i)$，使用求值形式向量的
+          逐點運算（乘法、加法）。成本：$O(n)$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>逐點除以 $Z_H$</h4>
+        <p>
+          對每個 $i$ 計算 $Z_H(\omega'^i) = (\omega'^i)^n - 1$（這些可以預計算）。
+          在 $\omega'^i \in H$ 的 $n$ 個點上，$Z_H = 0$ — 但根據構造，
+          $C$ 在那些點上也為 0。對那些點，透過 L'Hopital 法則或改在陪集上求值
+          來計算 $t(\omega'^i)$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>iNTT 轉回係數</h4>
+        <p>
+          對大小為 $4n$ 的結果施加 iNTT 以得到 $t(X)$ 的係數形式。此多項式的
+          次數應 $\leq 3n - 1$（透過檢查高次係數為零來驗證）。
+        </p>
+      </div>
+    </div>
+
+    <h3>Halo2 如何處理擴展求值</h3>
+
+    <p>
+      在 Halo2 程式碼庫中，多項式帶有型別層級的標記以表示其表示方式：
+    </p>
+
+    <pre><code>// Polynomial representations in halo2
+Polynomial&lt;F, LagrangeCoeff&gt;    // evaluations on H (size n)
+Polynomial&lt;F, Coeff&gt;             // coefficient form (degree < n)
+Polynomial&lt;F, ExtendedLagrangeCoeff&gt;  // evaluations on H' (size 4n or 8n)
+
+// Converting between them:
+domain.lagrange_to_coeff(poly_lagrange)   // iNTT: evaluation -> coefficients
+domain.coeff_to_extended(poly_coeff)      // NTT on extended domain
+domain.extended_to_coeff(poly_extended)   // iNTT on extended domain</code></pre>
+
+    <p>
+      域中儲存的 <code>extended_omega</code> 是階為
+      $n \cdot j$ 的原始單位根，其中 $j$ 是擴展因子（通常為 4 或 8，
+      根據約束系統的最大次數選擇）。
+    </p>
+
+    <!-- ===== 5.6 Vanishing Polynomial and Lagrange Basis ===== -->
+    <h2>5.6 消失多項式與 Lagrange 基底</h2>
+
+    <h3>消失多項式 $Z_H(X)$</h3>
+
+    <p>
+      域 $H$ 的消失多項式為：
+    </p>
+
+    $$Z_H(X) = \prod_{i=0}^{n-1} (X - \omega^i) = X^n - 1$$
+
+    <div class="callout theorem">
+      <div class="callout-title">定理：$\prod_{i=0}^{n-1}(X - \omega^i) = X^n - 1$</div>
+      <p>
+        <em>證明。</em> 兩邊都是次數為 $n$ 的首一多項式。左邊的根為
+        $\omega^0, \omega^1, \ldots, \omega^{n-1}$，它們恰好是
+        $X^n - 1$ 的 $n$ 個不同的根（因為 $(\omega^i)^n = (\omega^n)^i = 1$）。
+        兩個具有相同次數和相同根的首一多項式必定相同。$\square$
+      </p>
+    </div>
+
+    <p>
+      <strong>高效求值：</strong> 要對某個 $z \in \mathbb{F}_p$ 求值 $Z_H(z)$，
+      只需計算 $z^n$（透過 $O(\log n)$ 次平方）然後減 1。
+      不需要展開 $n$ 個線性因子的乘積。
+    </p>
+
+    <p>
+      <strong>在 PLONK 中的角色：</strong> 多項式恆等式 $f(X) = 0$ 對所有 $X \in H$ 成立
+      的充要條件是 $Z_H(X) \mid f(X)$，即 $f(X) = t(X) \cdot Z_H(X)$，
+      其中 $t(X)$ 是某個商多項式。證明者透過對 $t(X)$ 做承諾並在隨機挑戰點證明此關係來展示這一點。
+    </p>
+
+    <h3>Lagrange 基底多項式</h3>
+
+    <p>
+      域 $H = \{1, \omega, \ldots, \omega^{n-1}\}$ 的 Lagrange 基底由
+      $n$ 個多項式 $L_0(X), L_1(X), \ldots, L_{n-1}(X)$ 組成，每個次數為 $n-1$，定義為：
+    </p>
+
+    $$L_i(\omega^j) = \delta_{ij} = \begin{cases} 1 & \text{if } i = j \\ 0 & \text{if } i \neq j \end{cases}$$
+
+    <h4>一般公式</h4>
+
+    <p>
+      根據標準 Lagrange 插值公式：
+    </p>
+
+    $$L_i(X) = \prod_{\substack{j=0 \\ j \neq i}}^{n-1} \frac{X - \omega^j}{\omega^i - \omega^j}$$
+
+    <p>
+      此乘積有 $n-1$ 項 — 直接計算代價高昂。但在單位根上，
+      我們可以推導出更簡潔的封閉形式。
+    </p>
+
+    <h4>單位根上的封閉形式</h4>
+
+    <div class="callout theorem">
+      <div class="callout-title">定理：Lagrange 基底封閉形式</div>
+      $$L_i(X) = \frac{\omega^i}{n} \cdot \frac{X^n - 1}{X - \omega^i}$$
+      <p>
+        <em>證明。</em> 從 $Z_H(X) = \prod_{j=0}^{n-1}(X - \omega^j) = X^n - 1$ 開始。
+        取導數：$Z_H'(X) = nX^{n-1}$。由因式分解形式：
+        $Z_H'(\omega^i) = \prod_{j \neq i}(\omega^i - \omega^j)$。
+        因此 $\prod_{j \neq i}(\omega^i - \omega^j) = n(\omega^i)^{n-1} = n\omega^{-i}$
+        （因為 $\omega^{in} = 1$ 蘊含 $\omega^{i(n-1)} = \omega^{-i}$）。
+      </p>
+      <p>
+        故而：
+        $L_i(X) = \frac{1}{n\omega^{-i}} \prod_{j \neq i}(X - \omega^j)
+        = \frac{\omega^i}{n} \cdot \frac{\prod_{j=0}^{n-1}(X - \omega^j)}{X - \omega^i}
+        = \frac{\omega^i}{n} \cdot \frac{X^n - 1}{X - \omega^i}$。$\square$
+      </p>
+    </div>
+
+    <h4>特殊情況：$L_0(X)$</h4>
+
+    <p>
+      第一個 Lagrange 基底多項式（$i = 0$，$\omega^0 = 1$）：
+    </p>
+
+    $$L_0(X) = \frac{1}{n} \cdot \frac{X^n - 1}{X - 1}$$
+
+    <p>
+      利用因式分解 $X^n - 1 = (X - 1)(X^{n-1} + X^{n-2} + \cdots + X + 1)$：
+    </p>
+
+    $$L_0(X) = \frac{1}{n}(X^{n-1} + X^{n-2} + \cdots + 1)$$
+
+    <p>
+      這在 PLONK 中大量用於施加<strong>邊界約束</strong>
+      （例如，「執行軌跡的第一行滿足某個條件」）：
+    </p>
+
+    $$L_0(X) \cdot (a(X) - v) = 0 \quad \text{on } H$$
+
+    <p>
+      強制 $a(\omega^0) = a(1) = v$，同時允許 $a$ 在 $H$ 的其他點上取任意值。
+    </p>
+
+    <h4>與插值的關聯</h4>
+
+    <p>
+      任何次數 $&lt; n$ 的多項式 $f(X)$ 都可以表示為：
+    </p>
+
+    $$f(X) = \sum_{i=0}^{n-1} f(\omega^i) \cdot L_i(X)$$
+
+    <p>
+      這就是 Lagrange 插值公式。在求值形式中，$f$ 以向量
+      $[f(1), f(\omega), \ldots, f(\omega^{n-1})]$ 儲存。轉換為係數形式
+      等同於展開此求和 — 而 NTT/iNTT 以 $O(n \log n)$ 完成這一計算。
+    </p>
+
+    <div class="callout example">
+      <div class="callout-title">範例：$\mathbb{F}_{17}$ 中 $n = 4$ 的 Lagrange 基底</div>
+      <p>
+        域 $H = \{1, 13, 16, 4\}$，$\omega = 13$，$n = 4$，$n^{-1} = 4^{-1} \bmod 17$。
+      </p>
+      <p>
+        求 $4^{-1} \bmod 17$：$4 \cdot 13 = 52 = 3 \cdot 17 + 1 \equiv 1$，所以 $n^{-1} = 13$。
+      </p>
+      <p>
+        <strong>$L_0(X)$：</strong>
+        $L_0(X) = \frac{1}{4} \cdot \frac{X^4 - 1}{X - 1} = 13 \cdot (X^3 + X^2 + X + 1)$
+      </p>
+      <p>
+        在 $\mathbb{F}_{17}$ 中展開：$L_0(X) = 13X^3 + 13X^2 + 13X + 13$。
+      </p>
+      <p>
+        <strong>驗證：</strong> $L_0(1) = 13 + 13 + 13 + 13 = 52 \equiv 1$ &#10003;<br>
+        $L_0(13) = 13 \cdot 2197 + 13 \cdot 169 + 13 \cdot 13 + 13$
+        $\equiv 13 \cdot 4 + 13 \cdot 16 + 13 \cdot 13 + 13$
+        $= 52 + 208 + 169 + 13 = 442$。$442 \bmod 17 = 442 - 26 \cdot 17 = 442 - 442 = 0$ &#10003;
+      </p>
+    </div>
+
+    <h3>消失多項式用途總結</h3>
+
+    <table>
+      <thead>
+        <tr><th>情境</th><th>$Z_H(X)$ 的使用方式</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>閘約束</td>
+          <td>$C(X) = t(X) \cdot Z_H(X)$ — 證明者對 $t$ 做承諾</td>
+        </tr>
+        <tr>
+          <td>置換論證</td>
+          <td>累加器恆等式須在模 $Z_H(X)$ 下成立</td>
+        </tr>
+        <tr>
+          <td>邊界約束</td>
+          <td>$L_0(X) \cdot (f(X) - v) \equiv 0 \pmod{Z_H(X)}$</td>
+        </tr>
+        <tr>
+          <td>查找論證</td>
+          <td>累加器透過 $L_0$、$L_{n-1}$ 在起止處等於 1</td>
+        </tr>
+        <tr>
+          <td>驗證者檢查</td>
+          <td>$e_{\text{gate}} \stackrel{?}{=} t(z) \cdot Z_H(z)$，在隨機 $z$ 處</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ===== 5.7 Domain in Halo2 ===== -->
+    <h2>5.7 Halo2 中的域（程式碼層級）</h2>
+
+    <p>
+      Halo2 函式庫將所有與域相關的資料封裝在 <code>EvaluationDomain</code>
+      結構體中。理解此結構體對於閱讀和編寫 Halo2 電路至關重要。
+    </p>
+
+    <h3><code>EvaluationDomain</code> 結構體</h3>
+
+    <pre><code>pub struct EvaluationDomain&lt;F: Field&gt; {
+    n: u64,                // Domain size = 2^k
+    k: u32,                // log2(n)
+    extended_k: u32,       // log2(extended_n), where extended_n = n * quotient_poly_degree
+    omega: F,              // Primitive n-th root of unity
+    omega_inv: F,          // omega^(-1), for iNTT
+    extended_omega: F,     // Primitive (extended_n)-th root of unity
+    extended_omega_inv: F, // Its inverse
+    g_coset: F,            // Coset generator (for extended coset evaluation)
+    g_coset_inv: F,        // Its inverse
+    quotient_poly_degree: u64, // Typically = max_degree / n (how many chunks t is split into)
+}</code></pre>
+
+    <h3>建立域</h3>
+
+    <pre><code>// k: circuit needs 2^k rows
+// j: number of phases/columns needing extended evaluation
+let domain = EvaluationDomain::new(k, j);
+
+// Example: a circuit with 2^10 = 1024 rows
+let domain = EvaluationDomain::new(10, 1); // n = 1024, extended_n = 4096</code></pre>
+
+    <p>
+      參數 <code>j</code>（連同關於最大約束次數的內部計算）決定了<strong>擴展因子</strong>。
+      對於大多數具有二次自定義閘的 PLONKish 電路，擴展因子為 4（因此擴展域 = $4n$）。
+      更高次的閘可能需要 8 或更大的擴展因子。
+    </p>
+
+    <h3>多項式型別標記</h3>
+
+    <p>
+      Halo2 利用 Rust 的型別系統來防止混淆多項式的表示方式。
+      <code>Polynomial&lt;F, B&gt;</code> 型別以「基底」標記作為參數：
+    </p>
+
+    <table>
+      <thead>
+        <tr><th>型別標記</th><th>表示方式</th><th>大小</th><th>建立方式</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>LagrangeCoeff</code></td>
+          <td>在 $H$ 上的求值</td>
+          <td>$n$</td>
+          <td>見證賦值</td>
+        </tr>
+        <tr>
+          <td><code>Coeff</code></td>
+          <td>係數 $[a_0, \ldots, a_{n-1}]$</td>
+          <td>$n$</td>
+          <td><code>lagrange_to_coeff()</code>（iNTT）</td>
+        </tr>
+        <tr>
+          <td><code>ExtendedLagrangeCoeff</code></td>
+          <td>在擴展域 $H'$ 上的求值</td>
+          <td>$4n$ 或 $8n$</td>
+          <td><code>coeff_to_extended()</code>（陪集上的 NTT）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">型別安全的實際效果</div>
+      <p>
+        你無法意外地將 <code>Polynomial&lt;F, Coeff&gt;</code> 與
+        <code>Polynomial&lt;F, LagrangeCoeff&gt;</code> 進行逐點相乘 — Rust 編譯器
+        會拒絕這樣的操作。這避免了一類常見的錯誤：在錯誤的表示方式上執行多項式運算。
+      </p>
+    </div>
+
+    <h3>閘檢查的運作方式</h3>
+
+    <div class="steps">
+      <div class="step">
+        <h4>賦值見證值（求值形式）</h4>
+        <p>
+          證明者填充電路表：每一欄是大小為 $n$ 的
+          <code>Polynomial&lt;F, LagrangeCoeff&gt;</code>。
+          索引 $i$ 處的值即為第 $i$ 行的值。
+        </p>
+      </div>
+      <div class="step">
+        <h4>轉換為係數（iNTT）</h4>
+        <p>
+          <code>domain.lagrange_to_coeff(witness_poly)</code> 施加 iNTT，
+          產生 <code>Polynomial&lt;F, Coeff&gt;</code>。
+        </p>
+      </div>
+      <div class="step">
+        <h4>對見證多項式做承諾</h4>
+        <p>
+          使用係數形式多項式和結構化參考字串（SRS）
+          計算 KZG 或 IPA 承諾。
+        </p>
+      </div>
+      <div class="step">
+        <h4>擴展到陪集（擴展域上的 NTT）</h4>
+        <p>
+          <code>domain.coeff_to_extended(poly_coeff)</code> 在擴展陪集域上求值，
+          產生 <code>Polynomial&lt;F, ExtendedLagrangeCoeff&gt;</code>。
+          這裡會應用陪集平移 $g$。
+        </p>
+      </div>
+      <div class="step">
+        <h4>逐點求值閘表達式</h4>
+        <p>
+          所有閘多項式（選擇子 $\times$ 見證乘積）在擴展域上逐點合併。
+          結果在 $H$ 上應為零（但在擴展域的其餘部分不一定為零）。
+        </p>
+      </div>
+      <div class="step">
+        <h4>除以 $Z_H$ 並提取商</h4>
+        <p>
+          在陪集點上逐點除以 $Z_H$（那裡 $Z_H \neq 0$），然後
+          施加 iNTT 以得到商多項式 $t(X)$ 的係數形式。對 $t(X)$ 做承諾。
+        </p>
+      </div>
+    </div>
+
+    <!-- ===== 5.8 Blinding for ZK ===== -->
+    <h2>5.8 零知識的盲化處理</h2>
+
+    <h3>為什麼需要盲化</h3>
+
+    <p>
+      SNARK 在不揭示見證的情況下證明對見證的知識。但多項式承諾是<em>確定性的</em>：
+      相同的多項式總是產生相同的承諾。在協議過程中，驗證者要求證明者在隨機挑戰點
+      對多項式求值。每次求值 $f(z_i)$ 都會揭示關於 $f$ 係數的一個線性方程。
+      經過 $n$ 次這樣的查詢後，整個多項式（因而也是見證）就可以被復原。
+    </p>
+
+    <div class="callout warning">
+      <div class="callout-title">無盲化時：資訊洩漏</div>
+      <p>
+        如果證明者的次數為 $n-1$ 的多項式 $f(X)$ 直接編碼見證，那麼：
+      </p>
+      <ul>
+        <li>每次在隨機點的求值 $f(z_i)$ 都會揭示 $n$ 個係數的一個線性約束。</li>
+        <li>經過 $k$ 次求值，對手獲得 $n$ 個未知數的 $k$ 個獨立方程。</li>
+        <li>即使只有 $k = 1$ 次求值也會洩漏見證的部分資訊。</li>
+      </ul>
+    </div>
+
+    <h3>盲化的運作方式</h3>
+
+    <p>
+      解決方案：在域的末尾添加<strong>隨機「噪音」行</strong>。
+      不是用所有 $n$ 行來進行電路計算，而是只用 $n - b$ 行做計算，
+      保留最後 $b$ 行填入隨機值。這裡 $b$ 是<strong>盲化因子</strong>的數量。
+    </p>
+
+    <div class="callout definition">
+      <div class="callout-title">盲化行</div>
+      <p>
+        在大小為 $n$ 的域中有 $b$ 個盲化行：
+      </p>
+      <ul>
+        <li><strong>可用行：</strong> $0, 1, \ldots, n - b - 1$ — 編碼實際計算。</li>
+        <li><strong>盲化行：</strong> $n - b, n - b + 1, \ldots, n - 1$ — 填入
+          均勻隨機的域元素。</li>
+      </ul>
+      <p>
+        隨機值確保了多項式 $f(X)$（在所有 $n$ 行上插值而成）
+        在電路約束之外有 $b$ 個自由度。每次求值查詢「消耗」一個自由度。
+        只要查詢次數 $q < b$，剩餘的隨機性就能在統計意義上隱藏見證。
+      </p>
+    </div>
+
+    <h3>需要多少盲化行？</h3>
+
+    <p>
+      所需的盲化因子數量取決於協議：
+    </p>
+
+    <table>
+      <thead>
+        <tr><th>協議屬性</th><th>對盲化的影響</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>每個多項式的求值查詢次數</td>
+          <td>每個被查詢的多項式需要 $b \geq q + 1$ 個盲化行</td>
+        </tr>
+        <tr>
+          <td>不同多項式的數量</td>
+          <td>每個多項式需要自己的盲化行</td>
+        </tr>
+        <tr>
+          <td>PLONK（標準）</td>
+          <td>通常 $b = 5$ 到 $7$ 個盲化行</td>
+        </tr>
+        <tr>
+          <td>Halo2（含查找）</td>
+          <td>更多查詢 $\Rightarrow$ 更多盲化；通常 $b \approx 5$-$10$</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">Halo2 實作細節</div>
+      <p>
+        在 Halo2 中，盲化因子的數量根據電路配置自動計算：
+      </p>
+      <pre><code>// Simplified from halo2_proofs
+fn minimum_rows(&self) -> usize {
+    // Each advice column needs blinding rows
+    // Number depends on: phases, lookups, permutation columns
+    self.blinding_factors() + 1
+    // +1 because the last usable row is at index n - blinding_factors - 1
+}
+
+fn blinding_factors(&self) -> usize {
+    // One blinding factor for each evaluation query
+    // Plus one for zero-knowledge
+    let factors = /* computed from circuit config */;
+    max(factors, MIN_BLINDING_FACTORS)
+}</code></pre>
+      <p>
+        當你定義 Halo2 電路時，必須確保約束系統在 $n - b$ 行內，
+        其中 $b$ = <code>cs.blinding_factors()</code>。超出可用行數
+        是造成「not enough rows」錯誤的常見原因。
+      </p>
+    </div>
+
+    <h3>盲化與多項式</h3>
+
+    <p>
+      具體而言，假設一個見證欄有值 $[w_0, w_1, \ldots, w_{n-b-1}, r_0, r_1, \ldots, r_{b-1}]$，
+      其中 $w_i$ 是實際見證值，$r_j$ 是均勻隨機的。插值這些值的多項式
+      $f(X)$ 滿足：
+    </p>
+
+    <ul>
+      <li>$f(\omega^i) = w_i$，$i = 0, \ldots, n - b - 1$（由電路決定）</li>
+      <li>$f(\omega^{n-b+j}) = r_j$，$j = 0, \ldots, b - 1$（隨機）</li>
+    </ul>
+
+    <p>
+      $b$ 個隨機值為次數 $(n-1)$ 的多項式貢獻了 $b$ 個自由度。
+      在隨機點 $z$ 處的求值 $f(z)$ 是所有 $n$ 個值的隨機線性組合。
+      $b$ 個隨機分量「遮蔽」了 $n - b$ 個見證分量，在揭示少於 $b$ 次
+      求值的情況下實現統計零知識。
+    </p>
+
+    <div class="callout theorem">
+      <div class="callout-title">零知識保證</div>
+      <p>
+        若 $b$ 個盲化行使用獨立均勻隨機值，且驗證者最多獲知
+        $b - 1$ 次 $f(X)$ 在 $H$ 外部點的求值，則這些求值結果
+        在統計上與見證值 $w_0, \ldots, w_{n-b-1}$ 獨立。
+      </p>
+      <p>
+        <em>直觀理解：</em> 每次求值是 $n$ 個未知數（其中 $b$ 個是隨機的）的一個方程。
+        有 $b - 1$ 個方程時，仍有 $\geq 1$ 個自由隨機變數，
+        這意味著對任何固定的見證值，求值結果都是均勻分佈的。
+      </p>
+    </div>
+
+    <h3>對電路設計的影響</h3>
+
+    <div class="callout warning">
+      <div class="callout-title">實際影響</div>
+      <p>
+        你的電路無法使用所有 $n = 2^k$ 行。實際容量為
+        $n - b$，其中 $b$ 是盲化因子數量。對於需要恰好 1000 行計算
+        且 $b = 6$ 個盲化行的電路，你需要 $n \geq 1006$，
+        即 $k = 10$（$n = 1024$，可用行數為 1018）。
+      </p>
+      <p>
+        如果你的計算需要 1020 行，你必須提升到 $k = 11$（$n = 2048$），
+        浪費了近一半的域。這是實際的成本：每增加一個 $k$，
+        證明者的時間和記憶體大致加倍。
+      </p>
+    </div>
+
+    <!-- ===== Summary Diagram ===== -->
+    <h2>5.9 綜合整理</h2>
+
+    <p>
+      下圖展示了本章所有概念如何在一次 PLONK/Halo2 證明過程中相互關聯：
+    </p>
+
+    <div class="diagram">
+      <pre>
+    PLONK Prover: Domain and Polynomial Flow
+    ==========================================
+
+    Circuit Table (n rows)
+    ┌──────────────────────────────┐
+    │  row 0:  w_0                 │ ─┐
+    │  row 1:  w_1                 │  │  Usable rows
+    │  ...                         │  │  (n - b rows of
+    │  row n-b-1: w_{n-b-1}        │ ─┘   actual computation)
+    │  row n-b:   r_0  (random)    │ ─┐
+    │  ...                         │  │  Blinding rows (b rows)
+    │  row n-1:   r_{b-1} (random) │ ─┘
+    └──────────────────────────────┘
+                 │
+                 │  Polynomial&lt;F, LagrangeCoeff&gt;  (evaluation form, size n)
+                 │
+                 ▼
+         ┌──────────────┐
+         │    iNTT       │   O(n log n) field ops
+         │  (size n)     │
+         └──────────────┘
+                 │
+                 │  Polynomial&lt;F, Coeff&gt;  (coefficient form, degree &lt; n)
+                 │
+          ┌──────┴──────┐
+          │             │
+          ▼             ▼
+    ┌──────────┐  ┌─────────────────┐
+    │ Commit   │  │ NTT on extended │
+    │ (MSM     │  │ coset domain    │  O(4n log 4n) field ops
+    │  or IPA) │  │ (size 4n)       │
+    └──────────┘  └─────────────────┘
+                         │
+                         │  Polynomial&lt;F, ExtendedLagrangeCoeff&gt;  (size 4n)
+                         │
+                         ▼
+                  ┌────────────────┐
+                  │  Gate eval     │  Pointwise: q_L·a + q_R·b + q_M·a·b + ...
+                  │  (pointwise,   │  O(n) per gate type
+                  │   on 4n pts)   │
+                  └────────────────┘
+                         │
+                         │  C(X) on extended domain  (should be 0 on H)
+                         │
+                         ▼
+                  ┌────────────────┐
+                  │  ÷ Z_H        │  Pointwise division by (X^n - 1)
+                  │  (on coset,    │  Safe: Z_H ≠ 0 on coset points
+                  │   Z_H ≠ 0)    │
+                  └────────────────┘
+                         │
+                         │  t(X) on extended domain
+                         │
+                         ▼
+                  ┌────────────────┐
+                  │  iNTT          │  Back to coefficient form
+                  │  (size 4n)     │
+                  └────────────────┘
+                         │
+                         │  t(X) in Coeff form  (degree ≤ 3n-1)
+                         │
+                         ▼
+                  ┌────────────────┐
+                  │  Split & Commit │  t(X) = t_0 + X^n t_1 + X^{2n} t_2
+                  │  each chunk    │  Commit to t_0, t_1, t_2 separately
+                  └────────────────┘
+      </pre>
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">重點摘要</div>
+      <ul>
+        <li><strong>域的選擇至關重要</strong>：乘法子群結構 $H = \langle \omega \rangle$
+          使得原本 $O(n^2)$ 的多項式運算得以在 $O(n \log n)$ 內完成。</li>
+        <li><strong>NTT 是核心引擎</strong>：它在係數形式與求值形式之間進行轉換。
+          證明者的效能很大程度上取決於 NTT 的速度。</li>
+        <li><strong>陪集避免除以零</strong>：在 $gH$ 而非 $H$ 上對商多項式求值，
+          避開了 $Z_H = 0$ 的問題。</li>
+        <li><strong>擴展域防止混疊</strong>：次數為 $n$ 的多項式之乘積需要
+          $> n$ 個求值點才能忠實表示。</li>
+        <li><strong>Lagrange 基底連接兩種表示形式</strong>：$f(X) = \sum f(\omega^i) L_i(X)$
+          是求值表示與係數表示之間的橋樑。</li>
+        <li><strong>盲化行確保零知識</strong>：隨機條目增加了足夠的熵，
+          使見證隱藏於多項式求值之後。</li>
+      </ul>
+    </div>
+
+    <h2>對本研究的意義</h2>
+    <div class="callout theorem">
+      <div class="callout-title">域大小如何影響論文的電路</div>
+      <p>
+        FFT 求值域的參數直接決定了我們多項式方法電路的容量和效能：
+      </p>
+      <ul>
+        <li><strong>域大小 $k$</strong>：$n = 2^k$ 決定電路最多可容納多少行。每次函數求值需要 $d + 3$ 行左右（$d$ 個 Horner 步驟 + 截斷行），所以 $k$ 決定了一次證明最多能批量計算多少個函數值。</li>
+        <li><strong>盲化行</strong>：Halo2 的零知識性需要 $\text{bf}$ 行盲化行，實際可用行數為 $2^k - \text{bf} - 1$。我們的電路使用 <code>Rotation::prev()</code> 和 <code>Rotation::next()</code>，盲化因子取決於最大旋轉跨度。</li>
+        <li><strong>擴展域</strong>：自定義閘的次數越高，需要的擴展因子 $j$ 越大（$|H'| = 2^{k+j}$）。Horner 乘加閘是 degree-2，所以 $j = 1$ 通常即可。</li>
+        <li><strong>NTT 效能</strong>：$O(n \log n)$ 的 NTT 是 Prover 時間的主要瓶頸之一。$k$ 越大，證明時間越長。</li>
+      </ul>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>$k$ 值</th><th>可用行數（約）</th><th>可批量求值次數（$d=5$）</th><th>Prover NTT 時間（估計）</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>10</td><td>~1020</td><td>~127</td><td>~1 ms</td></tr>
+        <tr><td>14</td><td>~16380</td><td>~2047</td><td>~20 ms</td></tr>
+        <tr><td>17</td><td>~131068</td><td>~16383</td><td>~200 ms</td></tr>
+        <tr><td>20</td><td>~1048572</td><td>~131071</td><td>~2 s</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ===== Navigation ===== -->
+    <div class="page-nav">
+      <a href="arithmetization.html">
+        <span class="nav-label">上一章</span>
+        <span class="nav-title">&larr; 4. 算術化</span>
+      </a>
+      <a href="groth16.html">
+        <span class="nav-label">下一章</span>
+        <span class="nav-title">6. Groth16 &rarr;</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>
