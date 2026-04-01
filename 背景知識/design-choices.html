@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ch 15: 設計選擇總覽 — ZK Handbook</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+
+  <aside class="sidebar">
+  </aside>
+  <script src="components/sidebar-loader.js"></script>
+
+  <main class="main-content">
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+      <h1>15. 設計選擇總覽</h1>
+      <p class="page-subtitle">
+        本論文的技術堆疊共涉及 10 層選擇，每一層都有替代方案。
+        本章逐層說明「選了什麼、為什麼選它、放棄了什麼」。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- ARCHITECTURE OVERVIEW                                         -->
+    <!-- ============================================================ -->
+    <h2>技術堆疊全貌</h2>
+
+    <div class="callout note">
+      <div class="callout-title">閱讀方式</div>
+      <p>由底層（密碼學基礎設施）往上層（應用層面的演算法選擇）閱讀。每一層的選擇都會影響上一層的可行方案。</p>
+    </div>
+
+    <pre style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:1.25rem; font-size:0.95rem; line-height:1.6; overflow-x:auto;">
+Layer 10  ExplicitRC          輸入範圍驗證
+Layer  9  Deferred Truncation 延遲截斷策略
+Layer  8  Horner Evaluation   多項式求值法
+Layer  7  Constrained Minimax 函數逼近方法
+Layer  6  Fixed-Point         數值表示法
+Layer  5  BN254               橢圓曲線
+Layer  4  KZG                 多項式承諾方案
+Layer  3  Halo2 PSE fork      軟體框架
+Layer  2  PLONK               算術化方案
+Layer  1  zk-SNARK            證明系統類別
+    </pre>
+
+    <!-- ============================================================ -->
+    <!-- LAYER 1: zk-SNARK                                             -->
+    <!-- ============================================================ -->
+    <h2 id="layer1">Layer 1 — 證明系統類別：zk-SNARK</h2>
+
+    <div class="definitions-section">
+      <div class="def-item">
+        <div class="def-term">zk-SNARK <span class="zh">零知識簡潔非互動式知識論證</span></div>
+        <div class="def-body">
+          <strong>S</strong>uccinct（簡潔）、<strong>N</strong>on-interactive（非互動）、<strong>AR</strong>gument of <strong>K</strong>nowledge（知識論證）。
+          Proof 大小為常數級或對數級，驗證時間遠小於計算本身。
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>選項</th><th>Proof 大小</th><th>驗證速度</th><th>Trusted Setup</th><th>安全假設</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eff6ff;">
+          <td><strong>zk-SNARK ← 我們的選擇</strong></td>
+          <td>$O(1)$ 常數級</td>
+          <td>極快（pairing）</td>
+          <td>視方案而定</td>
+          <td>DLog / AGM</td>
+        </tr>
+        <tr>
+          <td>zk-STARK</td>
+          <td>$O(\text{polylog}(n))$ 較大</td>
+          <td>較慢（hash-based）</td>
+          <td>不需要（透明）</td>
+          <td>僅 CRHF（碰撞抗性）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout theorem">
+      <div class="callout-title">選擇理由</div>
+      <p>Proof size 小、驗證速度快，適合鏈上驗證場景。STARK 的透明性優勢在本研究中不是關鍵需求。</p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- LAYER 2: PLONK                                                -->
+    <!-- ============================================================ -->
+    <h2 id="layer2">Layer 2 — 算術化方案：PLONK</h2>
+
+    <div class="definitions-section">
+      <div class="def-item">
+        <div class="def-term">PLONK <span class="zh">一種算術化方案</span></div>
+        <div class="def-body">
+          把計算寫成 trace 表格，每行一個 gate 約束。用置換論證連接等值關係，
+          在 evaluation domain 上壓成多項式，透過隨機挑戰歸約成單點驗證。
+          支援 custom gate（自訂門），且 setup 是通用、可更新的。
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>選項</th><th>Gate 形式</th><th>靈活性</th><th>Setup</th><th>Lookup 支援</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eff6ff;">
+          <td><strong>PLONK ← 我們的選擇</strong></td>
+          <td>任意多項式（custom gate）</td>
+          <td>高</td>
+          <td>通用、可更新</td>
+          <td>可擴展（plookup）</td>
+        </tr>
+        <tr>
+          <td>R1CS（Groth16）</td>
+          <td>$L \cdot R = O$ 固定格式</td>
+          <td>低</td>
+          <td>每個電路重做</td>
+          <td>無原生支援</td>
+        </tr>
+        <tr>
+          <td>AIR（STARK 用）</td>
+          <td>轉移約束</td>
+          <td>中</td>
+          <td>透明</td>
+          <td>可擴展</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>PLONK 的優勢</h4>
+        <ul>
+          <li><strong>Custom gate</strong>：Horner 的乘加操作可以用一個 degree-2 gate 完成，R1CS 需要拆成兩條約束</li>
+          <li><strong>通用 setup</strong>：SRS 不包含電路資訊，換函數不需要重新做 ceremony</li>
+          <li><strong>Lookup 可擴展</strong>：ByteTable 的 range check 依賴 lookup argument</li>
+        </ul>
+      </div>
+      <div class="comparison-card">
+        <h4>R1CS 的劣勢</h4>
+        <ul>
+          <li>每條約束只能做一次乘法 $L \cdot R = O$</li>
+          <li>Horner 一步要拆成 2 條約束，degree-5 多項式需 10 條（PLONK 只要 5 個 gate）</li>
+          <li>Groth16 的 setup 綁定特定電路，換函數要重新做 trusted setup</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- LAYER 3: Halo2 PSE fork                                       -->
+    <!-- ============================================================ -->
+    <h2 id="layer3">Layer 3 — 軟體框架：Halo2 PSE fork</h2>
+
+    <div class="definitions-section">
+      <div class="def-item">
+        <div class="def-term">Halo2 <span class="zh">ZK 證明框架</span></div>
+        <div class="def-body">
+          Zcash 團隊開發的 PLONK 實現框架。PSE（Privacy and Scaling Explorations）fork 將承諾方案從 IPA 改為 KZG，
+          獲得常數大小的 proof。用 Rust 撰寫，提供 Chip / Gadget / Layouter 等 API。
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>選項</th><th>語言</th><th>算術化</th><th>承諾方案</th><th>特色</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eff6ff;">
+          <td><strong>Halo2 PSE fork ← 我們的選擇</strong></td>
+          <td>Rust</td>
+          <td>PLONK</td>
+          <td>KZG</td>
+          <td>Custom gate + Lookup + 跨行引用</td>
+        </tr>
+        <tr>
+          <td>Halo2 原版（Zcash）</td>
+          <td>Rust</td>
+          <td>PLONK</td>
+          <td>IPA</td>
+          <td>無 trusted setup，但 proof 較大</td>
+        </tr>
+        <tr>
+          <td>circom + snarkjs</td>
+          <td>JS / circom DSL</td>
+          <td>R1CS</td>
+          <td>Groth16</td>
+          <td>最小 proof，但 R1CS 限制多</td>
+        </tr>
+        <tr>
+          <td>arkworks</td>
+          <td>Rust</td>
+          <td>多種</td>
+          <td>多種</td>
+          <td>通用庫，API 較低階</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout theorem">
+      <div class="callout-title">選擇理由</div>
+      <ol>
+        <li><strong>Custom gate</strong>：設計高效的 Horner gate 和 Truncation gate</li>
+        <li><strong>Lookup argument</strong>：ByteTable 的 range check 是電路的核心組件</li>
+        <li><strong>跨行引用</strong>（Rotation）：Horner 鏈的每步可以直接引用上一行結果，不需要額外 wiring</li>
+        <li><strong>KZG proof</strong>：常數大小，便於效能比較</li>
+        <li><strong>生態相容</strong>：比較對象 ZKFixedPointChip 也使用 Halo2</li>
+      </ol>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- LAYER 4: KZG                                                  -->
+    <!-- ============================================================ -->
+    <h2 id="layer4">Layer 4 — 多項式承諾方案：KZG</h2>
+
+    <div class="definitions-section">
+      <div class="def-item">
+        <div class="def-term">KZG Commitment <span class="zh">Kate-Zaverucha-Goldberg 多項式承諾</span></div>
+        <div class="def-body">
+          把多項式 $f(x)$ 壓成橢圓曲線上的一個點 $C = [f(\tau)]_1$（$\tau$ 來自 trusted setup）。
+          之後可在任意點 $z$ 打開，證明 $f(z) = y$。Proof 為一個群元素（48 bytes on BN254），
+          驗證只需一次 pairing。
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>選項</th><th>Proof 大小</th><th>驗證速度</th><th>Trusted Setup</th><th>假設</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eff6ff;">
+          <td><strong>KZG ← 我們的選擇</strong></td>
+          <td>$O(1)$，48 bytes</td>
+          <td>一次 pairing（極快）</td>
+          <td>需要（MPC ceremony）</td>
+          <td>AGM + DLog</td>
+        </tr>
+        <tr>
+          <td>IPA（Inner Product Argument）</td>
+          <td>$O(\log n)$</td>
+          <td>多次標量乘法（慢）</td>
+          <td>不需要</td>
+          <td>DLog</td>
+        </tr>
+        <tr>
+          <td>FRI（STARK 用）</td>
+          <td>$O(\log^2 n)$</td>
+          <td>Hash 運算</td>
+          <td>不需要</td>
+          <td>CRHF</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout warning">
+      <div class="callout-title">Trade-off</div>
+      <p>
+        KZG 的代價是需要 trusted setup（SRS）。SRS 由 MPC ceremony 產生——只要有一個參與者是誠實的就安全。
+        Zcash 和 Ethereum 都已完成大規模 ceremony，這是業界普遍接受的假設。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- LAYER 5: BN254                                                -->
+    <!-- ============================================================ -->
+    <h2 id="layer5">Layer 5 — 橢圓曲線：BN254</h2>
+
+    <div class="definitions-section">
+      <div class="def-item">
+        <div class="def-term">BN254 <span class="zh">Barreto-Naehrig 曲線</span></div>
+        <div class="def-body">
+          一條 pairing-friendly 橢圓曲線。Scalar field 為 254-bit 質數
+          $p \approx 2^{253.97}$。電路中所有運算都是 $\bmod\; p$。
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>選項</th><th>Field 大小</th><th>Pairing</th><th>生態支援</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eff6ff;">
+          <td><strong>BN254 ← 我們的選擇</strong></td>
+          <td>254 bit</td>
+          <td>支援</td>
+          <td>Ethereum 原生支援</td>
+        </tr>
+        <tr>
+          <td>BLS12-381</td>
+          <td>255 bit</td>
+          <td>支援</td>
+          <td>Zcash、Ethereum 2.0</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout theorem">
+      <div class="callout-title">為什麼 254 bit 很重要</div>
+      <p>
+        254-bit field 為 deferred truncation 提供了 <strong>overflow headroom</strong>。
+        Horner 鏈中間值最大需要 $(d+1) \times pp$ bits：
+      </p>
+      <ul>
+        <li>$pp = 16, d = 5$：$(5+1) \times 16 = 96$ bits，headroom $= 254 - 96 = 158$ bits</li>
+        <li>$pp = 24, d = 5$：$(5+1) \times 24 = 144$ bits，headroom $= 254 - 144 = 110$ bits</li>
+        <li>$pp = 32, d = 7$：$(7+1) \times 32 = 256$ bits &gt; 254 bits <strong>→ overflow！不可行</strong></li>
+      </ul>
+      <p>硬約束：$(d+1) \times pp &lt; 254$。這直接決定了 $(pp, d)$ 設計空間的邊界。</p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- LAYER 6: Fixed-Point                                          -->
+    <!-- ============================================================ -->
+    <h2 id="layer6">Layer 6 — 數值表示法：定點（Fixed-Point）</h2>
+
+    <div class="definitions-section">
+      <div class="def-item">
+        <div class="def-term">Fixed-Point Representation <span class="zh">定點表示法</span></div>
+        <div class="def-body">
+          選一個精度參數 $pp$，令 $S = 2^{pp}$。實數 $r$ 表示為整數 $R = \text{round}(r \cdot S)$。
+          所有運算在整數上進行，最終結果除以 $S$ 還原。
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>選項</th><th>電路成本</th><th>精度</th><th>實現複雜度</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eff6ff;">
+          <td><strong>定點 ← 我們的選擇</strong></td>
+          <td>低（整數加乘 + 一次截斷）</td>
+          <td>由 $pp$ 決定</td>
+          <td>簡單</td>
+        </tr>
+        <tr>
+          <td>浮點（IEEE 754 風格）</td>
+          <td>極高（exponent 需 bit-level 操作）</td>
+          <td>高（動態範圍）</td>
+          <td>極複雜</td>
+        </tr>
+        <tr>
+          <td>純整數查表法（LUT）</td>
+          <td>表格巨大（每函數 65K+ 條目）</td>
+          <td>由表格大小決定</td>
+          <td>簡單但不可擴展</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout theorem">
+      <div class="callout-title">選擇理由</div>
+      <p>
+        ZK 電路的原生運算是 $\mathbb{F}_p$ 上的整數加法和乘法。定點表示法只需要在乘法後做一次截斷（除以 $S$），
+        是將實數帶入電路的最自然方式。浮點的 exponent 部分在電路中需要大量 bit 操作，成本不可接受。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- LAYER 7: Constrained Minimax                                  -->
+    <!-- ============================================================ -->
+    <h2 id="layer7">Layer 7 — 函數逼近方法：Constrained Minimax</h2>
+
+    <div class="definitions-section">
+      <div class="def-item">
+        <div class="def-term">Constrained Minimax Polynomial <span class="zh">受限 Minimax 多項式</span></div>
+        <div class="def-body">
+          在所有同 degree 且滿足 $c_0 = 0$ 約束的多項式中，找到使 $L_\infty$ 誤差最小的那一個。
+          即 $\min_{p \in \mathcal{P}_d,\; p(0)=0} \max_{x \in [a,b]} |f(x) - p(x)|$。
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>選項</th><th>同 degree 精度</th><th>特性</th><th>$c_0 = 0$</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eff6ff;">
+          <td><strong>Constrained Minimax ← 我們的選擇</strong></td>
+          <td>最優（$L_\infty$ 最小）</td>
+          <td>等振盪定理保證最優</td>
+          <td>支援</td>
+        </tr>
+        <tr>
+          <td>Taylor 展開</td>
+          <td>差（只在展開點附近好）</td>
+          <td>只優化一個點的誤差</td>
+          <td>天然 $c_0 = 0$（可做到）</td>
+        </tr>
+        <tr>
+          <td>Chebyshev 逼近</td>
+          <td>接近最佳但非最優</td>
+          <td>節點分佈近似等振盪</td>
+          <td>不保證</td>
+        </tr>
+        <tr>
+          <td>查表法（LUT）</td>
+          <td>精確到表格精度</td>
+          <td>每函數一張大表</td>
+          <td>不適用</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>Minimax vs Taylor 的精度差距</h4>
+        <p>以 $pp = 16$ 為例，Minimax 在同 degree 下 ULP 比 Taylor 好 <strong>幾十到上千倍</strong>。</p>
+        <p>原因：Taylor 把所有逼近精度集中在 $x = 0$ 附近，Minimax 把誤差均勻分配到整個區間（等振盪性質）。</p>
+      </div>
+      <div class="comparison-card">
+        <h4>$c_0 = 0$ 約束的意義</h4>
+        <p>強制多項式的常數項為 0，意味著 $p(0) = 0$。
+        好處：省掉一個加法常數項，Horner 求值的最後一步直接是 $R \cdot H_1$，截斷更乾淨。</p>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- LAYER 8: Horner Evaluation                                    -->
+    <!-- ============================================================ -->
+    <h2 id="layer8">Layer 8 — 多項式求值法：Horner</h2>
+
+    <div class="definitions-section">
+      <div class="def-item">
+        <div class="def-term">Horner's Method <span class="zh">Horner 求值法</span></div>
+        <div class="def-body">
+          把 $D_d x^d + \cdots + D_1 x$ 改寫成嵌套形式
+          $((\cdots((D_d \cdot x + D_{d-1}) \cdot x + D_{d-2}) \cdot x + \cdots) \cdot x + D_1) \cdot x$。
+          只需 $d$ 次乘法和 $d$ 次加法。
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>選項</th><th>乘法次數</th><th>Gate degree</th><th>可否延遲截斷</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eff6ff;">
+          <td><strong>Horner ← 我們的選擇</strong></td>
+          <td>$d$ 次（最少）</td>
+          <td>每步 degree 2</td>
+          <td>可以（序列結構，中間值可追蹤）</td>
+        </tr>
+        <tr>
+          <td>直接展開（$D_k \cdot x^k$ 逐項算）</td>
+          <td>$O(d^2)$（需算各次冪）</td>
+          <td>高（$x^k$ 需多次乘）</td>
+          <td>困難（多條平行路徑）</td>
+        </tr>
+        <tr>
+          <td>Estrin 法（樹狀並行）</td>
+          <td>$d$ 次</td>
+          <td>部分步驟 degree &gt; 2</td>
+          <td>困難（中間值分支）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout theorem">
+      <div class="callout-title">為什麼 Horner 完美契合 Halo2</div>
+      <p>每一步都是 $H_k = D_k + R \cdot H_{k+1}$——一個乘法 + 一個加法，剛好是 degree-2 的 custom gate。
+        $d$ 步 Horner = $d$ 行 trace，搭配跨行引用（Rotation），每行直接拿上一行的 $H_{k+1}$。
+        不需要額外 column，不需要 permutation wiring。</p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- LAYER 9: Deferred Truncation                                  -->
+    <!-- ============================================================ -->
+    <h2 id="layer9">Layer 9 — 截斷策略：Deferred Truncation</h2>
+
+    <div class="definitions-section">
+      <div class="def-item">
+        <div class="def-term">Deferred Truncation <span class="zh">延遲截斷</span></div>
+        <div class="def-body">
+          整條 Horner 鏈中間不做截斷（不除以 $S$），讓中間值在 $\mathbb{F}_p$ 中自由膨脹。
+          最後只做一次 $\lfloor w_{\text{pre}} / S^d \rfloor$。前提：中間值不超過 $p$（overflow headroom 足夠）。
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>選項</th><th>截斷次數</th><th>電路成本</th><th>精度</th><th>前提</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eff6ff;">
+          <td><strong>Deferred ← 我們的選擇</strong></td>
+          <td>1 次</td>
+          <td>1 次 byte decomp + lookup</td>
+          <td>ULP $\leq 1$（13/13 函數在 $d^*$）</td>
+          <td>$(d+1) \times pp &lt; 254$</td>
+        </tr>
+        <tr>
+          <td>Per-step truncation</td>
+          <td>$d$ 次</td>
+          <td>$d$ 次 byte decomp + lookup</td>
+          <td>每步累積捨入誤差，全部 13/13 函數失敗</td>
+          <td>無</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>Deferred Truncation 的優勢</h4>
+        <ul>
+          <li><strong>電路成本降至 $1/d$</strong>：截斷是最昂貴的操作（byte decomposition + lookup），從 $d$ 次減到 1 次</li>
+          <li><strong>精度更好</strong>：中間不截斷 = 中間不捨入 = 不累積誤差</li>
+          <li><strong>實驗結果</strong>：在 $d^*$ 處，deferred 讓 13/13 函數達 ULP $\leq$ 1；per-step 讓 13/13 函數全部失敗（ULP ratio 2x&ndash;7x）</li>
+        </ul>
+      </div>
+      <div class="comparison-card">
+        <h4>代價與限制</h4>
+        <ul>
+          <li><strong>Overflow 風險</strong>：中間值膨脹到 $(d+1) \times pp$ bits，必須確保不超過 $p$（254 bits）</li>
+          <li><strong>限制 $(pp, d)$ 組合</strong>：例如 $pp = 32, d = 7$ 需要 256 bits，超過 BN254 的 254 bits</li>
+          <li><strong>依賴 BN254 的 field size</strong>：換成更小的 field 就不可行</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- LAYER 10: ExplicitRC                                          -->
+    <!-- ============================================================ -->
+    <h2 id="layer10">Layer 10 — 輸入範圍驗證：ExplicitRC</h2>
+
+    <div class="definitions-section">
+      <div class="def-item">
+        <div class="def-term">ExplicitRC <span class="zh">顯式範圍檢查</span></div>
+        <div class="def-body">
+          計算 $\text{gap} = R_{\max} - R$，將 gap 拆成兩個 bytes 並查 ByteTable 驗證。
+          若 $R > R_{\max}$，差值在 $\mathbb{F}_p$ 中 wrap around 成巨大數，無法拆成 2 bytes，Prover 被抓到。
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>選項</th><th>Soundness</th><th>成本</th><th>狀態</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eff6ff;">
+          <td><strong>ExplicitRC ← 我們的選擇</strong></td>
+          <td>完整保證</td>
+          <td>1 gate + 2 lookups</td>
+          <td>使用中</td>
+        </tr>
+        <tr>
+          <td>不驗證（信任 Prover）</td>
+          <td>無保證</td>
+          <td>0</td>
+          <td>不可接受</td>
+        </tr>
+        <tr>
+          <td>ORV（Output Range Verification）</td>
+          <td>有漏洞（7/13 函數 vulnerable）</td>
+          <td>低</td>
+          <td>已放棄</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout warning">
+      <div class="callout-title">ORV 被放棄的原因</div>
+      <p>
+        ORV 嘗試透過檢查輸出值的範圍來間接驗證輸入範圍。但 7/13 函數存在漏洞——
+        惡意 Prover 可以用超出範圍的輸入，產生看起來在合理範圍內的輸出。
+        最嚴重的情況下誤差達 1043 ULP。ExplicitRC 的 gap decomposition 直接驗證 $R \leq R_{\max}$，
+        從根本上杜絕此問題。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SUMMARY: INTERDEPENDENCIES                                    -->
+    <!-- ============================================================ -->
+    <h2>層間依賴關係</h2>
+
+    <p>每一層的選擇不是獨立的，它們互相配合：</p>
+
+    <table>
+      <thead>
+        <tr><th>依賴關係</th><th>說明</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Deferred Truncation → BN254</td>
+          <td>延遲截斷需要 254-bit field 的 overflow headroom</td>
+        </tr>
+        <tr>
+          <td>Horner → PLONK custom gate</td>
+          <td>每步乘加 = degree-2 gate，完美契合 PLONK 的 custom gate</td>
+        </tr>
+        <tr>
+          <td>Horner → Halo2 Rotation</td>
+          <td>跨行引用讓 Horner 鏈不需額外 wiring</td>
+        </tr>
+        <tr>
+          <td>ExplicitRC → ByteTable → Lookup</td>
+          <td>Gap decomposition 依賴 lookup argument 做 byte range check</td>
+        </tr>
+        <tr>
+          <td>Constrained Minimax ($c_0 = 0$) → Horner</td>
+          <td>$c_0 = 0$ 讓 Horner 最後一步是 $R \cdot H_1$，截斷更乾淨</td>
+        </tr>
+        <tr>
+          <td>定點 → 截斷</td>
+          <td>乘法後 scale 變 $S^2$，必須截斷回 $S$，截斷是電路主要成本</td>
+        </tr>
+        <tr>
+          <td>KZG → BN254 pairing</td>
+          <td>KZG 的 commit 和 verify 需要 pairing-friendly 曲線</td>
+        </tr>
+        <tr>
+          <td>$(pp, d)$ 設計空間 → BN254 + Deferred Truncation</td>
+          <td>可行的 $(pp, d)$ 組合由 $(d+1) \times pp &lt; 254$ 決定</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">設計哲學</div>
+      <p>
+        這套技術堆疊的核心邏輯是：<strong>用多項式逼近取代查表，用代數約束取代暴力計算</strong>。
+        每一層選擇都在最小化電路成本的同時，維持精度（ULP $\leq$ 1）和安全性（soundness）。
+        最終結果：10 行、6 個 custom gates、12 個 lookups、256 條目的共享 ByteTable，
+        就能以零知識方式計算任意超越函數。
+      </p>
+    </div>
+
+    <!-- PAGE NAV -->
+    <div class="page-nav">
+      <a href="horner-evaluation.html">
+        <span class="nav-label">上一章</span>
+        <span class="nav-title">&larr; 14. Horner 求值與延遲截斷</span>
+      </a>
+      <a href="index.html">
+        <span class="nav-label">回到首頁</span>
+        <span class="nav-title">手冊首頁 &rarr;</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>
