@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Per-Step Minimax Horner Evaluation in Zero-Knowledge Proofs &mdash; Experimental Results</title>
+<title>逐步截斷 Minimax Horner 求值 — 實驗結果展示</title>
 <style>
   /* ===== Reset & Base ===== */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -21,7 +21,7 @@
     --text-light: #6b6b80;
     --border:     #e0e0e8;
     --mono:       'Consolas', 'SF Mono', 'Fira Code', 'Source Code Pro', monospace;
-    --sans:       'Segoe UI', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+    --sans:       'Segoe UI', 'Inter', -apple-system, BlinkMacSystemFont, 'Microsoft JhengHei', 'Noto Sans TC', 'Helvetica Neue', Arial, sans-serif;
     --radius:     8px;
     --shadow:     0 2px 12px rgba(26, 26, 46, .08);
     --shadow-lg:  0 8px 32px rgba(26, 26, 46, .12);
@@ -33,7 +33,7 @@
     font-family: var(--sans);
     background: var(--bg);
     color: var(--text);
-    line-height: 1.65;
+    line-height: 1.75;
     -webkit-font-smoothing: antialiased;
   }
 
@@ -70,13 +70,11 @@
     padding: 0 1.5rem;
   }
 
-  section {
-    margin-bottom: 3rem;
-  }
+  section { margin-bottom: 3rem; }
 
   /* ===== Hero ===== */
   .hero {
-    margin-top: 48px; /* nav height */
+    margin-top: 48px;
     background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 40%, var(--teal) 100%);
     color: #fff;
     padding: 4.5rem 2rem 3.5rem;
@@ -92,10 +90,10 @@
     pointer-events: none;
   }
   .hero h1 {
-    font-size: 2.3rem;
+    font-size: 2.2rem;
     font-weight: 800;
     letter-spacing: -.02em;
-    line-height: 1.2;
+    line-height: 1.3;
     margin-bottom: .6rem;
     position: relative; z-index: 1;
   }
@@ -194,7 +192,7 @@
   }
   .card p, .card li {
     font-size: .92rem;
-    line-height: 1.7;
+    line-height: 1.75;
   }
   .card ul, .card ol {
     padding-left: 1.4rem;
@@ -326,7 +324,6 @@
   tbody tr:nth-child(even) { background: rgba(244,244,248,.6); }
   tbody tr:hover { background: rgba(233,69,96,.04); }
 
-  /* Numeric cells */
   .num {
     font-family: var(--mono);
     font-size: .83rem;
@@ -338,7 +335,7 @@
   .num.green { color: #27ae60; }
   .num.gold { color: #c48a1a; }
 
-  /* ===== Data Bars (inline bar chart in table cells) ===== */
+  /* ===== Data Bars ===== */
   .data-bar-cell {
     position: relative;
     min-width: 140px;
@@ -395,7 +392,7 @@
     font-weight: 600;
   }
 
-  /* ===== Metric cards (small KPI boxes) ===== */
+  /* ===== Metric cards ===== */
   .metric-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -447,10 +444,7 @@
     padding: .25rem .6rem;
     border-radius: 4px;
   }
-  .ablation-header h3 {
-    margin: 0;
-    font-size: 1.05rem;
-  }
+  .ablation-header h3 { margin: 0; font-size: 1.05rem; }
 
   /* ===== Comparison layout ===== */
   .compare-grid {
@@ -465,10 +459,7 @@
     border: 1px solid var(--border);
     background: var(--card);
   }
-  .compare-box h4 {
-    margin: 0 0 .6rem;
-    font-size: .9rem;
-  }
+  .compare-box h4 { margin: 0 0 .6rem; font-size: .9rem; }
 
   /* ===== Limitation items ===== */
   .limitation {
@@ -492,6 +483,61 @@
   }
   .limitation p { margin: 0; font-size: .9rem; }
 
+  /* ===== Circuit diagram ===== */
+  .circuit-diagram {
+    background: var(--navy);
+    color: rgba(255,255,255,.85);
+    padding: 1.2rem 1.5rem;
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: .78rem;
+    line-height: 1.6;
+    overflow-x: auto;
+    margin: 1rem 0;
+    white-space: pre;
+  }
+  .circuit-diagram .highlight { color: var(--accent); font-weight: 700; }
+  .circuit-diagram .dim { color: rgba(255,255,255,.4); }
+
+  /* ===== Step list ===== */
+  .step-list {
+    counter-reset: step;
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+  }
+  .step-list li {
+    counter-increment: step;
+    padding: .5rem 0 .5rem 2.8rem;
+    position: relative;
+    border-bottom: 1px solid var(--border);
+  }
+  .step-list li:last-child { border-bottom: none; }
+  .step-list li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: .5rem;
+    width: 24px; height: 24px;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    font-size: .72rem;
+    color: var(--text-light);
+  }
+  .step-list li.star::before {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .step-list code {
+    font-family: var(--mono);
+    background: rgba(15,52,96,.06);
+    padding: .15rem .4rem;
+    border-radius: 3px;
+    font-size: .82rem;
+  }
+
   /* ===== Footer ===== */
   .footer {
     background: var(--navy);
@@ -513,7 +559,7 @@
   /* ===== Responsive ===== */
   @media (max-width: 720px) {
     .hero { padding: 3rem 1rem 2.5rem; }
-    .hero h1 { font-size: 1.6rem; }
+    .hero h1 { font-size: 1.5rem; }
     .not-is, .compare-grid { grid-template-columns: 1fr; }
     .card { padding: 1.2rem; }
     .section-header { padding: 1rem 1.2rem; }
@@ -521,7 +567,6 @@
     .metric-row { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
   }
 
-  /* ===== Print ===== */
   @media print {
     nav.toc { display: none; }
     .hero { margin-top: 0; }
@@ -529,7 +574,6 @@
     .card, .section-header { box-shadow: none; break-inside: avoid; }
   }
 
-  /* ===== Smooth highlight on anchor jump ===== */
   :target .section-header {
     box-shadow: 0 0 0 3px var(--accent);
     transition: box-shadow .3s;
@@ -542,59 +586,57 @@
 <nav class="toc">
   <a href="../index.html" style="opacity:.6;font-size:.85rem;">&larr; Home</a>
   <a href="#hero" class="nav-brand">Minimax-ZK</a>
-  <a href="#s1">Contributions</a>
-  <a href="#s2">Scenario A</a>
-  <a href="#s3">Scenario C</a>
-  <a href="#s4">Ablation Studies</a>
-  <a href="#s5">Comparison</a>
-  <a href="#s6">Limitations</a>
+  <a href="#s1">研究貢獻</a>
+  <a href="#s2">場景 A</a>
+  <a href="#s3">場景 C</a>
+  <a href="#s4">消融實驗</a>
+  <a href="#s5">場景比較</a>
+  <a href="#s6">已知限制</a>
 </nav>
 
 <!-- ========== HERO ========== -->
 <div class="hero" id="hero">
-  <h1>Per-Step Minimax Horner Evaluation<br>in Zero-Knowledge Proofs</h1>
-  <p class="subtitle">Experimental Results &amp; Contribution Overview</p>
+  <h1>逐步截斷 Minimax Horner 求值<br>在零知識證明中的應用</h1>
+  <p class="subtitle">實驗結果與研究貢獻總覽</p>
   <p class="brief">
-    A methodology for evaluating transcendental functions
-    (<strong>exp</strong>, <strong>ln</strong>, <strong>erf</strong>, <strong>sin</strong>, ...)
-    inside ZK circuits with up to <strong>44 effective bits</strong> of precision
-    and <strong>sub-10 KB</strong> proofs.
+    一套在 ZK 電路中求值超越函數（<strong>exp</strong>、<strong>ln</strong>、<strong>erf</strong>、<strong>sin</strong>、...）的完整方法論。
+    在金融級應用場景中實現最高 <strong>44 個有效位元</strong>的精度，
+    證明大小僅 <strong>7 KB 以下</strong>，驗證時間為毫秒級。
   </p>
   <div class="tag-row">
     <span class="tag">halo2 + KZG</span>
     <span class="tag">Minimax (Remez)</span>
-    <span class="tag">Fixed-Point Arithmetic</span>
+    <span class="tag">定點數算術</span>
     <span class="tag">Black-Scholes</span>
-    <span class="tag">Merton Structural Model</span>
-    <span class="tag">13 Transcendental Functions</span>
-    <span class="tag">637 Configurations</span>
+    <span class="tag">Merton 結構模型</span>
+    <span class="tag">13 種超越函數</span>
+    <span class="tag">637 組配置</span>
   </div>
 </div>
 
 <div class="container">
 
 <!-- ============================================================ -->
-<!-- SECTION 1: What This Work Is (And Isn't)                     -->
+<!-- SECTION 1: 研究貢獻                                          -->
 <!-- ============================================================ -->
 <section id="s1">
   <div class="section-header">
-    <h2><span class="sec-num">1</span> What This Work Is (And Isn't)</h2>
-    <p>Framing the contribution precisely</p>
+    <h2><span class="sec-num">1</span> 研究貢獻定位</h2>
+    <p>精確界定本研究做了什麼、沒做什麼</p>
   </div>
   <div class="card">
 
     <div class="not-is">
       <div class="not-box">
-        <div class="box-label">NOT the contribution</div>
-        <p>"We found better polynomial coefficients using Remez."</p>
+        <div class="box-label">不是我們的貢獻</div>
+        <p>「我們用 Remez 算法找到了更好的多項式係數。」</p>
         <p style="margin-top:.4rem;font-size:.84rem;color:var(--text-light);">
-          Remez is a tool &mdash; the same way halo2 is a tool.
-          The Remez exchange algorithm has been known since 1934.
+          Remez 只是工具 &mdash; 就像 halo2 是工具一樣。Remez 交換算法自 1934 年起已是數值分析的標準方法。
         </p>
       </div>
       <div class="is-box">
-        <div class="box-label">IS the contribution</div>
-        <p>A <strong>complete methodology</strong> for high-precision transcendental function evaluation inside zero-knowledge circuits &mdash; spanning circuit design, numerical analysis, and end-to-end financial model proofs.</p>
+        <div class="box-label">是我們的貢獻</div>
+        <p>一套<strong>完整的方法論</strong>：在零知識電路中實現高精度超越函數求值 &mdash; 涵蓋電路設計、數值分析、以及端到端的金融模型證明。</p>
       </div>
     </div>
 
@@ -602,36 +644,36 @@
       <div class="contrib-item">
         <div class="contrib-num">1</div>
         <div class="contrib-body">
-          <strong>Universal Horner Kernel</strong>
-          <span>A parameterizable halo2 circuit gadget (3 custom gates, universal <code>ByteTable[0..255]</code>) that evaluates <em>any</em> polynomial. Switching functions = swapping <em>d</em> coefficients &mdash; no circuit redesign required.</span>
+          <strong>通用 Horner 核心電路</strong>
+          <span>一個參數化的 halo2 電路元件（3 組自定義閘、通用 <code>ByteTable[0..255]</code>）。切換函數只需替換 <em>d</em> 個係數 &mdash; 不需重新設計電路。支援 13 種超越函數。</span>
         </div>
       </div>
       <div class="contrib-item">
         <div class="contrib-num">2</div>
         <div class="contrib-body">
-          <strong>Truncation Strategy Analysis</strong>
-          <span>First identification that <em>deferred</em> truncation overflows BN254 at pp&ge;32, making <em>per-step</em> truncation the only viable path for high-precision ZK arithmetic.</span>
+          <strong>截斷策略分析</strong>
+          <span>首次發現在 pp&ge;32 時，<em>延遲截斷</em>的中間值會溢出 BN254 有限域（253 位元），使<em>逐步截斷</em>成為高精度 ZK 算術的唯一可行路徑。</span>
         </div>
       </div>
       <div class="contrib-item">
         <div class="contrib-num">3</div>
         <div class="contrib-body">
-          <strong>Design Space Map</strong>
-          <span>637 (pp,&nbsp;d) configurations across 13 functions &mdash; including the "quantization saturation" boundary where increasing polynomial degree <em>hurts</em> precision rather than helping.</span>
+          <strong>設計空間地圖</strong>
+          <span>637 組 (pp, d) 配置橫跨 13 種函數的系統性實驗 &mdash; 包含「量化飽和邊界」：多項式次數超過某值後，精度反而<em>下降</em>而非提升。</span>
         </div>
       </div>
       <div class="contrib-item">
         <div class="contrib-num">4</div>
         <div class="contrib-body">
-          <strong>Coefficient Conditioning Discovery</strong>
-          <span>First finding that function structure (coefficient pattern) creates a <strong>10&times; precision gap</strong> at identical kernel parameters. No precedent in ZK fixed-point literature.</span>
+          <strong>係數條件數效應（新發現）</strong>
+          <span>首次揭示函數的係數結構造成相同參數下 <strong>10 倍精度落差</strong>。在 ZK 定點數文獻中尚無先例。</span>
         </div>
       </div>
       <div class="contrib-item">
         <div class="contrib-num">5</div>
         <div class="contrib-body">
-          <strong>End-to-End Financial Model Proofs</strong>
-          <span>From abstract methodology to working KZG proofs for Black-Scholes option pricing and Merton structural model default probability.</span>
+          <strong>端到端金融模型 ZK 證明</strong>
+          <span>從抽象方法論到可運行的 KZG 證明：Black-Scholes 選擇權定價（場景 A）與 Merton 結構模型違約機率（場景 C）。</span>
         </div>
       </div>
     </div>
@@ -639,33 +681,90 @@
 </section>
 
 <!-- ============================================================ -->
-<!-- SECTION 2: Scenario A — Baseline (Black-Scholes Delta)       -->
+<!-- SECTION 2: 場景 A — Black-Scholes Delta                      -->
 <!-- ============================================================ -->
 <section id="s2">
   <div class="section-header">
-    <h2><span class="sec-num">2</span> Scenario A &mdash; Baseline (Black-Scholes Delta)</h2>
-    <p>Prove option Delta without revealing volatility</p>
+    <h2><span class="sec-num">2</span> 場景 A &mdash; Black-Scholes 選擇權 Delta 合規證明</h2>
+    <p>證明投資組合風險在合規範圍內，不透露任何持倉細節</p>
   </div>
   <div class="card">
 
-    <span class="scenario-badge a">SCENARIO A</span>
+    <span class="scenario-badge a">場景 A &mdash; 基線驗證</span>
 
-    <h3>Application</h3>
-    <p>A market maker publishes a ZK proof that their quoted Delta is correctly computed from the Black-Scholes formula, without revealing the implied volatility parameter used. The verifier can confirm computational integrity in milliseconds.</p>
+    <h3>背景故事</h3>
+    <p>一家對沖基金在交易所持有大量選擇權部位（call 和 put 混合）。監管機構要求基金定期報告風險暴露，確認投資組合的 Delta 絕對值不超過門檻（例如 0.05，接近 delta-neutral）。</p>
+    <p>傳統做法是把完整持倉清單交給監管機構 &mdash; 但這等於公開交易策略。對沖基金的策略是它的命脈：一旦競爭對手知道部位結構，就能搶先交易（front-running），讓建倉成本大幅上升。</p>
+    <p>基金的目標：<strong>在不透露任何資訊</strong>（包括操作哪支股票、持有多少部位）的情況下，向監管機構證明自己是合規的。</p>
 
-    <h4>Configuration</h4>
+    <h4>角色分工</h4>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>角色</th><th>身份</th><th>職責</th></tr></thead>
+        <tbody>
+          <tr><td><strong>證明者</strong></td><td>對沖基金</td><td>持有選擇權部位，想保護交易策略。生成 ZK 證明</td></tr>
+          <tr><td><strong>驗證者</strong></td><td>監管機構</td><td>確認 |Delta_total| &le; 0.05，毫秒級驗證，不需知道持倉</td></tr>
+          <tr><td><strong>可信第三方</strong></td><td>清算所</td><td>記錄所有交易，每日公布持倉的 Merkle root（一個 hash），保證輸入真實性</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>為什麼需要超越函數</h4>
+    <p>計算選擇權 Delta 需要 Black-Scholes 公式。這個公式自然包含三種超越函數：</p>
+    <ul>
+      <li><strong>ln(S/K)</strong> &mdash; 計算 moneyness，衡量選擇權是價內還是價外</li>
+      <li><strong>exp(-qT)</strong> &mdash; 計算股息折現因子</li>
+      <li><strong>erf(d1/&radic;2)</strong> &mdash; 計算常態分布 CDF &Phi;(d1)，Black-Scholes 的核心</li>
+    </ul>
+    <p>這三種函數都不是加減乘除能算的。ZK 電路只能做有限域上的加法和乘法，所以必須用特殊方法來處理。</p>
+
+    <h4>電路架構</h4>
+    <div class="circuit-diagram"><span class="dim">┌────────────────────────────────────────────────────┐</span>
+<span class="dim">│</span>  公開輸入: Merkle_root, threshold                    <span class="dim">│</span>
+<span class="dim">│</span>  私密見證: S, r, sigma_i, n, 所有部位資料             <span class="dim">│</span>
+<span class="dim">└───────────────────┬────────────────────────────────┘</span>
+                    <span class="dim">│</span>
+    <span class="dim">┌───────────────v──────────────────────┐</span>
+    <span class="dim">│</span>  對每張選擇權 i（共 N 張）              <span class="dim">│</span>
+    <span class="dim">│</span>                                       <span class="dim">│</span>
+    <span class="dim">│</span>  Part A: Merkle 驗證     <span class="dim">← 已有技術</span>   <span class="dim">│</span>
+    <span class="dim">│</span>  Part B: Delta 計算                    <span class="dim">│</span>
+    <span class="dim">│</span>    B2. <span class="highlight">ln(S/K)</span>          <span class="highlight">★ 本論文方法</span>   <span class="dim">│</span>
+    <span class="dim">│</span>    B12. <span class="highlight">erf(d1/&radic;2)</span>      <span class="highlight">★ 本論文方法</span>   <span class="dim">│</span>
+    <span class="dim">│</span>    B15. <span class="highlight">exp(-qT)</span>        <span class="highlight">★ 本論文方法</span>   <span class="dim">│</span>
+    <span class="dim">│</span>  Part C: 累加 contrib     <span class="dim">← 標準加法</span>   <span class="dim">│</span>
+    <span class="dim">└───────────────┬──────────────────────┘</span>
+                    <span class="dim">│</span>
+    <span class="dim">┌───────────────v──────────────────────┐</span>
+    <span class="dim">│</span>  |Delta_total| &le; threshold → 合規     <span class="dim">│</span>
+    <span class="dim">└──────────────────────────────────────┘</span></div>
+    <p style="font-size:.85rem;color:var(--text-light);">三種超越函數共用同一個 ByteTable（256 行），只換係數向量。每張選擇權呼叫 3 次超越函數，n 張共 3n 次。</p>
+
+    <h4>計算步驟（每張選擇權 17 步）</h4>
+    <ol class="step-list">
+      <li><code>ratio = S / K_i</code> &mdash; 除法（witness + 驗證）</li>
+      <li class="star"><code>log_ratio = ln(ratio)</code> &mdash; <strong>超越函數 #1</strong></li>
+      <li><code>vol_sq = &sigma;_i &times; &sigma;_i</code> &mdash; 乘法</li>
+      <li><code>drift = r - q_i + vol_sq/2</code> &mdash; 加減法</li>
+      <li><code>numerator = log_ratio + drift &times; T_i</code> &mdash; 乘法 + 加法</li>
+      <li><code>d1 = numerator / (&sigma;_i &times; &radic;T_i)</code> &mdash; 除法</li>
+      <li class="star"><code>erf_val = erf(d1 / &radic;2)</code> &mdash; <strong>超越函數 #2</strong></li>
+      <li><code>&Phi;(d1) = (1 + erf_val) / 2</code> &mdash; 加法 + 乘法</li>
+      <li class="star"><code>discount = exp(-q_i &times; T_i)</code> &mdash; <strong>超越函數 #3</strong></li>
+      <li><code>&Delta;_i = discount &times; &Phi;(d1)</code> &mdash; 乘法（call 的情況）</li>
+    </ol>
+
+    <h4>配置與核心結果</h4>
     <div class="config-block">
       <span class="config-chip">pp = 24</span>
       <span class="config-chip">d = 8</span>
-      <span class="config-chip">f(x) = exp(x)</span>
+      <span class="config-chip">f(x) = ln, exp, erf</span>
       <span class="config-chip">k = 13</span>
     </div>
-
-    <h4>Core Results</h4>
     <div class="metric-row">
       <div class="metric">
         <div class="metric-val">22.4</div>
-        <div class="metric-label">Effective Bits</div>
+        <div class="metric-label">有效位元</div>
       </div>
       <div class="metric">
         <div class="metric-val green">14</div>
@@ -673,35 +772,152 @@
       </div>
       <div class="metric">
         <div class="metric-val navy">7,488 B</div>
-        <div class="metric-label">Proof Size</div>
+        <div class="metric-label">證明大小</div>
       </div>
       <div class="metric">
         <div class="metric-val green">8 ms</div>
-        <div class="metric-label">Verify Time</div>
+        <div class="metric-label">驗證時間</div>
       </div>
       <div class="metric">
         <div class="metric-val navy">635 ms</div>
-        <div class="metric-label">Prove Time</div>
+        <div class="metric-label">證明時間</div>
       </div>
     </div>
 
-    <div class="callout insight">
-      <div class="callout-label">Key Result</div>
-      <p>Sub-second proving, single-digit millisecond verification, and a proof that fits in a single TCP packet. The framework demonstrates practical feasibility for real-time financial applications.</p>
+    <div class="callout finding">
+      <div class="callout-label">關鍵結果</div>
+      <p>亞秒級證明生成、個位數毫秒驗證、證明大小可放入單一 TCP 封包。框架已展示即時金融應用的可行性。</p>
     </div>
 
-    <h4>13-Function Grid at pp=16, d&le;7</h4>
-    <p>All 13 transcendental functions achieve <strong>ULP = 1</strong> (maximum 1 unit-in-the-last-place error) at the baseline configuration, confirming universal kernel correctness across function families.</p>
-
+    <h4>四方法完整對比（pp=16 實測）</h4>
+    <p>所有數據均為實測值（KZG/SHPLONK, Release mode, Windows 11）。</p>
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Function</th>
-            <th style="text-align:right">Max ULP</th>
-            <th>Status</th>
+            <th>指標</th>
+            <th>A 直接查找表</th>
+            <th>B 分段查找</th>
+            <th style="background:var(--teal);">G 本文 Minimax</th>
+            <th>C Taylor</th>
           </tr>
         </thead>
+        <tbody>
+          <tr>
+            <td>可行性</td>
+            <td>可行</td>
+            <td>不完整（只能處理 exp）</td>
+            <td style="color:#27ae60;font-weight:700;">完整</td>
+            <td>完整</td>
+          </tr>
+          <tr>
+            <td>函數表大小</td>
+            <td class="num">176,499 行</td>
+            <td class="num">&mdash;</td>
+            <td class="num green" style="font-weight:800;">256 行</td>
+            <td class="num">256 行</td>
+          </tr>
+          <tr>
+            <td>k 值</td>
+            <td class="num">18</td>
+            <td class="num">&mdash;</td>
+            <td class="num green" style="font-weight:800;">12</td>
+            <td class="num">12</td>
+          </tr>
+          <tr>
+            <td>證明時間</td>
+            <td class="num accent">18,193 ms</td>
+            <td class="num">&mdash;</td>
+            <td class="num green" style="font-weight:800;">692.9 ms</td>
+            <td class="num">709.2 ms</td>
+          </tr>
+          <tr>
+            <td>ln 精度 (ULP)</td>
+            <td class="num green">0</td>
+            <td class="num">&mdash;</td>
+            <td class="num green">1</td>
+            <td class="num accent">762</td>
+          </tr>
+          <tr>
+            <td>erf 精度 (ULP)</td>
+            <td class="num green">0</td>
+            <td class="num">&mdash;</td>
+            <td class="num green">3</td>
+            <td class="num accent">1,467</td>
+          </tr>
+          <tr>
+            <td>新增函數邊際成本</td>
+            <td>+65,536 行/函數</td>
+            <td>&mdash;</td>
+            <td style="color:#27ae60;font-weight:600;">+5 個常數</td>
+            <td>+5 個常數</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>pp=24 金融級精度</h4>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>指標</th>
+            <th>A 直接查找表</th>
+            <th style="background:var(--teal);">G 本文 Minimax</th>
+            <th>C Taylor</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>可行性</td>
+            <td><span class="status impossible">不可行</span></td>
+            <td style="color:#27ae60;font-weight:700;">完整</td>
+            <td>完整</td>
+          </tr>
+          <tr>
+            <td>表大小</td>
+            <td class="num accent">50,331,648 行</td>
+            <td class="num green" style="font-weight:800;">256 行</td>
+            <td class="num">256 行</td>
+          </tr>
+          <tr>
+            <td>k 值</td>
+            <td class="num accent">&ge; 26</td>
+            <td class="num green" style="font-weight:800;">13</td>
+            <td class="num">13</td>
+          </tr>
+          <tr>
+            <td>證明時間</td>
+            <td class="num accent">&gt; 800,000 ms</td>
+            <td class="num green" style="font-weight:800;">1,357.1 ms</td>
+            <td class="num">1,403.9 ms</td>
+          </tr>
+          <tr>
+            <td>ln 精度 (ULP)</td>
+            <td class="num green">0</td>
+            <td class="num green" style="font-weight:700;">1</td>
+            <td class="num accent">42,468</td>
+          </tr>
+          <tr>
+            <td>erf 精度 (ULP)</td>
+            <td class="num green">0</td>
+            <td class="num green" style="font-weight:700;">2</td>
+            <td class="num accent">75,100</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <div class="callout-label">核心結論</div>
+      <p>查找表在 pp=16 下的證明時間是 Minimax 的 <strong>26.3 倍</strong>，在 pp&ge;24 下完全不可行。Taylor 和 Minimax 使用<strong>完全相同的電路</strong>，差異純粹來自係數品質：Minimax 在 ln 上改善 762&times;、erf 上改善 489&times;（pp=16） &mdash; 這是零成本的精度提升。</p>
+    </div>
+
+    <h4>13 種函數通用驗證（pp=16, d&le;7）</h4>
+    <p>全部 13 種超越函數在基線配置下均達到 <strong>ULP = 1</strong>（最多 1 個最低位元誤差），確認通用核心電路的正確性。</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>函數</th><th style="text-align:right">Max ULP</th><th>狀態</th></tr></thead>
         <tbody>
           <tr><td>exp(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
           <tr><td>ln(1+x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
@@ -715,7 +931,7 @@
           <tr><td>tanh(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
           <tr><td>softplus(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
           <tr><td>GELU(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
-          <tr><td>&Phi;(x) (CDF)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
+          <tr><td>&Phi;(x)（常態 CDF）</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
         </tbody>
       </table>
     </div>
@@ -723,124 +939,150 @@
 </section>
 
 <!-- ============================================================ -->
-<!-- SECTION 3: Scenario C — High Precision (Merton CDS)          -->
+<!-- SECTION 3: 場景 C — Merton CDS                               -->
 <!-- ============================================================ -->
 <section id="s3">
   <div class="section-header">
-    <h2><span class="sec-num">3</span> Scenario C &mdash; High Precision (Merton CDS Portfolio)</h2>
-    <p>Prove portfolio default probability below regulatory threshold without revealing positions</p>
+    <h2><span class="sec-num">3</span> 場景 C &mdash; Merton 結構模型違約機率合規證明</h2>
+    <p>證明投資組合違約機率在監管門檻以下，不透露持倉組成</p>
   </div>
   <div class="card">
 
-    <span class="scenario-badge c">SCENARIO C</span>
+    <span class="scenario-badge c">場景 C &mdash; 高精度擴展</span>
 
-    <h3>Application</h3>
-    <p>A financial institution proves that its portfolio-level probability of default (PD) is below a regulatory threshold using the Merton structural model, without disclosing the asset composition or individual position sizes. Portfolio composition is proprietary intellectual property.</p>
+    <h3>背景故事</h3>
+    <p>一家信用衍生品交易商持有 N 筆信用違約交換（CDS）部位，每筆對應不同公司。監管機構要求交易商定期報告投資組合的加權違約機率（weighted PD），確認在可接受門檻以下（例如 5%）。</p>
+    <p>傳統做法是交出完整持倉清單 &mdash; 但這等於公開哪些公司的信用風險被交易、曝險多大。投資組合組成是交易商的核心商業機密。</p>
+    <p>交易商的目標：<strong>在不透露任何持倉資訊的情況下</strong>，向監管機構證明組合風險在合規範圍內。</p>
 
-    <h4>Why High Precision?</h4>
-    <div class="callout">
-      <div class="callout-label">Precision Requirement</div>
-      <p>Investment-grade default probabilities are in the range 0.001&ndash;0.01. At these magnitudes, even small arithmetic errors can flip a pass/fail regulatory decision. The methodology must deliver enough effective bits to keep the error well below the decision boundary.</p>
+    <h4>角色分工</h4>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>角色</th><th>身份</th><th>職責</th></tr></thead>
+        <tbody>
+          <tr><td><strong>證明者</strong></td><td>信用衍生品交易商</td><td>持有 CDS 部位，保護組合結構。生成 ZK 證明</td></tr>
+          <tr><td><strong>驗證者</strong></td><td>監管機構</td><td>確認 PD_portfolio &le; threshold，毫秒級驗證</td></tr>
+        </tbody>
+      </table>
     </div>
 
-    <h4>Functions Required</h4>
-    <p><code>ln(1+x)</code> + <code>erf(x)</code> via Merton structural model: PD = &Phi;(&minus;d<sub>2</sub>), where d<sub>2</sub> depends on ln(V/D) and the cumulative normal is computed via erf.</p>
+    <h4>為什麼需要高精度</h4>
+    <div class="callout">
+      <div class="callout-label">精度需求</div>
+      <p>投資等級公司的違約機率在 0.001&ndash;0.01（10&ndash;100 個基點）。在這個量級下，即使小的絕對誤差（例如 &plusmn;0.002）就可能翻轉合規/不合規的判定。場景 A 的 pp=24 對 Delta 足夠，但對違約機率只是勉強 &mdash; 場景 C 測試 pp=32 和 pp=48 能否為更嚴格的 Merton 模型提供足夠精度。</p>
+    </div>
 
-    <h4>Results at pp=32</h4>
+    <h4>Merton 結構模型</h4>
+    <p>公司在到期日違約，當且僅當資產價值低於負債：V<sub>T</sub> &lt; D。假設資產價值服從幾何布朗運動，違約機率為：</p>
+    <p style="text-align:center;font-size:1.05rem;font-weight:700;margin:1rem 0;">
+      PD<sub>i</sub> = &Phi;(&minus;d2<sub>i</sub>) = (1 &minus; erf(d2 / &radic;2)) / 2
+    </p>
+    <p>其中：</p>
+    <p style="text-align:center;font-family:var(--mono);font-size:.9rem;margin:.5rem 0;">
+      d2 = [ ln(V/D) + (r &minus; &sigma;&sup2;/2) &times; T ] / (&sigma; &times; &radic;T)
+    </p>
+
+    <h4>所需超越函數</h4>
+    <ul>
+      <li><strong>ln(V/D)</strong> &mdash; 計算資產對負債比率的對數，衡量公司的緩衝空間</li>
+      <li><strong>erf(d2/&radic;2)</strong> &mdash; 計算常態分布 CDF，將 d2 統計量轉換為違約機率</li>
+    </ul>
+    <p style="font-size:.88rem;color:var(--text-light);">與場景 A 相比：場景 C 只需 2 種函數（無 exp），但精度要求從 pp=24 提升到 pp=32/48。</p>
+
+    <h4>電路架構</h4>
+    <div class="circuit-diagram"><span class="dim">┌──────────────────────────────────────────┐</span>
+<span class="dim">│</span>  公開輸入: r, T, threshold                 <span class="dim">│</span>
+<span class="dim">│</span>  私密見證: V_i, D_i, &sigma;_i, w_i, N        <span class="dim">│</span>
+<span class="dim">└──────────────┬───────────────────────────┘</span>
+               <span class="dim">│</span>
+   <span class="dim">┌──────────v───────────────────────┐</span>
+   <span class="dim">│</span>  對每筆部位 i（共 N 筆）            <span class="dim">│</span>
+   <span class="dim">│</span>                                    <span class="dim">│</span>
+   <span class="dim">│</span>  Part A: <span class="highlight">ln(V/D) 管線</span>             <span class="dim">│</span>
+   <span class="dim">│</span>    LeadBit 範圍歸約 + <span class="highlight">★ Horner</span>    <span class="dim">│</span>
+   <span class="dim">│</span>  Part B: Merton 算術               <span class="dim">│</span>
+   <span class="dim">│</span>    &sigma;&sup2;, drift, d2 計算   <span class="dim">← 標準閘</span>  <span class="dim">│</span>
+   <span class="dim">│</span>  Part C: <span class="highlight">erf(d2/&radic;2) 管線</span>          <span class="dim">│</span>
+   <span class="dim">│</span>    SignExtend + <span class="highlight">★ Horner</span>          <span class="dim">│</span>
+   <span class="dim">│</span>  Part D: PD 計算 + 加權累加         <span class="dim">│</span>
+   <span class="dim">└──────────┬───────────────────────┘</span>
+               <span class="dim">│</span>
+   <span class="dim">┌──────────v───────────────────────┐</span>
+   <span class="dim">│</span>  PD_portfolio &le; threshold → 合規  <span class="dim">│</span>
+   <span class="dim">└──────────────────────────────────┘</span></div>
+
+    <h4>計算步驟（每筆部位 13 步）</h4>
+    <ol class="step-list">
+      <li><code>ratio = V_i / D_i</code> &mdash; 除法</li>
+      <li class="star"><code>ln_val = ln(ratio)</code> &mdash; <strong>超越函數 #1</strong></li>
+      <li><code>&sigma;_sq = &sigma;_i &times; &sigma;_i</code> &mdash; 乘法</li>
+      <li><code>drift = (r &minus; &sigma;_sq/2) &times; T</code> &mdash; 減法 + 乘法</li>
+      <li><code>numerator = ln_val + drift</code> &mdash; 加法</li>
+      <li><code>d2 = numerator / (&sigma;_i &times; &radic;T)</code> &mdash; 除法</li>
+      <li class="star"><code>erf_val = erf(d2 / &radic;2)</code> &mdash; <strong>超越函數 #2</strong></li>
+      <li><code>PD_i = (1 &minus; erf_val) / 2</code> &mdash; 減法 + 乘法</li>
+      <li><code>contrib_i = w_i &times; PD_i</code> &mdash; 加權</li>
+    </ol>
+
+    <h4>為什麼必須用逐步截斷</h4>
+    <div class="callout">
+      <div class="callout-label">關鍵約束</div>
+      <p>延遲截斷在 Horner 鏈中不做中間截斷，讓中間值累積。但 pp=32 時中間值達 ~2<sup>347</sup> 位元，pp=48 時達 ~2<sup>713</sup> 位元 &mdash; 遠超 BN254 有限域的 253 位元容量。<strong>逐步截斷是 pp&ge;32 的唯一可行策略。</strong></p>
+    </div>
+
+    <h4>pp=32 核心結果</h4>
     <div class="config-block">
       <span class="config-chip">pp = 32</span>
       <span class="config-chip">d = 10</span>
+      <span class="config-chip">k = 15</span>
     </div>
     <div class="table-wrap">
       <table>
-        <thead>
-          <tr>
-            <th>Function</th>
-            <th style="text-align:right">Max ULP</th>
-            <th style="text-align:right">Effective Bits</th>
-          </tr>
-        </thead>
+        <thead><tr><th>函數</th><th style="text-align:right">Max ULP</th><th style="text-align:right">有效位元</th></tr></thead>
         <tbody>
-          <tr>
-            <td>ln(1+x)</td>
-            <td class="num accent">10.4</td>
-            <td class="num">28.6</td>
-          </tr>
-          <tr>
-            <td>erf(x)</td>
-            <td class="num green">8.0</td>
-            <td class="num">29.0</td>
-          </tr>
+          <tr><td>ln(1+x)</td><td class="num accent">10.4</td><td class="num">28.6</td></tr>
+          <tr><td>erf(x)</td><td class="num green">8.0</td><td class="num">29.0</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h4>Results at pp=48 (Extreme Precision)</h4>
-    <div class="config-block">
-      <span class="config-chip">pp = 48</span>
-      <span class="config-chip">d = 14</span>
-    </div>
+    <h4>KZG 證明基準測試（pp=32, 三種測試案例）</h4>
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Function</th>
-            <th style="text-align:right">Max ULP</th>
-            <th style="text-align:right">Effective Bits</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>ln(1+x)</td>
-            <td class="num accent">142.5</td>
-            <td class="num">40.8</td>
-          </tr>
-          <tr>
-            <td>erf(x)</td>
-            <td class="num green">15.2</td>
-            <td class="num">44.1</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h4>KZG Proof Benchmarks (pp=32, k=15)</h4>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Test Case</th>
+            <th>測試案例</th>
             <th style="text-align:right">V/D</th>
             <th style="text-align:right">&sigma;</th>
-            <th style="text-align:right">PD</th>
-            <th style="text-align:right">Prove (ms)</th>
-            <th style="text-align:right">Verify (ms)</th>
+            <th style="text-align:right">PD 輸出</th>
+            <th style="text-align:right">證明時間</th>
+            <th style="text-align:right">驗證時間</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>Speculative</td>
+            <td>投機級（Speculative）</td>
             <td class="num">1.20</td>
             <td class="num">0.30</td>
             <td class="num accent">0.2662</td>
-            <td class="num">15,134</td>
-            <td class="num green">21</td>
+            <td class="num">15,134 ms</td>
+            <td class="num green">21 ms</td>
           </tr>
           <tr>
-            <td>Distressed</td>
+            <td>困境（Distressed）</td>
             <td class="num">1.10</td>
             <td class="num">0.40</td>
             <td class="num accent">0.4352</td>
-            <td class="num">15,490</td>
-            <td class="num green">26</td>
+            <td class="num">15,490 ms</td>
+            <td class="num green">26 ms</td>
           </tr>
           <tr>
-            <td>Borderline</td>
+            <td>邊緣（Borderline）</td>
             <td class="num">1.30</td>
             <td class="num">0.25</td>
             <td class="num accent">0.1304</td>
-            <td class="num">15,028</td>
-            <td class="num green">23</td>
+            <td class="num">15,028 ms</td>
+            <td class="num green">23 ms</td>
           </tr>
         </tbody>
       </table>
@@ -849,58 +1091,120 @@
     <div class="metric-row">
       <div class="metric">
         <div class="metric-val navy">6,944 B</div>
-        <div class="metric-label">Proof Size</div>
+        <div class="metric-label">證明大小</div>
       </div>
       <div class="metric">
         <div class="metric-val green">23 ms</div>
-        <div class="metric-label">Avg Verify</div>
+        <div class="metric-label">平均驗證時間</div>
       </div>
       <div class="metric">
         <div class="metric-val">~15.2 s</div>
-        <div class="metric-label">Avg Prove (debug)</div>
+        <div class="metric-label">平均證明時間 (debug)</div>
       </div>
     </div>
 
-    <div class="callout finding">
-      <div class="callout-label">Verification</div>
-      <p>All PD values match expected Merton model outputs. The full proof pipeline &mdash; from private inputs (V, D, &sigma;) through ln and erf evaluation to final PD comparison &mdash; produces correct results for all three test cases.</p>
+    <h4>pp=48 極端精度展示</h4>
+    <div class="config-block">
+      <span class="config-chip">pp = 48</span>
+      <span class="config-chip">d = 14</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>函數</th><th style="text-align:right">Max ULP</th><th style="text-align:right">有效位元</th><th>備註</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>ln(1+x)</td>
+            <td class="num accent">142.5</td>
+            <td class="num">40.8</td>
+            <td style="font-size:.82rem;color:var(--text-light);">所有係數顯著 → 截斷誤差累積</td>
+          </tr>
+          <tr>
+            <td>erf(x)</td>
+            <td class="num green">15.2</td>
+            <td class="num">44.1</td>
+            <td style="font-size:.82rem;color:var(--text-light);">約半數係數近零 → 誤差累積小</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
+    <div class="callout insight">
+      <div class="callout-label">係數條件數效應 &mdash; 本實驗最重要的精度發現</div>
+      <p>ln 和 erf 使用<strong>完全相同的核心</strong>、相同精度、相同次數 &mdash; 但精度差了 <strong>9.4 倍</strong>。原因是 ln(1+x) 的 14 個 Minimax 係數全部有顯著幅度且交替正負，而 erf(x) 作為奇函數，約一半的偶數次係數接近零，等效只有 ~7 個活躍 Horner 步驟。在 ZK 定點數文獻中，這個發現尚無先例。</p>
+    </div>
+
+    <h4>多項式方法 vs 查找表（pp=32 配置）</h4>
+    <div class="compare-grid">
+      <div class="compare-box">
+        <h4 style="color:var(--accent);">查找表方法</h4>
+        <p style="font-size:.88rem;">每種函數需要 2<sup>32</sup> = <strong>43 億行</strong>。兩種函數合計 86 億行，所需 k &ge; 34。</p>
+        <p style="font-size:.88rem;margin-top:.4rem;"><strong>完全不可行。</strong>Halo2 電路的 k 通常在 15&ndash;22 之間。</p>
+      </div>
+      <div class="compare-box">
+        <h4 style="color:#27ae60;">多項式方法</h4>
+        <p style="font-size:.88rem;">ByteTable = <strong>256 行</strong>（不變）。ln 核心 = 12 行 + 48 lookups。erf 核心 = 12 行 + 48 lookups。</p>
+        <p style="font-size:.88rem;margin-top:.4rem;">在高精度場景下，<strong>多項式方法是唯一的選擇</strong>。</p>
+      </div>
+    </div>
+
+    <h4>金融管線中的誤差放大</h4>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>層級</th><th style="text-align:right">ln Max ULP</th><th style="text-align:right">管線後 PD 誤差</th><th>說明</th></tr></thead>
+        <tbody>
+          <tr><td>核心多項式</td><td class="num">10.6</td><td class="num">&mdash;</td><td>多項式本身的截斷誤差</td></tr>
+          <tr><td>d2 計算</td><td class="num">~50 ULP</td><td class="num">&mdash;</td><td>除法放大（低波動率 &sigma;=0.2 放大 ~5&times;）</td></tr>
+          <tr><td>PD 輸出</td><td class="num">&mdash;</td><td class="num accent">2 bp（基點）</td><td>CDF 尾部敏感性：d2 &gt; 2 時微小變化 → PD 大變化</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:.85rem;color:var(--text-light);">核心精度夠好（28.6 有效位元），但管線放大效應是 Merton 模型的固有特性，與 ZK 電路無關。</p>
+
+    <h4>erf 邊界限制（誠實聲明）</h4>
+    <div class="callout">
+      <div class="callout-label">已知限制</div>
+      <p>erf 多項式逼近區間為 [0, 1]。但投資等級公司的 d2 值通常導致 erf 輸入超過 1（例如 d2=2.18 → erf 輸入 1.54）。這意味著投資等級公司（PD &lt; 0.08）的計算依賴多項式外推，精度不受形式化保證。測試案例中的 2 bp 誤差是巧合性的近似。未來工作包括擴展逼近區間到 [0, 3] 或採用分段多項式。</p>
+    </div>
+
+    <div class="callout finding">
+      <div class="callout-label">驗證通過</div>
+      <p>所有 PD 值與預期 Merton 模型輸出吻合。從私密輸入 (V, D, &sigma;) 經過 ln 和 erf 求值到最終 PD 比較的完整證明管線，三個測試案例全部正確。</p>
+    </div>
   </div>
 </section>
 
 <!-- ============================================================ -->
-<!-- SECTION 4: Ablation Studies                                   -->
+<!-- SECTION 4: 消融實驗                                           -->
 <!-- ============================================================ -->
 <section id="s4">
   <div class="section-header">
-    <h2><span class="sec-num">4</span> Ablation Studies &mdash; Why Each Component Matters</h2>
-    <p>Isolating the effect of each design decision</p>
+    <h2><span class="sec-num">4</span> 消融實驗 &mdash; 每個設計決策為什麼重要</h2>
+    <p>逐一隔離各設計決策的效果</p>
   </div>
   <div class="card">
 
     <!-- A1 -->
     <div class="ablation-header">
       <span class="ab-tag">A1</span>
-      <h3>Taylor vs Minimax &mdash; The Critical Comparison</h3>
+      <h3>Taylor vs Minimax &mdash; 關鍵對比</h3>
     </div>
-    <p>This is not a marginal optimization. The data below shows that minimax approximation is a <strong>prerequisite</strong> for high-precision ZK fixed-point transcendentals &mdash; not merely an improvement over Taylor series.</p>
+    <p>這不是邊際優化。以下數據顯示，Minimax 逼近是高精度 ZK 定點超越函數的<strong>必要條件</strong> &mdash; 而非僅僅是對 Taylor 級數的改進。</p>
 
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Config</th>
+            <th>配置</th>
             <th style="text-align:right">Taylor ULP</th>
             <th style="text-align:right">Minimax ULP</th>
-            <th style="text-align:right">Ratio</th>
-            <th style="text-align:right">Taylor Bits</th>
-            <th style="text-align:right">Minimax Bits</th>
+            <th style="text-align:right">改善倍率</th>
+            <th style="text-align:right">Taylor 有效位元</th>
+            <th style="text-align:right">Minimax 有效位元</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>ln&nbsp; pp=32 d=10</td>
+            <td>ln pp=32 d=10</td>
             <td class="data-bar-cell"><span class="bar red" style="width:100%"></span><span class="val" style="color:var(--accent)">204,063,608</span></td>
             <td class="data-bar-cell"><span class="bar green" style="width:0.000001%"></span><span class="val" style="color:#27ae60">10.4</span></td>
             <td class="num accent">19.5M&times;</td>
@@ -908,7 +1212,7 @@
             <td class="num green">28.6</td>
           </tr>
           <tr>
-            <td>ln&nbsp; pp=48 d=14</td>
+            <td>ln pp=48 d=14</td>
             <td class="data-bar-cell"><span class="bar red" style="width:100%"></span><span class="val" style="color:var(--accent)">9,694,560,262,569</span></td>
             <td class="data-bar-cell"><span class="bar green" style="width:0.000001%"></span><span class="val" style="color:#27ae60">142.5</span></td>
             <td class="num accent">68.0B&times;</td>
@@ -936,75 +1240,75 @@
     </div>
 
     <div class="callout">
-      <div class="callout-label">Critical Insight</div>
-      <p>The improvement ratio <strong>grows with precision</strong>. At pp=16, both approaches might look similar. At pp=48, Taylor yields 4.9 effective bits while Minimax delivers 40.8 bits. <strong>Minimax is not an optimization &mdash; it is a prerequisite.</strong></p>
+      <div class="callout-label">關鍵洞察</div>
+      <p>改善倍率<strong>隨精度增長</strong>。在 pp=16 時兩種方法可能看起來差不多。在 pp=48 時，Taylor 的 ln 只有 4.9 個有效位元，而 Minimax 達到 40.8 位元。<strong>Minimax 不是優化 &mdash; 是必要條件。</strong></p>
     </div>
 
     <!-- A2 -->
     <div class="ablation-header">
       <span class="ab-tag">A2</span>
-      <h3>Deferred Truncation Overflow</h3>
+      <h3>延遲截斷溢出</h3>
     </div>
-    <p>Deferred truncation (accumulating the full-precision intermediate and truncating only once at the end) saves constraints but hits a hard wall: BN254's 253-bit field element capacity.</p>
+    <p>延遲截斷（在 Horner 鏈中累積全精度中間值，最後才截斷一次）可以節省約束，但會撞上硬牆：BN254 有限域的 253 位元容量。</p>
 
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Config</th>
-            <th style="text-align:right">Overflow Step</th>
-            <th style="text-align:right">Max Bits Required</th>
-            <th style="text-align:right">BN254 Capacity</th>
-            <th style="text-align:right">Margin</th>
-            <th>Status</th>
+            <th>配置</th>
+            <th style="text-align:right">溢出步驟</th>
+            <th style="text-align:right">最大所需位元</th>
+            <th style="text-align:right">BN254 容量</th>
+            <th style="text-align:right">餘量</th>
+            <th>狀態</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td>pp=24 d=8</td>
-            <td class="num green">Never</td>
+            <td class="num green">不溢出</td>
             <td class="num">212</td>
             <td class="num">253</td>
             <td class="num green">+41 bits</td>
-            <td><span class="status ok">OK</span></td>
+            <td><span class="status ok">安全</span></td>
           </tr>
           <tr>
             <td>pp=32 d=10</td>
-            <td class="num accent">Step 8</td>
+            <td class="num accent">第 8 步</td>
             <td class="num accent">347</td>
             <td class="num">253</td>
             <td class="num accent">&minus;94 bits</td>
-            <td><span class="status overflow">OVERFLOW</span></td>
+            <td><span class="status overflow">溢出</span></td>
           </tr>
           <tr>
             <td>pp=48 d=14</td>
-            <td class="num accent">Step 5</td>
+            <td class="num accent">第 5 步</td>
             <td class="num accent">713</td>
             <td class="num">253</td>
             <td class="num accent">&minus;460 bits</td>
-            <td><span class="status overflow">OVERFLOW</span></td>
+            <td><span class="status overflow">溢出</span></td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <div class="callout finding">
-      <div class="callout-label">Resolution</div>
-      <p>Per-step truncation keeps intermediates bounded: 48 bits (pp=24), 64 bits (pp=32), 96 bits (pp=48) &mdash; always well within BN254's 253-bit capacity. This is the only viable strategy for pp&ge;32.</p>
+      <div class="callout-label">解決方案</div>
+      <p>逐步截斷使中間值保持有界：48 bits（pp=24）、64 bits（pp=32）、96 bits（pp=48） &mdash; 始終在 BN254 的 253 位元容量之內。這是 pp&ge;32 下唯一可行的策略。</p>
     </div>
 
     <!-- A3 -->
     <div class="ablation-header">
       <span class="ab-tag">A3</span>
-      <h3>Precision Scaling</h3>
+      <h3>精度隨 pp 的縮放行為</h3>
     </div>
-    <p>Effective bits scale roughly linearly with precision parameter pp. However, the gap between functions widens at high precision &mdash; this is the conditioning effect studied in A4.</p>
+    <p>有效位元大致隨精度參數 pp 線性增長。但不同函數之間的差距在高精度下急劇擴大 &mdash; 這正是係數條件數效應的體現。</p>
 
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Measure</th>
+            <th>指標</th>
             <th style="text-align:right">pp=16 d=6</th>
             <th style="text-align:right">pp=24 d=8</th>
             <th style="text-align:right">pp=32 d=10</th>
@@ -1013,28 +1317,28 @@
         </thead>
         <tbody>
           <tr>
-            <td>ln &mdash; Max ULP</td>
+            <td>ln Max ULP</td>
             <td class="num">4.3</td>
             <td class="num">6.2</td>
             <td class="num">10.4</td>
             <td class="num accent">142.5</td>
           </tr>
           <tr>
-            <td>ln &mdash; Effective Bits</td>
+            <td>ln 有效位元</td>
             <td class="data-bar-cell"><span class="bar blue" style="width:31%"></span><span class="val">13.9</span></td>
             <td class="data-bar-cell"><span class="bar blue" style="width:49%"></span><span class="val">21.4</span></td>
             <td class="data-bar-cell"><span class="bar blue" style="width:65%"></span><span class="val">28.6</span></td>
             <td class="data-bar-cell"><span class="bar blue" style="width:93%"></span><span class="val">40.8</span></td>
           </tr>
           <tr>
-            <td>erf &mdash; Max ULP</td>
+            <td>erf Max ULP</td>
             <td class="num">4.4</td>
             <td class="num">6.8</td>
             <td class="num green">8.0</td>
             <td class="num green">15.2</td>
           </tr>
           <tr>
-            <td>erf &mdash; Effective Bits</td>
+            <td>erf 有效位元</td>
             <td class="data-bar-cell"><span class="bar green" style="width:31%"></span><span class="val">13.9</span></td>
             <td class="data-bar-cell"><span class="bar green" style="width:48%"></span><span class="val">21.2</span></td>
             <td class="data-bar-cell"><span class="bar green" style="width:66%"></span><span class="val">29.0</span></td>
@@ -1045,34 +1349,34 @@
     </div>
 
     <div class="callout insight">
-      <div class="callout-label">Observation</div>
-      <p>At pp=16, ln and erf have nearly identical precision (13.9 bits each). At pp=48, erf achieves 44.1 bits while ln reaches only 40.8 bits &mdash; a growing gap that reveals function-specific conditioning effects.</p>
+      <div class="callout-label">觀察</div>
+      <p>在 pp=16 時，ln 和 erf 精度幾乎相同（13.9 bits）。在 pp=48 時，erf 達到 44.1 bits 而 ln 只有 40.8 bits &mdash; 差距不斷擴大，揭示了函數特有的條件數效應。</p>
     </div>
 
     <!-- A4 -->
     <div class="ablation-header">
       <span class="ab-tag">A4</span>
-      <h3>Coefficient Conditioning &mdash; Novel Finding</h3>
+      <h3>係數條件數 &mdash; 新發現</h3>
     </div>
-    <p>At identical kernel parameters (pp=48, d=14), the <strong>same circuit</strong> produces dramatically different precision for different functions. The cause is the structure of the minimax coefficients themselves.</p>
+    <p>在完全相同的核心參數下（pp=48, d=14），<strong>同一個電路</strong>對不同函數產生截然不同的精度。原因是 Minimax 係數本身的結構。</p>
 
     <div class="compare-grid">
       <div class="compare-box">
         <h4 style="color:var(--accent);">ln(1+x) &mdash; 142 ULP</h4>
-        <p style="font-size:.88rem;">All 14 coefficients are significant. Alternating signs cause cancellation during fixed-point Horner evaluation, amplifying rounding errors at each step.</p>
+        <p style="font-size:.88rem;">全部 14 個係數都有顯著幅度。交替正負號在定點 Horner 求值中引起消去效應，每步截斷誤差逐步累積。</p>
         <div style="margin-top:.6rem;">
           <div class="metric-row" style="margin:0;">
-            <div class="metric"><div class="metric-val">14</div><div class="metric-label">Active Coefficients</div></div>
+            <div class="metric"><div class="metric-val">14</div><div class="metric-label">活躍係數</div></div>
             <div class="metric"><div class="metric-val accent">142</div><div class="metric-label">Max ULP</div></div>
           </div>
         </div>
       </div>
       <div class="compare-box">
         <h4 style="color:#27ae60;">erf(x) &mdash; 15 ULP</h4>
-        <p style="font-size:.88rem;">Only ~7 coefficients are significant (even-order terms near zero for this odd function). Fewer active terms = fewer rounding steps = less error accumulation.</p>
+        <p style="font-size:.88rem;">只有 ~7 個係數有顯著幅度（偶數次項因奇函數性質接近零）。活躍項少 = 截斷步驟少 = 誤差累積小。</p>
         <div style="margin-top:.6rem;">
           <div class="metric-row" style="margin:0;">
-            <div class="metric"><div class="metric-val green">~7</div><div class="metric-label">Active Coefficients</div></div>
+            <div class="metric"><div class="metric-val green">~7</div><div class="metric-label">活躍係數</div></div>
             <div class="metric"><div class="metric-val green">15</div><div class="metric-label">Max ULP</div></div>
           </div>
         </div>
@@ -1080,71 +1384,71 @@
     </div>
 
     <div class="callout">
-      <div class="callout-label">Precision Gap: 9.4x</div>
-      <p>Same kernel. Same parameters. Same circuit. The only difference is the coefficient vector loaded into the gadget. This <strong>has no precedent in ZK fixed-point literature</strong> and has direct implications for circuit designers choosing which functions to support at which precision targets.</p>
+      <div class="callout-label">精度落差：9.4 倍</div>
+      <p>同一個核心。同一組參數。同一個電路。唯一的差異是載入的係數向量。這個發現在 <strong>ZK 定點數文獻中沒有先例</strong>，對電路設計者選擇在何種精度目標下支援何種函數具有直接的指導意義。</p>
     </div>
 
     <!-- A5 -->
     <div class="ablation-header">
       <span class="ab-tag">A5</span>
-      <h3>Lookup Table Comparison</h3>
+      <h3>查找表方法比較</h3>
     </div>
-    <p>Comparing our polynomial+ByteTable approach against the two main alternatives: direct lookup and segmented lookup tables.</p>
+    <p>將本文的多項式 + ByteTable 方法與兩種主要替代方案進行比較。</p>
 
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Dimension</th>
-            <th>Direct Lookup</th>
-            <th>Segmented Lookup</th>
-            <th style="background:var(--teal);">Ours (Polynomial + ByteTable)</th>
+            <th>維度</th>
+            <th>直接查找表</th>
+            <th>分段查找表</th>
+            <th style="background:var(--teal);">本文（多項式 + ByteTable）</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>Max pp supported</td>
+            <td>支援的最大 pp</td>
             <td class="num">16</td>
             <td class="num">~28</td>
             <td class="num green" style="font-weight:800;">48+</td>
           </tr>
           <tr>
-            <td>Table entries (pp=32)</td>
-            <td class="num"><span class="status impossible">IMPOSSIBLE</span></td>
-            <td class="num">~1,280 / function</td>
-            <td class="num green" style="font-weight:800;">256 (universal)</td>
+            <td>表項數（pp=32）</td>
+            <td class="num"><span class="status impossible">不可行</span></td>
+            <td class="num">~1,280 / 函數</td>
+            <td class="num green" style="font-weight:800;">256（通用）</td>
           </tr>
           <tr>
-            <td>Proof size (pp=32)</td>
+            <td>證明大小（pp=32）</td>
             <td class="num" style="color:var(--text-light);">N/A</td>
             <td class="num">~60 KB</td>
             <td class="num green" style="font-weight:800;">~7 KB</td>
           </tr>
           <tr>
-            <td>Adding new function</td>
-            <td>New huge table</td>
-            <td>New segment table</td>
-            <td style="color:#27ae60;font-weight:600;">New coefficients only</td>
+            <td>新增函數</td>
+            <td>新增一張巨大表</td>
+            <td>新增分段表</td>
+            <td style="color:#27ae60;font-weight:600;">只加一組係數</td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <div class="callout finding">
-      <div class="callout-label">Advantage</div>
-      <p>The universal ByteTable[0..255] is shared across <em>all</em> functions. Direct lookup cannot reach pp=32 (it would require 2<sup>32</sup> = 4 billion entries). Segmented lookup scales better but still needs per-function tables and produces 8&times; larger proofs.</p>
+      <div class="callout-label">優勢</div>
+      <p>通用的 ByteTable[0..255] 被<em>所有</em>函數共享。直接查找表無法達到 pp=32（需要 43 億行）。分段查找表擴展性較好，但仍需逐函數建表，且證明大小為本文方法的 8 倍。</p>
     </div>
 
   </div>
 </section>
 
 <!-- ============================================================ -->
-<!-- SECTION 5: Scenario Comparison                                -->
+<!-- SECTION 5: 場景比較                                           -->
 <!-- ============================================================ -->
 <section id="s5">
   <div class="section-header">
-    <h2><span class="sec-num">5</span> Scenario Comparison</h2>
-    <p>Side-by-side summary of experimental configurations</p>
+    <h2><span class="sec-num">5</span> 場景比較</h2>
+    <p>兩個場景的並排總結</p>
   </div>
   <div class="card">
 
@@ -1152,100 +1456,115 @@
       <table>
         <thead>
           <tr>
-            <th>Metric</th>
+            <th>指標</th>
             <th>
-              <span style="display:inline-block;background:rgba(15,52,96,.3);padding:.15rem .5rem;border-radius:3px;">Scenario A</span><br>
+              <span style="display:inline-block;background:rgba(15,52,96,.3);padding:.15rem .5rem;border-radius:3px;">場景 A</span><br>
               <span style="font-weight:400;font-size:.72rem;">Black-Scholes Delta</span>
             </th>
             <th>
-              <span style="display:inline-block;background:rgba(233,69,96,.3);padding:.15rem .5rem;border-radius:3px;">Scenario C</span><br>
-              <span style="font-weight:400;font-size:.72rem;">Merton CDS Portfolio</span>
+              <span style="display:inline-block;background:rgba(233,69,96,.3);padding:.15rem .5rem;border-radius:3px;">場景 C</span><br>
+              <span style="font-weight:400;font-size:.72rem;">Merton CDS 組合</span>
             </th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>Functions</td>
-            <td>1 (exp)</td>
-            <td>2 (ln + erf)</td>
+            <td>金融應用</td>
+            <td>選擇權 Delta 合規證明</td>
+            <td>信用違約機率合規證明</td>
           </tr>
           <tr>
-            <td>Precision</td>
-            <td class="num">22.4 eff bits</td>
-            <td class="num accent">28.6 &ndash; 44.1 eff bits</td>
+            <td>超越函數</td>
+            <td>3 種（ln + exp + erf）</td>
+            <td>2 種（ln + erf）</td>
           </tr>
           <tr>
-            <td>Proof size</td>
+            <td>精度</td>
+            <td class="num">22.4 有效位元</td>
+            <td class="num accent">28.6 &ndash; 44.1 有效位元</td>
+          </tr>
+          <tr>
+            <td>截斷策略</td>
+            <td>延遲截斷可用</td>
+            <td style="color:var(--accent);font-weight:600;">必須用逐步截斷</td>
+          </tr>
+          <tr>
+            <td>證明大小</td>
             <td class="num">7,488 B</td>
             <td class="num">6,944 B</td>
           </tr>
           <tr>
-            <td>Verify time</td>
+            <td>驗證時間</td>
             <td class="num green">8 ms</td>
             <td class="num green">23 ms</td>
           </tr>
           <tr>
-            <td>Prove time</td>
+            <td>證明時間</td>
             <td class="num">635 ms</td>
             <td class="num">~15,200 ms (debug)</td>
           </tr>
           <tr>
-            <td>Circuit size (k)</td>
+            <td>電路規模 (k)</td>
             <td class="num">13</td>
             <td class="num">15</td>
           </tr>
           <tr>
-            <td style="font-weight:700;">Key finding</td>
-            <td>Framework feasibility confirmed</td>
-            <td style="color:var(--accent);font-weight:600;">Per-step is the only viable path; coefficient conditioning discovered</td>
+            <td style="font-weight:700;">核心發現</td>
+            <td>框架可行性驗證 + 四方法對比</td>
+            <td style="color:var(--accent);font-weight:600;">逐步截斷為唯一路徑；<br>係數條件數效應</td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <div class="callout insight">
-      <div class="callout-label">Proof Size Observation</div>
-      <p>Scenario C uses two functions and higher precision (pp=32 vs pp=24) yet produces a <em>smaller</em> proof than Scenario A (6,944 vs 7,488 bytes). Proof size is dominated by commitment structure (k parameter), not by arithmetic complexity within the circuit.</p>
+      <div class="callout-label">證明大小觀察</div>
+      <p>場景 C 使用兩種函數和更高精度（pp=32 vs pp=24），證明大小反而比場景 A <em>更小</em>（6,944 vs 7,488 bytes）。證明大小主要由 commitment 結構（k 參數）決定，而非電路內部的算術複雜度。</p>
+    </div>
+
+    <div class="callout finding">
+      <div class="callout-label">互補關係</div>
+      <p>場景 A 驗證基線可行性：亞秒級證明、多函數共用核心、四方法量化比較。場景 C 驗證高精度擴展性：揭示場景 A 看不到的現象（延遲截斷溢出、係數條件數、erf 邊界限制、管線誤差放大）。兩個場景合在一起，完整展示了多項式方法從標準到極端精度的全範圍能力。</p>
     </div>
 
   </div>
 </section>
 
 <!-- ============================================================ -->
-<!-- SECTION 6: Known Limitations                                  -->
+<!-- SECTION 6: 已知限制                                           -->
 <!-- ============================================================ -->
 <section id="s6">
   <div class="section-header">
-    <h2><span class="sec-num">6</span> Known Limitations</h2>
-    <p>Honest assessment of current scope boundaries</p>
+    <h2><span class="sec-num">6</span> 已知限制</h2>
+    <p>誠實評估目前的範疇邊界</p>
   </div>
   <div class="card">
 
     <div class="limitation">
       <div class="lim-num">1</div>
       <div>
-        <p><strong>erf domain restriction.</strong> The erf approximation covers [0, 1], which restricts the Merton model to default probabilities above approximately 0.08 (speculative-grade). Investment-grade PDs (below 0.01) would require extending the domain via range reduction or piecewise approximation.</p>
+        <p><strong>erf 定義域限制。</strong>erf 逼近區間為 [0, 1]，限制 Merton 模型只能處理違約機率高於約 0.08 的投機級公司。投資等級（PD &lt; 0.01）需要將定義域擴展到 [0, 3]，可透過範圍歸約或分段多項式實現。</p>
       </div>
     </div>
 
     <div class="limitation">
       <div class="lim-num">2</div>
       <div>
-        <p><strong>pp=48 full circuit not yet built.</strong> The pp=48 d=14 results are kernel-level benchmarks (isolated Horner evaluation). The complete Merton circuit at pp=48 has not been integrated end-to-end. Constraint counts and proving times may differ from kernel extrapolations.</p>
+        <p><strong>pp=48 完整電路尚未建構。</strong>pp=48 d=14 的結果為核心層級基準測試（隔離的 Horner 求值）。完整 Merton 電路的端到端整合尚未完成，約束數量和證明時間可能與核心外推不同。</p>
       </div>
     </div>
 
     <div class="limitation">
       <div class="lim-num">3</div>
       <div>
-        <p><strong>Debug-build proving times.</strong> The ~15 second proving times for Scenario C were measured in Rust debug mode. Release-build benchmarks with compiler optimizations are expected to be significantly faster but have not been formally measured.</p>
+        <p><strong>Debug 模式證明時間。</strong>場景 C 的 ~15 秒證明時間是在 Rust debug 模式下測量的。Release 模式（含編譯器優化）預計顯著更快，但尚未正式測量。</p>
       </div>
     </div>
 
     <div class="limitation">
       <div class="lim-num">4</div>
       <div>
-        <p><strong>Portfolio batching not implemented.</strong> The current implementation proves a single (V, D, &sigma;) tuple per proof. Batching multiple positions into a single proof &mdash; required for real portfolio-level attestation &mdash; is architecturally supported by the kernel design but not yet implemented.</p>
+        <p><strong>投資組合批次處理未實作。</strong>目前實作對單一 (V, D, &sigma;) 元組產生一個證明。將多筆部位批次打包進單一證明 &mdash; 這是真正的組合層級證明所必需的 &mdash; 在核心設計上已支援，但尚未實作。</p>
       </div>
     </div>
 
@@ -1257,12 +1576,12 @@
 <!-- ========== FOOTER ========== -->
 <div class="footer">
   <p>
-    All experiments implemented in <strong>Rust</strong> (halo2 + KZG).
-    Tests: <strong>34/34 pass</strong>.
-    Coefficients generated via <strong>Python mpmath</strong> Remez exchange at 80-digit precision.
+    所有實驗以 <strong>Rust</strong> 實作（halo2 + KZG）。
+    測試：<strong>34/34 全部通過</strong>。
+    係數由 <strong>Python mpmath</strong> Remez 交換算法以 80 位精度生成。
   </p>
   <p style="margin-top:.6rem;font-size:.76rem;color:rgba(255,255,255,.4);">
-    Per-Step Minimax Horner Evaluation in Zero-Knowledge Proofs &mdash; Experimental Showcase
+    逐步截斷 Minimax Horner 求值在零知識證明中的應用 &mdash; 實驗結果展示
   </p>
 </div>
 
