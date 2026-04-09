@@ -1083,6 +1083,7 @@
       <span class="config-chip">pp = 32</span>
       <span class="config-chip">d = 10</span>
       <span class="config-chip">k = 15</span>
+      <span class="config-chip">erf: 3 段分段 [0,3]</span>
     </div>
     <div class="table-wrap">
       <table>
@@ -1195,24 +1196,12 @@
       </div>
     </div>
 
-    <h4>金融管線中的誤差放大</h4>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>層級</th><th style="text-align:right">ln Max ULP</th><th style="text-align:right">管線後 PD 誤差</th><th>說明</th></tr></thead>
-        <tbody>
-          <tr><td>核心多項式</td><td class="num">10.6</td><td class="num">&mdash;</td><td>多項式本身的截斷誤差</td></tr>
-          <tr><td>d2 計算</td><td class="num">~50 ULP</td><td class="num">&mdash;</td><td>除法放大（低波動率 &sigma;=0.2 放大 ~5&times;）</td></tr>
-          <tr><td>PD 輸出</td><td class="num">&mdash;</td><td class="num accent">2 bp（基點）</td><td>CDF 尾部敏感性：d2 &gt; 2 時微小變化 → PD 大變化</td></tr>
-        </tbody>
-      </table>
+    <h4>分段 erf 擴展定義域</h4>
+    <div class="callout finding">
+      <div class="callout-label">解決方案</div>
+      <p>單段 erf 逼近區間為 [0, 1]，只能處理 d2/&radic;2 &lt; 1 的投機級公司。為覆蓋更廣的信用評等光譜，我們實作了 <strong>3 段分段 Minimax 多項式</strong>，將 erf 定義域擴展到 [0, 3]。每段使用獨立的 Minimax 係數組和預計算偏移量 erf(0)、erf(1)、erf(2)，共用同一個 ByteTable。</p>
     </div>
-    <p style="font-size:.85rem;color:var(--text-light);">核心精度夠好（28.6 有效位元），但管線放大效應是 Merton 模型的固有特性，與 ZK 電路無關。</p>
-
-    <h4>erf 邊界限制（誠實聲明）</h4>
-    <div class="callout">
-      <div class="callout-label">已知限制</div>
-      <p>erf 多項式逼近區間為 [0, 1]。但投資等級公司的 d2 值通常導致 erf 輸入超過 1（例如 d2=2.18 → erf 輸入 1.54）。這意味著投資等級公司（PD &lt; 0.08）的計算依賴多項式外推，精度不受形式化保證。測試案例中的 2 bp 誤差是巧合性的近似。未來工作包括擴展逼近區間到 [0, 3] 或採用分段多項式。</p>
-    </div>
+    <p style="font-size:.88rem;color:var(--text-light);">覆蓋範圍：d2/&radic;2 &le; 3 → 涵蓋 CCC 到 BBB（PD &ge; 0.001）。A/AA 評等的 d2/&radic;2 超過 3，需進一步擴展到 [0, 5] 或更多段。</p>
 
     <h4>端到端違約機率精度（完整管線輸出 vs 解析解）</h4>
     <p>以下是 ZK 電路跑完<strong>完整 Merton 管線</strong>後的最終 PD 輸出，與解析解（libm::erf 參考實作）的比較。覆蓋從 CCC（困境）到 AA（高評等）的完整信用評等光譜。</p>
@@ -1306,6 +1295,11 @@
     <div class="callout insight">
       <div class="callout-label">為什麼 CCC&ndash;BBB 能精確匹配而 A/AA 不行</div>
       <p>關鍵分界線是 erf 的分段逼近區間上界。CCC 到 BBB 的 d2/&radic;2 值在 &minus;0.04 到 2.18 之間，完全落在 3 段多項式的覆蓋範圍內，因此 erf 精度充足，最終 PD 自然精確。A 和 AA 的 d2/&radic;2 分別為 3.23 和 5.04，超出逼近區間，erf 退化為外推，輸出飽和在同一值（0.00001105）。這不是精度劣化，而是<strong>定義域不足</strong> &mdash; 擴展到 [0, 5S) 即可覆蓋。</p>
+    </div>
+
+    <div class="callout finding">
+      <div class="callout-label">pp=32 的實用性結論</div>
+      <p>pp=32（28.6 有效位元）在實際信用風險場景中已足夠使用。對於監管最關注的評等區間（CCC&ndash;BBB，涵蓋絕大多數需要監控的高風險部位），ZK 管線的 PD 輸出與解析解<strong>完全一致到 8 位小數</strong>。pp=48 的核心層級測試（40.8&ndash;44.1 有效位元）展示了方法的精度擴展潛力，但對當前應用場景而言 pp=32 已足夠。</p>
     </div>
   </div>
 </section>
@@ -1680,7 +1674,7 @@
     <div class="limitation">
       <div class="lim-num">1</div>
       <div>
-        <p><strong>erf 定義域限制。</strong>erf 逼近區間為 [0, 1]，限制 Merton 模型只能處理違約機率高於約 0.08 的投機級公司。投資等級（PD &lt; 0.01）需要將定義域擴展到 [0, 3]，可透過範圍歸約或分段多項式實現。</p>
+        <p><strong>erf 定義域上界。</strong>目前使用 3 段分段 Minimax 多項式，覆蓋 erf 輸入 [0, 3]（對應 d2/&radic;2 &le; 3）。這足以精確處理 CCC 到 BBB 評等（PD &ge; 0.001，實測零誤差）。但 A/AA 評等（d2/&radic;2 = 3.2&ndash;5.0）超出此範圍，erf 輸出飽和。可透過增加分段數量（例如 5 段覆蓋 [0, 5]）解決。</p>
       </div>
     </div>
 
