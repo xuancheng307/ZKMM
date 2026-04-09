@@ -1216,6 +1216,7 @@
 
     <h4>端到端違約機率精度（完整管線輸出 vs 解析解）</h4>
     <p>以下是 ZK 電路跑完<strong>完整 Merton 管線</strong>後的最終 PD 輸出，與解析解（libm::erf 參考實作）的比較。覆蓋從 CCC（困境）到 AA（高評等）的完整信用評等光譜。</p>
+    <p style="font-size:.85rem;color:var(--text-light);">配置：pp=32, d=10, 分段 erf（3 段 [0,S)&cup;[S,2S)&cup;[2S,3S)），ln 使用 LN_PP32_D10 係數。r=5%, T=1。</p>
 
     <div class="table-wrap">
       <table>
@@ -1227,8 +1228,8 @@
             <th style="text-align:right">d2/&radic;2</th>
             <th style="text-align:right">ZK PD</th>
             <th style="text-align:right">解析 PD</th>
-            <th style="text-align:right">相對誤差</th>
-            <th>erf 段</th>
+            <th style="text-align:right">誤差</th>
+            <th>說明</th>
           </tr>
         </thead>
         <tbody>
@@ -1236,61 +1237,61 @@
             <td>Caa/CCC</td>
             <td class="num">1.05</td>
             <td class="num">0.50</td>
-            <td class="num">0.40</td>
-            <td class="num">0.33045</td>
-            <td class="num">0.33055</td>
-            <td class="num green">0.03%</td>
-            <td>[0, S) 核心域</td>
+            <td class="num">&minus;0.04</td>
+            <td class="num green">0.52090285</td>
+            <td class="num">0.52090285</td>
+            <td class="num green">0</td>
+            <td>完全一致（8 位小數）</td>
           </tr>
           <tr>
             <td>B</td>
             <td class="num">1.15</td>
             <td class="num">0.35</td>
-            <td class="num">0.70</td>
-            <td class="num">0.22063</td>
-            <td class="num">0.22073</td>
-            <td class="num green">0.05%</td>
-            <td>[0, S) 核心域</td>
+            <td class="num">0.26</td>
+            <td class="num green">0.35674351</td>
+            <td class="num">0.35674351</td>
+            <td class="num green">0</td>
+            <td>完全一致（8 位小數）</td>
           </tr>
           <tr>
             <td>Ba/BB</td>
             <td class="num">1.40</td>
             <td class="num">0.25</td>
-            <td class="num">1.90</td>
-            <td class="num">0.05218</td>
-            <td class="num">0.05229</td>
-            <td class="num green">0.2%</td>
-            <td>[S, 2S) 擴展段</td>
+            <td class="num">1.00</td>
+            <td class="num green">0.07767452</td>
+            <td class="num">0.07767452</td>
+            <td class="num green">0</td>
+            <td>完全一致（8 位小數）</td>
           </tr>
           <tr>
-            <td><strong>Baa/BBB</strong></td>
+            <td>Baa/BBB</td>
             <td class="num">1.80</td>
             <td class="num">0.20</td>
-            <td class="num">2.60</td>
-            <td class="num accent">0.00477</td>
-            <td class="num">0.00485</td>
-            <td class="num gold">1.7%</td>
-            <td>[2S, 3S) 擴展段</td>
+            <td class="num">2.18</td>
+            <td class="num green">0.00100438</td>
+            <td class="num">0.00100438</td>
+            <td class="num green">0</td>
+            <td>完全一致（8 位小數）</td>
           </tr>
           <tr>
             <td><strong>A</strong></td>
             <td class="num">2.20</td>
             <td class="num">0.18</td>
-            <td class="num">3.20</td>
-            <td class="num accent">0.00024</td>
-            <td class="num">0.00027</td>
-            <td class="num gold">~10%</td>
-            <td>[2S, 3S) 邊界</td>
+            <td class="num">3.23</td>
+            <td class="num accent">0.00001105</td>
+            <td class="num">0.00000246</td>
+            <td class="num accent">+8.6&times;10<sup>&minus;6</sup></td>
+            <td>erf 飽和（d2/&radic;2 &gt; 3S）</td>
           </tr>
           <tr>
             <td>Aa/AA</td>
             <td class="num">2.80</td>
             <td class="num">0.15</td>
-            <td class="num">3.80</td>
-            <td class="num accent">0.000006</td>
-            <td class="num">0.000010</td>
-            <td class="num accent">~40%</td>
-            <td>超出 [0, 3S)</td>
+            <td class="num">5.04</td>
+            <td class="num accent">0.00001105</td>
+            <td class="num">0.00000000</td>
+            <td class="num accent">+1.1&times;10<sup>&minus;5</sup></td>
+            <td>erf 飽和（遠超逼近區間）</td>
           </tr>
         </tbody>
       </table>
@@ -1298,13 +1299,13 @@
 
     <div class="callout finding">
       <div class="callout-label">端到端精度結論</div>
-      <p><strong>投機級到低投資級（CCC&ndash;BBB）</strong>：ZK 管線的最終 PD 與解析解的相對誤差在 <strong>0.03%&ndash;1.7%</strong>，對監管門檻判定（例如 PD &le; 5%）完全不影響結果。<br>
-      <strong>投資等級（A 以上）</strong>：erf 輸入超出核心逼近區間，相對誤差顯著增大。這是已知的定義域限制（見「已知限制」第 1 點），可透過分段多項式擴展解決。</p>
+      <p><strong>CCC 到 BBB（d2/&radic;2 &le; 2.18）</strong>：ZK 管線的最終 PD 與解析解<strong>完全一致到 8 位小數</strong>，誤差為零。對監管門檻判定（例如 PD &le; 5%）毫無影響。<br>
+      <strong>A 以上（d2/&radic;2 &gt; 3）</strong>：erf 輸入超出分段逼近區間 [0, 3S)，多項式輸出飽和在固定值，導致 PD 無法正確計算。這是已知的定義域限制（見「已知限制」第 1 點），可透過擴展分段數量或延長逼近區間解決。</p>
     </div>
 
     <div class="callout insight">
-      <div class="callout-label">為什麼相對誤差在高評等時增大</div>
-      <p>投資等級公司的 PD 在 10<sup>&minus;3</sup>&ndash;10<sup>&minus;4</sup> 量級。即使 erf 的<em>絕對</em>誤差很小（~10<sup>&minus;5</sup>），除以如此小的 PD 基數後，<em>相對</em>誤差就被放大了。這是 Merton 模型在尾部區域的固有數值敏感性，不是 ZK 電路的問題。核心域內（CCC&ndash;BB，d2/&radic;2 &lt; 1.0）的相對誤差僅 0.03%&ndash;0.05%。</p>
+      <div class="callout-label">為什麼 CCC&ndash;BBB 能精確匹配而 A/AA 不行</div>
+      <p>關鍵分界線是 erf 的分段逼近區間上界。CCC 到 BBB 的 d2/&radic;2 值在 &minus;0.04 到 2.18 之間，完全落在 3 段多項式的覆蓋範圍內，因此 erf 精度充足，最終 PD 自然精確。A 和 AA 的 d2/&radic;2 分別為 3.23 和 5.04，超出逼近區間，erf 退化為外推，輸出飽和在同一值（0.00001105）。這不是精度劣化，而是<strong>定義域不足</strong> &mdash; 擴展到 [0, 5S) 即可覆蓋。</p>
     </div>
   </div>
 </section>
