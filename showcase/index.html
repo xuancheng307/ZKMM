@@ -1,0 +1,1270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Per-Step Minimax Horner Evaluation in Zero-Knowledge Proofs &mdash; Experimental Results</title>
+<style>
+  /* ===== Reset & Base ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:       #1a1a2e;
+    --navy-light: #16213e;
+    --accent:     #e94560;
+    --accent-dim: #c73a52;
+    --gold:       #f5a623;
+    --teal:       #0f3460;
+    --bg:         #f4f4f8;
+    --card:       #ffffff;
+    --text:       #2c2c3a;
+    --text-light: #6b6b80;
+    --border:     #e0e0e8;
+    --mono:       'Consolas', 'SF Mono', 'Fira Code', 'Source Code Pro', monospace;
+    --sans:       'Segoe UI', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+    --radius:     8px;
+    --shadow:     0 2px 12px rgba(26, 26, 46, .08);
+    --shadow-lg:  0 8px 32px rgba(26, 26, 46, .12);
+  }
+
+  html { font-size: 16px; scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ===== Navigation (sticky TOC) ===== */
+  nav.toc {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: var(--navy);
+    border-bottom: 3px solid var(--accent);
+    padding: .55rem 1.5rem;
+    display: flex; flex-wrap: wrap; gap: .4rem 1.2rem;
+    align-items: center;
+    font-size: .78rem;
+    box-shadow: 0 2px 16px rgba(0,0,0,.25);
+  }
+  nav.toc a {
+    color: rgba(255,255,255,.75);
+    text-decoration: none;
+    transition: color .2s;
+    white-space: nowrap;
+  }
+  nav.toc a:hover { color: var(--accent); }
+  nav.toc .nav-brand {
+    color: #fff;
+    font-weight: 700;
+    font-size: .85rem;
+    letter-spacing: .02em;
+    margin-right: .6rem;
+  }
+
+  /* ===== Layout ===== */
+  .container {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+
+  section {
+    margin-bottom: 3rem;
+  }
+
+  /* ===== Hero ===== */
+  .hero {
+    margin-top: 48px; /* nav height */
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 40%, var(--teal) 100%);
+    color: #fff;
+    padding: 4.5rem 2rem 3.5rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 70% 20%, rgba(233,69,96,.12) 0%, transparent 60%),
+                radial-gradient(ellipse at 30% 80%, rgba(15,52,96,.3) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .hero h1 {
+    font-size: 2.3rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    line-height: 1.2;
+    margin-bottom: .6rem;
+    position: relative; z-index: 1;
+  }
+  .hero .subtitle {
+    font-size: 1.15rem;
+    font-weight: 400;
+    color: rgba(255,255,255,.8);
+    margin-bottom: 1.6rem;
+    position: relative; z-index: 1;
+  }
+  .hero .brief {
+    max-width: 740px;
+    margin: 0 auto;
+    font-size: .95rem;
+    color: rgba(255,255,255,.68);
+    line-height: 1.7;
+    position: relative; z-index: 1;
+  }
+  .hero .brief strong { color: var(--accent); font-weight: 600; }
+
+  /* ===== Tag pills ===== */
+  .tag-row {
+    display: flex; flex-wrap: wrap; gap: .45rem;
+    justify-content: center;
+    margin-top: 1.4rem;
+    position: relative; z-index: 1;
+  }
+  .tag {
+    display: inline-block;
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 20px;
+    padding: .25rem .85rem;
+    font-size: .75rem;
+    color: rgba(255,255,255,.8);
+    letter-spacing: .02em;
+  }
+
+  /* ===== Section Headers ===== */
+  .section-header {
+    background: var(--navy);
+    color: #fff;
+    padding: 1.4rem 2rem;
+    border-radius: var(--radius) var(--radius) 0 0;
+    margin-top: 2.5rem;
+    position: relative;
+  }
+  .section-header::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 5px;
+    background: var(--accent);
+    border-radius: var(--radius) 0 0 var(--radius);
+  }
+  .section-header h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -.01em;
+  }
+  .section-header .sec-num {
+    color: var(--accent);
+    font-weight: 800;
+    margin-right: .4rem;
+  }
+  .section-header p {
+    margin-top: .35rem;
+    font-size: .88rem;
+    color: rgba(255,255,255,.6);
+  }
+
+  /* ===== Cards ===== */
+  .card {
+    background: var(--card);
+    border-radius: 0 0 var(--radius) var(--radius);
+    padding: 2rem 2rem 2.2rem;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    border-top: none;
+  }
+  .card + .card {
+    border-radius: var(--radius);
+    margin-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+  .card h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: .8rem;
+    color: var(--navy);
+  }
+  .card h4 {
+    font-size: .95rem;
+    font-weight: 700;
+    margin: 1.4rem 0 .6rem;
+    color: var(--teal);
+  }
+  .card p, .card li {
+    font-size: .92rem;
+    line-height: 1.7;
+  }
+  .card ul, .card ol {
+    padding-left: 1.4rem;
+    margin-bottom: .8rem;
+  }
+  .card li { margin-bottom: .35rem; }
+
+  /* ===== Callout boxes ===== */
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: linear-gradient(90deg, rgba(233,69,96,.04) 0%, transparent 100%);
+    padding: 1rem 1.3rem;
+    margin: 1.2rem 0;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .callout.insight {
+    border-left-color: var(--gold);
+    background: linear-gradient(90deg, rgba(245,166,35,.06) 0%, transparent 100%);
+  }
+  .callout.finding {
+    border-left-color: #27ae60;
+    background: linear-gradient(90deg, rgba(39,174,96,.04) 0%, transparent 100%);
+  }
+  .callout .callout-label {
+    font-weight: 700;
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: .3rem;
+  }
+  .callout.insight .callout-label { color: var(--gold); }
+  .callout .callout-label { color: var(--accent); }
+  .callout.finding .callout-label { color: #27ae60; }
+  .callout p { font-size: .9rem; margin: 0; }
+
+  /* ===== Contribution list ===== */
+  .contrib-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin: 1.2rem 0;
+  }
+  .contrib-item {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    padding: 1rem 1.2rem;
+    background: var(--bg);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    transition: box-shadow .2s;
+  }
+  .contrib-item:hover { box-shadow: var(--shadow); }
+  .contrib-num {
+    flex-shrink: 0;
+    width: 32px; height: 32px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800;
+    font-size: .85rem;
+  }
+  .contrib-body strong {
+    display: block;
+    font-size: .92rem;
+    margin-bottom: .2rem;
+    color: var(--navy);
+  }
+  .contrib-body span {
+    font-size: .85rem;
+    color: var(--text-light);
+    line-height: 1.55;
+  }
+
+  /* ===== NOT / IS boxes ===== */
+  .not-is {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem;
+    margin: 1rem 0 1.5rem;
+  }
+  .not-box, .is-box {
+    padding: 1.1rem 1.3rem;
+    border-radius: var(--radius);
+    font-size: .9rem;
+    line-height: 1.6;
+  }
+  .not-box {
+    background: rgba(233,69,96,.06);
+    border: 1px solid rgba(233,69,96,.2);
+  }
+  .not-box .box-label { color: var(--accent); font-weight: 700; margin-bottom: .3rem; }
+  .is-box {
+    background: rgba(39,174,96,.06);
+    border: 1px solid rgba(39,174,96,.2);
+  }
+  .is-box .box-label { color: #27ae60; font-weight: 700; margin-bottom: .3rem; }
+
+  /* ===== Tables ===== */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 1rem 0;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .85rem;
+  }
+  thead {
+    background: var(--navy);
+    color: #fff;
+  }
+  thead th {
+    padding: .7rem .9rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: .8rem;
+    letter-spacing: .03em;
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: .6rem .9rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  tbody tr:nth-child(even) { background: rgba(244,244,248,.6); }
+  tbody tr:hover { background: rgba(233,69,96,.04); }
+
+  /* Numeric cells */
+  .num {
+    font-family: var(--mono);
+    font-size: .83rem;
+    font-weight: 600;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .num.accent { color: var(--accent); font-weight: 800; }
+  .num.green { color: #27ae60; }
+  .num.gold { color: #c48a1a; }
+
+  /* ===== Data Bars (inline bar chart in table cells) ===== */
+  .data-bar-cell {
+    position: relative;
+    min-width: 140px;
+  }
+  .data-bar-cell .bar {
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    height: 22px;
+    border-radius: 3px;
+    opacity: .18;
+    transition: opacity .2s;
+  }
+  tbody tr:hover .data-bar-cell .bar { opacity: .28; }
+  .data-bar-cell .bar.red { background: var(--accent); }
+  .data-bar-cell .bar.green { background: #27ae60; }
+  .data-bar-cell .bar.blue { background: var(--teal); }
+  .data-bar-cell .val {
+    position: relative;
+    z-index: 1;
+    font-family: var(--mono);
+    font-size: .82rem;
+    font-weight: 700;
+  }
+
+  /* ===== Scenario badge ===== */
+  .scenario-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .35rem 1rem;
+    border-radius: 20px;
+    font-size: .82rem;
+    font-weight: 700;
+    margin-bottom: .8rem;
+  }
+  .scenario-badge.a { background: rgba(15,52,96,.1); color: var(--teal); }
+  .scenario-badge.c { background: rgba(233,69,96,.1); color: var(--accent); }
+
+  /* ===== Config block ===== */
+  .config-block {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin: .6rem 0 1rem;
+  }
+  .config-chip {
+    font-family: var(--mono);
+    font-size: .78rem;
+    padding: .3rem .7rem;
+    background: var(--navy);
+    color: #fff;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  /* ===== Metric cards (small KPI boxes) ===== */
+  .metric-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: .8rem;
+    margin: 1rem 0;
+  }
+  .metric {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: .8rem 1rem;
+    text-align: center;
+    transition: box-shadow .2s, transform .15s;
+  }
+  .metric:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+  .metric .metric-val {
+    font-family: var(--mono);
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1.1;
+  }
+  .metric .metric-val.green { color: #27ae60; }
+  .metric .metric-val.navy { color: var(--navy); }
+  .metric .metric-label {
+    font-size: .72rem;
+    color: var(--text-light);
+    margin-top: .2rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+
+  /* ===== Ablation sub-headers ===== */
+  .ablation-header {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    margin: 1.8rem 0 .8rem;
+    padding-bottom: .5rem;
+    border-bottom: 2px solid var(--border);
+  }
+  .ablation-header .ab-tag {
+    flex-shrink: 0;
+    background: var(--navy);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: .75rem;
+    font-weight: 700;
+    padding: .25rem .6rem;
+    border-radius: 4px;
+  }
+  .ablation-header h3 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+
+  /* ===== Comparison layout ===== */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem;
+    margin: 1rem 0;
+  }
+  .compare-box {
+    padding: 1.2rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--card);
+  }
+  .compare-box h4 {
+    margin: 0 0 .6rem;
+    font-size: .9rem;
+  }
+
+  /* ===== Limitation items ===== */
+  .limitation {
+    display: flex;
+    gap: .8rem;
+    align-items: flex-start;
+    padding: .8rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .limitation:last-child { border-bottom: none; }
+  .limitation .lim-num {
+    flex-shrink: 0;
+    width: 26px; height: 26px;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    font-size: .75rem;
+    color: var(--text-light);
+  }
+  .limitation p { margin: 0; font-size: .9rem; }
+
+  /* ===== Footer ===== */
+  .footer {
+    background: var(--navy);
+    color: rgba(255,255,255,.6);
+    padding: 2rem 2rem;
+    text-align: center;
+    font-size: .82rem;
+    line-height: 1.7;
+    margin-top: 3rem;
+  }
+  .footer strong { color: rgba(255,255,255,.85); }
+
+  /* ===== Status chips ===== */
+  .status { font-size: .75rem; font-weight: 700; padding: .2rem .55rem; border-radius: 4px; }
+  .status.ok { background: rgba(39,174,96,.12); color: #27ae60; }
+  .status.overflow { background: rgba(233,69,96,.12); color: var(--accent); }
+  .status.impossible { background: rgba(233,69,96,.12); color: var(--accent); }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 720px) {
+    .hero { padding: 3rem 1rem 2.5rem; }
+    .hero h1 { font-size: 1.6rem; }
+    .not-is, .compare-grid { grid-template-columns: 1fr; }
+    .card { padding: 1.2rem; }
+    .section-header { padding: 1rem 1.2rem; }
+    nav.toc { padding: .4rem .8rem; font-size: .7rem; }
+    .metric-row { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  }
+
+  /* ===== Print ===== */
+  @media print {
+    nav.toc { display: none; }
+    .hero { margin-top: 0; }
+    body { background: #fff; }
+    .card, .section-header { box-shadow: none; break-inside: avoid; }
+  }
+
+  /* ===== Smooth highlight on anchor jump ===== */
+  :target .section-header {
+    box-shadow: 0 0 0 3px var(--accent);
+    transition: box-shadow .3s;
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== NAVIGATION ========== -->
+<nav class="toc">
+  <a href="../index.html" style="opacity:.6;font-size:.85rem;">&larr; Home</a>
+  <a href="#hero" class="nav-brand">Minimax-ZK</a>
+  <a href="#s1">Contributions</a>
+  <a href="#s2">Scenario A</a>
+  <a href="#s3">Scenario C</a>
+  <a href="#s4">Ablation Studies</a>
+  <a href="#s5">Comparison</a>
+  <a href="#s6">Limitations</a>
+</nav>
+
+<!-- ========== HERO ========== -->
+<div class="hero" id="hero">
+  <h1>Per-Step Minimax Horner Evaluation<br>in Zero-Knowledge Proofs</h1>
+  <p class="subtitle">Experimental Results &amp; Contribution Overview</p>
+  <p class="brief">
+    A methodology for evaluating transcendental functions
+    (<strong>exp</strong>, <strong>ln</strong>, <strong>erf</strong>, <strong>sin</strong>, ...)
+    inside ZK circuits with up to <strong>44 effective bits</strong> of precision
+    and <strong>sub-10 KB</strong> proofs.
+  </p>
+  <div class="tag-row">
+    <span class="tag">halo2 + KZG</span>
+    <span class="tag">Minimax (Remez)</span>
+    <span class="tag">Fixed-Point Arithmetic</span>
+    <span class="tag">Black-Scholes</span>
+    <span class="tag">Merton Structural Model</span>
+    <span class="tag">13 Transcendental Functions</span>
+    <span class="tag">637 Configurations</span>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============================================================ -->
+<!-- SECTION 1: What This Work Is (And Isn't)                     -->
+<!-- ============================================================ -->
+<section id="s1">
+  <div class="section-header">
+    <h2><span class="sec-num">1</span> What This Work Is (And Isn't)</h2>
+    <p>Framing the contribution precisely</p>
+  </div>
+  <div class="card">
+
+    <div class="not-is">
+      <div class="not-box">
+        <div class="box-label">NOT the contribution</div>
+        <p>"We found better polynomial coefficients using Remez."</p>
+        <p style="margin-top:.4rem;font-size:.84rem;color:var(--text-light);">
+          Remez is a tool &mdash; the same way halo2 is a tool.
+          The Remez exchange algorithm has been known since 1934.
+        </p>
+      </div>
+      <div class="is-box">
+        <div class="box-label">IS the contribution</div>
+        <p>A <strong>complete methodology</strong> for high-precision transcendental function evaluation inside zero-knowledge circuits &mdash; spanning circuit design, numerical analysis, and end-to-end financial model proofs.</p>
+      </div>
+    </div>
+
+    <div class="contrib-grid">
+      <div class="contrib-item">
+        <div class="contrib-num">1</div>
+        <div class="contrib-body">
+          <strong>Universal Horner Kernel</strong>
+          <span>A parameterizable halo2 circuit gadget (3 custom gates, universal <code>ByteTable[0..255]</code>) that evaluates <em>any</em> polynomial. Switching functions = swapping <em>d</em> coefficients &mdash; no circuit redesign required.</span>
+        </div>
+      </div>
+      <div class="contrib-item">
+        <div class="contrib-num">2</div>
+        <div class="contrib-body">
+          <strong>Truncation Strategy Analysis</strong>
+          <span>First identification that <em>deferred</em> truncation overflows BN254 at pp&ge;32, making <em>per-step</em> truncation the only viable path for high-precision ZK arithmetic.</span>
+        </div>
+      </div>
+      <div class="contrib-item">
+        <div class="contrib-num">3</div>
+        <div class="contrib-body">
+          <strong>Design Space Map</strong>
+          <span>637 (pp,&nbsp;d) configurations across 13 functions &mdash; including the "quantization saturation" boundary where increasing polynomial degree <em>hurts</em> precision rather than helping.</span>
+        </div>
+      </div>
+      <div class="contrib-item">
+        <div class="contrib-num">4</div>
+        <div class="contrib-body">
+          <strong>Coefficient Conditioning Discovery</strong>
+          <span>First finding that function structure (coefficient pattern) creates a <strong>10&times; precision gap</strong> at identical kernel parameters. No precedent in ZK fixed-point literature.</span>
+        </div>
+      </div>
+      <div class="contrib-item">
+        <div class="contrib-num">5</div>
+        <div class="contrib-body">
+          <strong>End-to-End Financial Model Proofs</strong>
+          <span>From abstract methodology to working KZG proofs for Black-Scholes option pricing and Merton structural model default probability.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 2: Scenario A — Baseline (Black-Scholes Delta)       -->
+<!-- ============================================================ -->
+<section id="s2">
+  <div class="section-header">
+    <h2><span class="sec-num">2</span> Scenario A &mdash; Baseline (Black-Scholes Delta)</h2>
+    <p>Prove option Delta without revealing volatility</p>
+  </div>
+  <div class="card">
+
+    <span class="scenario-badge a">SCENARIO A</span>
+
+    <h3>Application</h3>
+    <p>A market maker publishes a ZK proof that their quoted Delta is correctly computed from the Black-Scholes formula, without revealing the implied volatility parameter used. The verifier can confirm computational integrity in milliseconds.</p>
+
+    <h4>Configuration</h4>
+    <div class="config-block">
+      <span class="config-chip">pp = 24</span>
+      <span class="config-chip">d = 8</span>
+      <span class="config-chip">f(x) = exp(x)</span>
+      <span class="config-chip">k = 13</span>
+    </div>
+
+    <h4>Core Results</h4>
+    <div class="metric-row">
+      <div class="metric">
+        <div class="metric-val">22.4</div>
+        <div class="metric-label">Effective Bits</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val green">14</div>
+        <div class="metric-label">Max ULP</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val navy">7,488 B</div>
+        <div class="metric-label">Proof Size</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val green">8 ms</div>
+        <div class="metric-label">Verify Time</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val navy">635 ms</div>
+        <div class="metric-label">Prove Time</div>
+      </div>
+    </div>
+
+    <div class="callout insight">
+      <div class="callout-label">Key Result</div>
+      <p>Sub-second proving, single-digit millisecond verification, and a proof that fits in a single TCP packet. The framework demonstrates practical feasibility for real-time financial applications.</p>
+    </div>
+
+    <h4>13-Function Grid at pp=16, d&le;7</h4>
+    <p>All 13 transcendental functions achieve <strong>ULP = 1</strong> (maximum 1 unit-in-the-last-place error) at the baseline configuration, confirming universal kernel correctness across function families.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Function</th>
+            <th style="text-align:right">Max ULP</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>exp(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
+          <tr><td>ln(1+x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
+          <tr><td>erf(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
+          <tr><td>sin(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
+          <tr><td>cos(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
+          <tr><td>tan(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
+          <tr><td>arctan(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
+          <tr><td>arcsin(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
+          <tr><td>sigmoid(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
+          <tr><td>tanh(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
+          <tr><td>softplus(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
+          <tr><td>GELU(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
+          <tr><td>&Phi;(x) (CDF)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 3: Scenario C — High Precision (Merton CDS)          -->
+<!-- ============================================================ -->
+<section id="s3">
+  <div class="section-header">
+    <h2><span class="sec-num">3</span> Scenario C &mdash; High Precision (Merton CDS Portfolio)</h2>
+    <p>Prove portfolio default probability below regulatory threshold without revealing positions</p>
+  </div>
+  <div class="card">
+
+    <span class="scenario-badge c">SCENARIO C</span>
+
+    <h3>Application</h3>
+    <p>A financial institution proves that its portfolio-level probability of default (PD) is below a regulatory threshold using the Merton structural model, without disclosing the asset composition or individual position sizes. Portfolio composition is proprietary intellectual property.</p>
+
+    <h4>Why High Precision?</h4>
+    <div class="callout">
+      <div class="callout-label">Precision Requirement</div>
+      <p>Investment-grade default probabilities are in the range 0.001&ndash;0.01. At these magnitudes, even small arithmetic errors can flip a pass/fail regulatory decision. The methodology must deliver enough effective bits to keep the error well below the decision boundary.</p>
+    </div>
+
+    <h4>Functions Required</h4>
+    <p><code>ln(1+x)</code> + <code>erf(x)</code> via Merton structural model: PD = &Phi;(&minus;d<sub>2</sub>), where d<sub>2</sub> depends on ln(V/D) and the cumulative normal is computed via erf.</p>
+
+    <h4>Results at pp=32</h4>
+    <div class="config-block">
+      <span class="config-chip">pp = 32</span>
+      <span class="config-chip">d = 10</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Function</th>
+            <th style="text-align:right">Max ULP</th>
+            <th style="text-align:right">Effective Bits</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ln(1+x)</td>
+            <td class="num accent">10.4</td>
+            <td class="num">28.6</td>
+          </tr>
+          <tr>
+            <td>erf(x)</td>
+            <td class="num green">8.0</td>
+            <td class="num">29.0</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>Results at pp=48 (Extreme Precision)</h4>
+    <div class="config-block">
+      <span class="config-chip">pp = 48</span>
+      <span class="config-chip">d = 14</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Function</th>
+            <th style="text-align:right">Max ULP</th>
+            <th style="text-align:right">Effective Bits</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ln(1+x)</td>
+            <td class="num accent">142.5</td>
+            <td class="num">40.8</td>
+          </tr>
+          <tr>
+            <td>erf(x)</td>
+            <td class="num green">15.2</td>
+            <td class="num">44.1</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>KZG Proof Benchmarks (pp=32, k=15)</h4>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Test Case</th>
+            <th style="text-align:right">V/D</th>
+            <th style="text-align:right">&sigma;</th>
+            <th style="text-align:right">PD</th>
+            <th style="text-align:right">Prove (ms)</th>
+            <th style="text-align:right">Verify (ms)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Speculative</td>
+            <td class="num">1.20</td>
+            <td class="num">0.30</td>
+            <td class="num accent">0.2662</td>
+            <td class="num">15,134</td>
+            <td class="num green">21</td>
+          </tr>
+          <tr>
+            <td>Distressed</td>
+            <td class="num">1.10</td>
+            <td class="num">0.40</td>
+            <td class="num accent">0.4352</td>
+            <td class="num">15,490</td>
+            <td class="num green">26</td>
+          </tr>
+          <tr>
+            <td>Borderline</td>
+            <td class="num">1.30</td>
+            <td class="num">0.25</td>
+            <td class="num accent">0.1304</td>
+            <td class="num">15,028</td>
+            <td class="num green">23</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="metric-row">
+      <div class="metric">
+        <div class="metric-val navy">6,944 B</div>
+        <div class="metric-label">Proof Size</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val green">23 ms</div>
+        <div class="metric-label">Avg Verify</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val">~15.2 s</div>
+        <div class="metric-label">Avg Prove (debug)</div>
+      </div>
+    </div>
+
+    <div class="callout finding">
+      <div class="callout-label">Verification</div>
+      <p>All PD values match expected Merton model outputs. The full proof pipeline &mdash; from private inputs (V, D, &sigma;) through ln and erf evaluation to final PD comparison &mdash; produces correct results for all three test cases.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 4: Ablation Studies                                   -->
+<!-- ============================================================ -->
+<section id="s4">
+  <div class="section-header">
+    <h2><span class="sec-num">4</span> Ablation Studies &mdash; Why Each Component Matters</h2>
+    <p>Isolating the effect of each design decision</p>
+  </div>
+  <div class="card">
+
+    <!-- A1 -->
+    <div class="ablation-header">
+      <span class="ab-tag">A1</span>
+      <h3>Taylor vs Minimax &mdash; The Critical Comparison</h3>
+    </div>
+    <p>This is not a marginal optimization. The data below shows that minimax approximation is a <strong>prerequisite</strong> for high-precision ZK fixed-point transcendentals &mdash; not merely an improvement over Taylor series.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Config</th>
+            <th style="text-align:right">Taylor ULP</th>
+            <th style="text-align:right">Minimax ULP</th>
+            <th style="text-align:right">Ratio</th>
+            <th style="text-align:right">Taylor Bits</th>
+            <th style="text-align:right">Minimax Bits</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ln&nbsp; pp=32 d=10</td>
+            <td class="data-bar-cell"><span class="bar red" style="width:100%"></span><span class="val" style="color:var(--accent)">204,063,608</span></td>
+            <td class="data-bar-cell"><span class="bar green" style="width:0.000001%"></span><span class="val" style="color:#27ae60">10.4</span></td>
+            <td class="num accent">19.5M&times;</td>
+            <td class="num">4.4</td>
+            <td class="num green">28.6</td>
+          </tr>
+          <tr>
+            <td>ln&nbsp; pp=48 d=14</td>
+            <td class="data-bar-cell"><span class="bar red" style="width:100%"></span><span class="val" style="color:var(--accent)">9,694,560,262,569</span></td>
+            <td class="data-bar-cell"><span class="bar green" style="width:0.000001%"></span><span class="val" style="color:#27ae60">142.5</span></td>
+            <td class="num accent">68.0B&times;</td>
+            <td class="num">4.9</td>
+            <td class="num green">40.8</td>
+          </tr>
+          <tr>
+            <td>erf pp=32 d=10</td>
+            <td class="data-bar-cell"><span class="bar red" style="width:33%"></span><span class="val" style="color:var(--accent)">3,211,380</span></td>
+            <td class="data-bar-cell"><span class="bar green" style="width:0.0001%"></span><span class="val" style="color:#27ae60">8.0</span></td>
+            <td class="num accent">402K&times;</td>
+            <td class="num">10.4</td>
+            <td class="num green">29.0</td>
+          </tr>
+          <tr>
+            <td>erf pp=48 d=14</td>
+            <td class="data-bar-cell"><span class="bar red" style="width:60%"></span><span class="val" style="color:var(--accent)">3,780,048,854</span></td>
+            <td class="data-bar-cell"><span class="bar green" style="width:0.0001%"></span><span class="val" style="color:#27ae60">15.2</span></td>
+            <td class="num accent">248M&times;</td>
+            <td class="num">16.2</td>
+            <td class="num green">44.1</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <div class="callout-label">Critical Insight</div>
+      <p>The improvement ratio <strong>grows with precision</strong>. At pp=16, both approaches might look similar. At pp=48, Taylor yields 4.9 effective bits while Minimax delivers 40.8 bits. <strong>Minimax is not an optimization &mdash; it is a prerequisite.</strong></p>
+    </div>
+
+    <!-- A2 -->
+    <div class="ablation-header">
+      <span class="ab-tag">A2</span>
+      <h3>Deferred Truncation Overflow</h3>
+    </div>
+    <p>Deferred truncation (accumulating the full-precision intermediate and truncating only once at the end) saves constraints but hits a hard wall: BN254's 253-bit field element capacity.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Config</th>
+            <th style="text-align:right">Overflow Step</th>
+            <th style="text-align:right">Max Bits Required</th>
+            <th style="text-align:right">BN254 Capacity</th>
+            <th style="text-align:right">Margin</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>pp=24 d=8</td>
+            <td class="num green">Never</td>
+            <td class="num">212</td>
+            <td class="num">253</td>
+            <td class="num green">+41 bits</td>
+            <td><span class="status ok">OK</span></td>
+          </tr>
+          <tr>
+            <td>pp=32 d=10</td>
+            <td class="num accent">Step 8</td>
+            <td class="num accent">347</td>
+            <td class="num">253</td>
+            <td class="num accent">&minus;94 bits</td>
+            <td><span class="status overflow">OVERFLOW</span></td>
+          </tr>
+          <tr>
+            <td>pp=48 d=14</td>
+            <td class="num accent">Step 5</td>
+            <td class="num accent">713</td>
+            <td class="num">253</td>
+            <td class="num accent">&minus;460 bits</td>
+            <td><span class="status overflow">OVERFLOW</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout finding">
+      <div class="callout-label">Resolution</div>
+      <p>Per-step truncation keeps intermediates bounded: 48 bits (pp=24), 64 bits (pp=32), 96 bits (pp=48) &mdash; always well within BN254's 253-bit capacity. This is the only viable strategy for pp&ge;32.</p>
+    </div>
+
+    <!-- A3 -->
+    <div class="ablation-header">
+      <span class="ab-tag">A3</span>
+      <h3>Precision Scaling</h3>
+    </div>
+    <p>Effective bits scale roughly linearly with precision parameter pp. However, the gap between functions widens at high precision &mdash; this is the conditioning effect studied in A4.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Measure</th>
+            <th style="text-align:right">pp=16 d=6</th>
+            <th style="text-align:right">pp=24 d=8</th>
+            <th style="text-align:right">pp=32 d=10</th>
+            <th style="text-align:right">pp=48 d=14</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ln &mdash; Max ULP</td>
+            <td class="num">4.3</td>
+            <td class="num">6.2</td>
+            <td class="num">10.4</td>
+            <td class="num accent">142.5</td>
+          </tr>
+          <tr>
+            <td>ln &mdash; Effective Bits</td>
+            <td class="data-bar-cell"><span class="bar blue" style="width:31%"></span><span class="val">13.9</span></td>
+            <td class="data-bar-cell"><span class="bar blue" style="width:49%"></span><span class="val">21.4</span></td>
+            <td class="data-bar-cell"><span class="bar blue" style="width:65%"></span><span class="val">28.6</span></td>
+            <td class="data-bar-cell"><span class="bar blue" style="width:93%"></span><span class="val">40.8</span></td>
+          </tr>
+          <tr>
+            <td>erf &mdash; Max ULP</td>
+            <td class="num">4.4</td>
+            <td class="num">6.8</td>
+            <td class="num green">8.0</td>
+            <td class="num green">15.2</td>
+          </tr>
+          <tr>
+            <td>erf &mdash; Effective Bits</td>
+            <td class="data-bar-cell"><span class="bar green" style="width:31%"></span><span class="val">13.9</span></td>
+            <td class="data-bar-cell"><span class="bar green" style="width:48%"></span><span class="val">21.2</span></td>
+            <td class="data-bar-cell"><span class="bar green" style="width:66%"></span><span class="val">29.0</span></td>
+            <td class="data-bar-cell"><span class="bar green" style="width:100%"></span><span class="val">44.1</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout insight">
+      <div class="callout-label">Observation</div>
+      <p>At pp=16, ln and erf have nearly identical precision (13.9 bits each). At pp=48, erf achieves 44.1 bits while ln reaches only 40.8 bits &mdash; a growing gap that reveals function-specific conditioning effects.</p>
+    </div>
+
+    <!-- A4 -->
+    <div class="ablation-header">
+      <span class="ab-tag">A4</span>
+      <h3>Coefficient Conditioning &mdash; Novel Finding</h3>
+    </div>
+    <p>At identical kernel parameters (pp=48, d=14), the <strong>same circuit</strong> produces dramatically different precision for different functions. The cause is the structure of the minimax coefficients themselves.</p>
+
+    <div class="compare-grid">
+      <div class="compare-box">
+        <h4 style="color:var(--accent);">ln(1+x) &mdash; 142 ULP</h4>
+        <p style="font-size:.88rem;">All 14 coefficients are significant. Alternating signs cause cancellation during fixed-point Horner evaluation, amplifying rounding errors at each step.</p>
+        <div style="margin-top:.6rem;">
+          <div class="metric-row" style="margin:0;">
+            <div class="metric"><div class="metric-val">14</div><div class="metric-label">Active Coefficients</div></div>
+            <div class="metric"><div class="metric-val accent">142</div><div class="metric-label">Max ULP</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="compare-box">
+        <h4 style="color:#27ae60;">erf(x) &mdash; 15 ULP</h4>
+        <p style="font-size:.88rem;">Only ~7 coefficients are significant (even-order terms near zero for this odd function). Fewer active terms = fewer rounding steps = less error accumulation.</p>
+        <div style="margin-top:.6rem;">
+          <div class="metric-row" style="margin:0;">
+            <div class="metric"><div class="metric-val green">~7</div><div class="metric-label">Active Coefficients</div></div>
+            <div class="metric"><div class="metric-val green">15</div><div class="metric-label">Max ULP</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <div class="callout-label">Precision Gap: 9.4x</div>
+      <p>Same kernel. Same parameters. Same circuit. The only difference is the coefficient vector loaded into the gadget. This <strong>has no precedent in ZK fixed-point literature</strong> and has direct implications for circuit designers choosing which functions to support at which precision targets.</p>
+    </div>
+
+    <!-- A5 -->
+    <div class="ablation-header">
+      <span class="ab-tag">A5</span>
+      <h3>Lookup Table Comparison</h3>
+    </div>
+    <p>Comparing our polynomial+ByteTable approach against the two main alternatives: direct lookup and segmented lookup tables.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Dimension</th>
+            <th>Direct Lookup</th>
+            <th>Segmented Lookup</th>
+            <th style="background:var(--teal);">Ours (Polynomial + ByteTable)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Max pp supported</td>
+            <td class="num">16</td>
+            <td class="num">~28</td>
+            <td class="num green" style="font-weight:800;">48+</td>
+          </tr>
+          <tr>
+            <td>Table entries (pp=32)</td>
+            <td class="num"><span class="status impossible">IMPOSSIBLE</span></td>
+            <td class="num">~1,280 / function</td>
+            <td class="num green" style="font-weight:800;">256 (universal)</td>
+          </tr>
+          <tr>
+            <td>Proof size (pp=32)</td>
+            <td class="num" style="color:var(--text-light);">N/A</td>
+            <td class="num">~60 KB</td>
+            <td class="num green" style="font-weight:800;">~7 KB</td>
+          </tr>
+          <tr>
+            <td>Adding new function</td>
+            <td>New huge table</td>
+            <td>New segment table</td>
+            <td style="color:#27ae60;font-weight:600;">New coefficients only</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout finding">
+      <div class="callout-label">Advantage</div>
+      <p>The universal ByteTable[0..255] is shared across <em>all</em> functions. Direct lookup cannot reach pp=32 (it would require 2<sup>32</sup> = 4 billion entries). Segmented lookup scales better but still needs per-function tables and produces 8&times; larger proofs.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 5: Scenario Comparison                                -->
+<!-- ============================================================ -->
+<section id="s5">
+  <div class="section-header">
+    <h2><span class="sec-num">5</span> Scenario Comparison</h2>
+    <p>Side-by-side summary of experimental configurations</p>
+  </div>
+  <div class="card">
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>
+              <span style="display:inline-block;background:rgba(15,52,96,.3);padding:.15rem .5rem;border-radius:3px;">Scenario A</span><br>
+              <span style="font-weight:400;font-size:.72rem;">Black-Scholes Delta</span>
+            </th>
+            <th>
+              <span style="display:inline-block;background:rgba(233,69,96,.3);padding:.15rem .5rem;border-radius:3px;">Scenario C</span><br>
+              <span style="font-weight:400;font-size:.72rem;">Merton CDS Portfolio</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Functions</td>
+            <td>1 (exp)</td>
+            <td>2 (ln + erf)</td>
+          </tr>
+          <tr>
+            <td>Precision</td>
+            <td class="num">22.4 eff bits</td>
+            <td class="num accent">28.6 &ndash; 44.1 eff bits</td>
+          </tr>
+          <tr>
+            <td>Proof size</td>
+            <td class="num">7,488 B</td>
+            <td class="num">6,944 B</td>
+          </tr>
+          <tr>
+            <td>Verify time</td>
+            <td class="num green">8 ms</td>
+            <td class="num green">23 ms</td>
+          </tr>
+          <tr>
+            <td>Prove time</td>
+            <td class="num">635 ms</td>
+            <td class="num">~15,200 ms (debug)</td>
+          </tr>
+          <tr>
+            <td>Circuit size (k)</td>
+            <td class="num">13</td>
+            <td class="num">15</td>
+          </tr>
+          <tr>
+            <td style="font-weight:700;">Key finding</td>
+            <td>Framework feasibility confirmed</td>
+            <td style="color:var(--accent);font-weight:600;">Per-step is the only viable path; coefficient conditioning discovered</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout insight">
+      <div class="callout-label">Proof Size Observation</div>
+      <p>Scenario C uses two functions and higher precision (pp=32 vs pp=24) yet produces a <em>smaller</em> proof than Scenario A (6,944 vs 7,488 bytes). Proof size is dominated by commitment structure (k parameter), not by arithmetic complexity within the circuit.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 6: Known Limitations                                  -->
+<!-- ============================================================ -->
+<section id="s6">
+  <div class="section-header">
+    <h2><span class="sec-num">6</span> Known Limitations</h2>
+    <p>Honest assessment of current scope boundaries</p>
+  </div>
+  <div class="card">
+
+    <div class="limitation">
+      <div class="lim-num">1</div>
+      <div>
+        <p><strong>erf domain restriction.</strong> The erf approximation covers [0, 1], which restricts the Merton model to default probabilities above approximately 0.08 (speculative-grade). Investment-grade PDs (below 0.01) would require extending the domain via range reduction or piecewise approximation.</p>
+      </div>
+    </div>
+
+    <div class="limitation">
+      <div class="lim-num">2</div>
+      <div>
+        <p><strong>pp=48 full circuit not yet built.</strong> The pp=48 d=14 results are kernel-level benchmarks (isolated Horner evaluation). The complete Merton circuit at pp=48 has not been integrated end-to-end. Constraint counts and proving times may differ from kernel extrapolations.</p>
+      </div>
+    </div>
+
+    <div class="limitation">
+      <div class="lim-num">3</div>
+      <div>
+        <p><strong>Debug-build proving times.</strong> The ~15 second proving times for Scenario C were measured in Rust debug mode. Release-build benchmarks with compiler optimizations are expected to be significantly faster but have not been formally measured.</p>
+      </div>
+    </div>
+
+    <div class="limitation">
+      <div class="lim-num">4</div>
+      <div>
+        <p><strong>Portfolio batching not implemented.</strong> The current implementation proves a single (V, D, &sigma;) tuple per proof. Batching multiple positions into a single proof &mdash; required for real portfolio-level attestation &mdash; is architecturally supported by the kernel design but not yet implemented.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</div><!-- /.container -->
+
+<!-- ========== FOOTER ========== -->
+<div class="footer">
+  <p>
+    All experiments implemented in <strong>Rust</strong> (halo2 + KZG).
+    Tests: <strong>34/34 pass</strong>.
+    Coefficients generated via <strong>Python mpmath</strong> Remez exchange at 80-digit precision.
+  </p>
+  <p style="margin-top:.6rem;font-size:.76rem;color:rgba(255,255,255,.4);">
+    Per-Step Minimax Horner Evaluation in Zero-Knowledge Proofs &mdash; Experimental Showcase
+  </p>
+</div>
+
+</body>
+</html>

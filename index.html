@@ -215,6 +215,13 @@
     .entry-card.accent-blue .card-en { color: var(--blue); }
     .entry-card.accent-blue .card-arrow { color: var(--blue); }
 
+    .entry-card.accent-purple:hover {
+      border-color: #a78bfa;
+      box-shadow: 0 8px 32px rgba(167, 139, 250, 0.12);
+    }
+    .entry-card.accent-purple .card-en { color: #a78bfa; }
+    .entry-card.accent-purple .card-arrow { color: #a78bfa; }
+
     /* ---- Tag chips ---- */
     .tags {
       display: flex;
@@ -364,6 +371,26 @@
         <div class="card-arrow">進入手冊 &rarr;</div>
       </a>
 
+    </div>
+
+    <!-- Experimental Showcase -->
+    <div class="section-title">實驗成果</div>
+    <div class="cards two-col">
+      <a href="showcase/index.html" class="entry-card accent-purple">
+        <div class="card-icon">&#x1F4CA;</div>
+        <h2>Experimental Showcase</h2>
+        <div class="card-en">實驗結果展示</div>
+        <div class="card-desc">
+          Scenario A (Black-Scholes Delta) 與 Scenario C (Merton CDS Portfolio) 的完整實驗數據：精度、證明大小、效能基準，以及六項消融實驗。
+        </div>
+        <div class="tags">
+          <span class="tag">KZG Proofs</span>
+          <span class="tag">Ablation</span>
+          <span class="tag">Benchmarks</span>
+          <span class="tag">2 Scenarios</span>
+        </div>
+        <div class="card-arrow">查看結果 &rarr;</div>
+      </a>
     </div>
 
     <!-- Report Sub-pages -->
