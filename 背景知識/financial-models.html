@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ch 16: 金融模型背景 — ZK Handbook</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+
+  <aside class="sidebar">
+  </aside>
+  <script src="components/sidebar-loader.js"></script>
+
+  <main class="main-content">
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+      <h1>16. 金融模型背景</h1>
+      <p class="page-subtitle">
+        本論文的兩個應用情境分別使用 Black-Scholes 與 Merton 結構性模型。
+        本章介紹這些模型的數學基礎、所需的超越函數，以及它們為何需要零知識證明。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DEFINITIONS                                                   -->
+    <!-- ============================================================ -->
+    <div class="definitions-section">
+      <h2>核心定義</h2>
+
+      <div class="def-item">
+        <div class="def-term">Geometric Brownian Motion (GBM) <span class="zh">幾何布朗運動</span></div>
+        <div class="def-body">
+          描述資產價格隨機演化的連續時間隨機過程：
+          $dS_t = \mu S_t \, dt + \sigma S_t \, dW_t$，
+          其中 $\mu$ 為漂移率、$\sigma$ 為波動率、$W_t$ 為 Wiener 過程。
+          Black-Scholes 與 Merton 模型都假設標的資產服從 GBM。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Option <span class="zh">選擇權</span></div>
+        <div class="def-body">
+          一種衍生性金融商品，賦予持有者在到期日以約定價格（履約價 $K$）買入（Call）或賣出（Put）標的資產的<strong>權利</strong>（非義務）。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Delta ($\Delta$) <span class="zh">Delta 值</span></div>
+        <div class="def-body">
+          選擇權價格對標的資產價格的一階偏微分：$\Delta = \partial C / \partial S$。
+          衡量標的價格變動 1 元時，選擇權價格變動多少。Call 的 $\Delta \in [0, 1]$，Put 的 $\Delta \in [-1, 0]$。
+          投資組合的總 $\Delta$ 接近 0 表示「Delta 中性」——已做好對沖。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Credit Default Swap (CDS) <span class="zh">信用違約交換</span></div>
+        <div class="def-body">
+          一種信用衍生商品。買方定期支付保費（spread），若參考實體（reference entity）發生信用事件（違約），
+          賣方賠償買方的損失。功能上等同於「公司債的保險」。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Probability of Default (PD) <span class="zh">違約機率</span></div>
+        <div class="def-body">
+          在特定時間範圍內，債務人無法履行債務的機率。
+          投資等級（investment grade）公司的年化 PD 通常 &lt; 2%，投機等級（speculative grade）&gt; 4%。
+          PD 的微小差異（2 個基點）可能影響合規判定。
+        </div>
+      </div>
+
+      <div class="def-item">
+        <div class="def-term">Normal CDF $\Phi(x)$ <span class="zh">標準常態累積分布函數</span></div>
+        <div class="def-body">
+          $\Phi(x) = \frac{1}{2}\bigl[1 + \text{erf}(x / \sqrt{2})\bigr]$，
+          其中 $\text{erf}(z) = \frac{2}{\sqrt{\pi}} \int_0^z e^{-t^2} dt$。
+          Black-Scholes 與 Merton 的公式都透過 $\Phi$ 將 $d_1, d_2$ 轉換為機率。
+          在 ZK 電路中，$\Phi$ 的計算歸結為 erf 函數的多項式逼近。
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BLACK-SCHOLES MODEL                                           -->
+    <!-- ============================================================ -->
+    <h2 id="black-scholes">Black-Scholes 選擇權定價模型</h2>
+
+    <h3>模型假設</h3>
+    <p>Black-Scholes (1973) 假設：</p>
+    <ul>
+      <li>標的資產價格服從幾何布朗運動（GBM）</li>
+      <li>無風險利率 $r$ 為常數</li>
+      <li>波動率 $\sigma$ 為常數</li>
+      <li>無交易成本、無套利機會</li>
+      <li>歐式選擇權（只在到期日行使）</li>
+    </ul>
+
+    <h3>定價公式</h3>
+    <p>歐式 Call 的價格：</p>
+    $$C = S \, e^{-qT} \, \Phi(d_1) - K \, e^{-rT} \, \Phi(d_2)$$
+
+    <p>其中：</p>
+    $$d_1 = \frac{\ln(S/K) + (r - q + \sigma^2/2) \, T}{\sigma \sqrt{T}}, \quad d_2 = d_1 - \sigma \sqrt{T}$$
+
+    <table>
+      <thead>
+        <tr><th>符號</th><th>意義</th><th>典型值</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>$S$</td><td>標的資產現價</td><td>100</td></tr>
+        <tr><td>$K$</td><td>履約價（strike price）</td><td>95 &ndash; 105</td></tr>
+        <tr><td>$T$</td><td>到期時間（年）</td><td>0.25 &ndash; 2</td></tr>
+        <tr><td>$r$</td><td>無風險利率</td><td>0.02 &ndash; 0.05</td></tr>
+        <tr><td>$q$</td><td>股息殖利率</td><td>0 &ndash; 0.03</td></tr>
+        <tr><td>$\sigma$</td><td>波動率</td><td>0.15 &ndash; 0.60</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Delta：對沖的核心</h3>
+    <p>對定價公式求 $\partial / \partial S$：</p>
+
+    $$\Delta_{\text{call}} = e^{-qT} \, \Phi(d_1), \quad \Delta_{\text{put}} = e^{-qT} \bigl[\Phi(d_1) - 1\bigr]$$
+
+    <div class="callout note">
+      <div class="callout-title">直觀理解</div>
+      <p>
+        Delta 是選擇權價格對股價的「敏感度」。$\Delta = 0.6$ 表示股價漲 1 元，選擇權漲約 0.6 元。
+        <strong>Delta 中性</strong>（$|\Delta_{\text{total}}| \approx 0$）是機構對沖的基本要求——
+        組合價值不隨市場方向變動。
+      </p>
+    </div>
+
+    <h3>計算 Delta 需要的超越函數</h3>
+    <table>
+      <thead>
+        <tr><th>計算步驟</th><th>超越函數</th><th>電路中的處理</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>$\ln(S/K)$</td>
+          <td>自然對數 $\ln$</td>
+          <td>Minimax 多項式逼近 + Horner 求值</td>
+        </tr>
+        <tr>
+          <td>$\Phi(d_1) = \frac{1 + \text{erf}(d_1/\sqrt{2})}{2}$</td>
+          <td>誤差函數 $\text{erf}$</td>
+          <td>Minimax 多項式逼近 + Horner 求值</td>
+        </tr>
+        <tr>
+          <td>$e^{-qT}$（股息折現因子）</td>
+          <td>指數函數 $\exp$</td>
+          <td>Minimax 多項式逼近 + Horner 求值</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      這三個超越函數（$\ln, \text{erf}, \exp$）正是本論文 ZK 電路必須處理的核心——
+      它們無法在有限域上精確計算，必須透過多項式逼近來實現。
+    </p>
+
+    <!-- ============================================================ -->
+    <!-- MERTON STRUCTURAL MODEL                                       -->
+    <!-- ============================================================ -->
+    <h2 id="merton">Merton 結構性信用模型</h2>
+
+    <h3>核心思想：股權即 Call Option</h3>
+
+    <p>
+      Merton (1974) 的關鍵洞察：將公司的<strong>股權</strong>視為一個以<strong>公司資產</strong>為標的、
+      以<strong>負債面值</strong>為履約價的 Call Option。
+    </p>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h4>到期時 $V_T > D$（資產 &gt; 負債）</h4>
+        <ul>
+          <li>公司有剩餘價值 $V_T - D$</li>
+          <li>股東拿走剩餘 &rarr; 股權有價值</li>
+          <li>等同 Call Option 在價內 (ITM)</li>
+          <li><strong>不違約</strong></li>
+        </ul>
+      </div>
+      <div class="comparison-card">
+        <h4>到期時 $V_T < D$（資產 &lt; 負債）</h4>
+        <ul>
+          <li>公司資不抵債</li>
+          <li>股東的有限責任 &rarr; 股權歸零</li>
+          <li>等同 Call Option 在價外 (OTM)</li>
+          <li><strong>違約</strong></li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>違約機率公式</h3>
+
+    <p>假設公司資產價值也服從 GBM：$dV_t = \mu V_t \, dt + \sigma_V V_t \, dW_t$</p>
+
+    <p>在風險中立測度下，違約機率（Probability of Default）為：</p>
+
+    $$PD = \Phi(-d_2) = \frac{1 - \text{erf}\bigl(d_2 / \sqrt{2}\bigr)}{2}$$
+
+    <p>其中：</p>
+
+    $$d_2 = \frac{\ln(V/D) + (r - \sigma_V^2 / 2) \, T}{\sigma_V \sqrt{T}}$$
+
+    <table>
+      <thead>
+        <tr><th>符號</th><th>意義</th><th>典型值</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>$V$</td><td>公司資產市值</td><td>不可直接觀察</td></tr>
+        <tr><td>$D$</td><td>負債面值（違約門檻）</td><td>短期負債 + 0.5 $\times$ 長期負債</td></tr>
+        <tr><td>$\sigma_V$</td><td>資產波動率</td><td>0.10 &ndash; 0.50</td></tr>
+        <tr><td>$r$</td><td>無風險利率</td><td>0.02 &ndash; 0.05</td></tr>
+        <tr><td>$T$</td><td>評估期限</td><td>通常 1 年</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">與 Black-Scholes 的數學同構</div>
+      <p>
+        比較兩者的公式結構：
+      </p>
+      <table>
+        <thead><tr><th></th><th>Black-Scholes Delta</th><th>Merton PD</th></tr></thead>
+        <tbody>
+          <tr><td>計算目標</td><td>$\Phi(d_1)$</td><td>$\Phi(-d_2)$</td></tr>
+          <tr><td>ln 的自變量</td><td>$\ln(S/K)$</td><td>$\ln(V/D)$</td></tr>
+          <tr><td>漂移項</td><td>$(r - q + \sigma^2/2) T$</td><td>$(r - \sigma_V^2/2) T$</td></tr>
+          <tr><td>除數</td><td>$\sigma \sqrt{T}$</td><td>$\sigma_V \sqrt{T}$</td></tr>
+        </tbody>
+      </table>
+      <p>
+        兩者在數學結構上幾乎一致——都需要 $\ln$ 和 $\text{erf}$，差別只在語義（選擇權 Delta vs 違約機率）
+        和精度需求。
+      </p>
+    </div>
+
+    <h3>計算 PD 需要的超越函數</h3>
+    <table>
+      <thead>
+        <tr><th>計算步驟</th><th>超越函數</th><th>備註</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>$\ln(V/D)$</td>
+          <td>自然對數 $\ln$</td>
+          <td>對精度要求最高——V/D 接近 1 時 ln 接近 0，微小誤差被放大</td>
+        </tr>
+        <tr>
+          <td>$\Phi(-d_2) = \frac{1 - \text{erf}(d_2/\sqrt{2})}{2}$</td>
+          <td>誤差函數 $\text{erf}$</td>
+          <td>投資等級公司 $d_2 > 1$，erf 輸入可能超出 [0, 1] 逼近區間</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      與 Black-Scholes 的不同之處：Merton 不需要 $\exp$（沒有股息折現因子），
+      但對 $\ln$ 和 $\text{erf}$ 的精度要求更高——因為投資等級公司的 PD 差異在千分之幾，
+      2 個基點（0.02%）的誤差就可能翻轉合規判定。
+    </p>
+
+    <!-- ============================================================ -->
+    <!-- CDS MARKET                                                    -->
+    <!-- ============================================================ -->
+    <h2 id="cds">信用違約交換（CDS）</h2>
+
+    <h3>基本結構</h3>
+
+    <p>CDS 涉及三方：</p>
+
+    <pre style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:1.25rem; font-size:0.95rem; line-height:1.8; overflow-x:auto;">
+  Protection Buyer               Protection Seller
+  （信用保護買方）                  （信用保護賣方）
+        |                               |
+        |  ----  定期保費（spread）--->  |
+        |  <--- 違約時賠償損失 ----      |
+        |                               |
+        +--- 標的：Reference Entity（參考實體，如某公司） ---+
+    </pre>
+
+    <ul>
+      <li><strong>買方</strong>：持有公司債或暴露於信用風險的機構，希望轉移風險</li>
+      <li><strong>賣方</strong>：收取保費，承擔信用事件發生時的賠償責任</li>
+      <li><strong>保費（spread）</strong>：以基點（bps）計價，例如 100 bps = 每年支付名目本金的 1%</li>
+      <li><strong>信用事件</strong>：包含破產、未能付款、債務重組等</li>
+    </ul>
+
+    <h3>CDS Spread 與違約機率的關係</h3>
+
+    <p>簡化近似：</p>
+    $$\text{CDS spread} \approx PD \times LGD$$
+
+    <p>其中 $LGD$（Loss Given Default）為違約損失率，通常假設 60%。</p>
+
+    <p>
+      因此 CDS spread 直接反映市場對違約機率的定價。Merton 模型計算出的 PD 可以與 CDS 市場報價對比，
+      也可以用於內部風險管理。
+    </p>
+
+    <h3>CDS 組合的信用風險</h3>
+    <p>
+      持有多個 CDS（賣方部位）的機構，其加權違約機率為：
+    </p>
+
+    $$\text{Weighted PD} = \sum_{i=1}^{N} w_i \cdot PD_i, \quad \sum_{i=1}^{N} w_i = 1$$
+
+    <p>
+      監管要求此值不超過門檻值。這就是情境 C 的 ZK statement：
+      在不揭露每間公司的 $V_i, D_i, \sigma_i$ 的前提下，證明組合的加權 PD 合規。
+    </p>
+
+    <!-- ============================================================ -->
+    <!-- WHY ZK                                                        -->
+    <!-- ============================================================ -->
+    <h2 id="why-zk">為什麼需要零知識證明？</h2>
+
+    <p>
+      金融模型的輸入參數（持倉明細、隱含波動率、公司資產價值）是機構的核心機密。
+      現行的合規流程要求機構向監管單位<strong>完全揭露</strong>這些數據，產生了根本性的矛盾：
+    </p>
+
+    <table>
+      <thead>
+        <tr><th>矛盾</th><th>傳統做法</th><th>ZK 做法</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>監管需要驗證合規</td>
+          <td>機構提交完整持倉數據</td>
+          <td>機構提交 ZK proof（~7 KB）</td>
+        </tr>
+        <tr>
+          <td>機構需要保護商業機密</td>
+          <td>被迫揭露策略細節</td>
+          <td>監管只看到 proof 是否驗過</td>
+        </tr>
+        <tr>
+          <td>驗證需要信任計算正確性</td>
+          <td>依賴審計、抽查</td>
+          <td>數學保證（soundness）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout theorem">
+      <div class="callout-title">兩個情境的 ZK Statement 對比</div>
+      <table>
+        <thead>
+          <tr><th></th><th>情境 A：Black-Scholes</th><th>情境 C：Merton</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>陳述</strong></td>
+            <td>「我的選擇權組合 Delta 中性」</td>
+            <td>「我的 CDS 組合違約機率夠低」</td>
+          </tr>
+          <tr>
+            <td><strong>公開</strong></td>
+            <td>Merkle root, 門檻 $\epsilon$</td>
+            <td>$r$, $T$, 門檻 $\tau$</td>
+          </tr>
+          <tr>
+            <td><strong>私密</strong></td>
+            <td>$S, K_i, \sigma_i, w_i, T_i, q_i$</td>
+            <td>$V_i, D_i, \sigma_i, w_i$</td>
+          </tr>
+          <tr>
+            <td><strong>關係</strong></td>
+            <td>$|\sum w_i \cdot \Delta_i| \leq \epsilon$</td>
+            <td>$\sum w_i \cdot PD_i \leq \tau$, $\sum w_i = 1$</td>
+          </tr>
+          <tr>
+            <td><strong>函數</strong></td>
+            <td>$\ln, \text{erf}, \exp$</td>
+            <td>$\ln, \text{erf}$</td>
+          </tr>
+          <tr>
+            <td><strong>精度</strong></td>
+            <td>pp=24 (22 bits)</td>
+            <td>pp=32+ (28+ bits)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- PRECISION REQUIREMENTS                                        -->
+    <!-- ============================================================ -->
+    <h2 id="precision">精度需求差異</h2>
+
+    <p>兩個情境對計算精度的要求不同，這直接影響了 ZK 電路的設計：</p>
+
+    <h3>情境 A 為何 pp=24 足夠</h3>
+    <p>
+      Black-Scholes Delta 的值域是 $[0, 1]$（call）或 $[-1, 0]$（put），合規門檻通常設在 $|\Delta_{\text{total}}| \leq 0.05$。
+      即使計算有 $10^{-5}$ 量級的誤差（約 22 bits 精度），距離 0.05 的判定邊界仍有足夠的安全餘裕。
+    </p>
+
+    <h3>情境 C 為何需要 pp=32+</h3>
+    <p>
+      投資等級公司的 PD 通常在 0.1%&ndash;2% 之間。以一個由 BBB 等級公司組成的 CDS 組合為例：
+    </p>
+    <ul>
+      <li>加權 PD 可能在 1.5% 附近</li>
+      <li>門檻設在 2%</li>
+      <li>餘裕僅 0.5%（50 個基點）</li>
+      <li>若 ln 或 erf 的計算誤差導致 PD 偏移 0.5% 以上，就會翻轉合規判定</li>
+    </ul>
+    <p>
+      因此需要至少 28 bits 的有效精度（pp=32 提供 28.1&ndash;29.0 bits），
+      才能確保計算誤差不會影響合規結論。
+    </p>
+
+    <div class="callout warning">
+      <div class="callout-title">erf 域限制</div>
+      <p>
+        目前的 erf 多項式逼近區間為 $[0, 1]$，對應 $\Phi$ 的有效覆蓋範圍至 $\Phi(x)$ 中 $x \leq \sqrt{2}$，
+        即 PD $\geq$ 7.9%。<strong>投資等級公司</strong>（PD &lt; 2%）的 erf 輸入超出此區間，
+        需要額外的域擴展技術（如分段逼近或漸近展開）。這是目前已知的主要技術限制。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SUMMARY TABLE                                                 -->
+    <!-- ============================================================ -->
+    <h2>超越函數需求總覽</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>函數</th>
+          <th>來源</th>
+          <th>情境 A</th>
+          <th>情境 C</th>
+          <th>電路中的角色</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>$\ln(x)$</td>
+          <td>$\ln(S/K)$ 或 $\ln(V/D)$</td>
+          <td>需要</td>
+          <td>需要</td>
+          <td>計算 $d_1$ 或 $d_2$ 的第一步</td>
+        </tr>
+        <tr>
+          <td>$\text{erf}(x)$</td>
+          <td>$\Phi(d_1)$ 或 $\Phi(-d_2)$</td>
+          <td>需要</td>
+          <td>需要</td>
+          <td>將 $d$ 值轉換為機率</td>
+        </tr>
+        <tr>
+          <td>$\exp(x)$</td>
+          <td>$e^{-qT}$ 股息折現因子</td>
+          <td>需要</td>
+          <td>不需要</td>
+          <td>折現因子（僅 B-S）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      這三個函數是本論文 ZK 電路方法的核心驅動力。
+      第 13 章（<a href="approximation-theory.html">多項式逼近理論</a>）說明如何用 Remez 演算法找到最佳逼近，
+      第 14 章（<a href="horner-evaluation.html">Horner 求值與延遲截斷</a>）說明如何在電路中高效求值。
+    </p>
+
+    <!-- PAGE NAV -->
+    <div class="page-nav">
+      <a href="design-choices.html">
+        <span class="nav-label">上一章</span>
+        <span class="nav-title">&larr; 15. 設計選擇總覽</span>
+      </a>
+      <a href="index.html">
+        <span class="nav-label">回到首頁</span>
+        <span class="nav-title">手冊首頁 &rarr;</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

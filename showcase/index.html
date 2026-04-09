@@ -601,7 +601,7 @@
   <p class="brief">
     一套在 ZK 電路中求值超越函數（<strong>exp</strong>、<strong>ln</strong>、<strong>erf</strong>、<strong>sin</strong>、...）的完整方法論。
     在金融級應用場景中實現最高 <strong>44 個有效位元</strong>的精度，
-    證明大小僅 <strong>7 KB 以下</strong>，驗證時間為毫秒級。
+    證明大小僅 <strong>7–15 KB</strong>，驗證時間為毫秒級。
   </p>
   <div class="tag-row">
     <span class="tag">halo2 + KZG</span>
@@ -1083,7 +1083,7 @@
       <span class="config-chip">pp = 32</span>
       <span class="config-chip">d = 10</span>
       <span class="config-chip">k = 15</span>
-      <span class="config-chip">erf: 3 段分段 [0,3]</span>
+      <span class="config-chip">erf: 5 段分段 [0,5]</span>
     </div>
     <div class="table-wrap">
       <table>
@@ -1095,7 +1095,7 @@
       </table>
     </div>
 
-    <h4>KZG 證明基準測試（pp=32, 三種測試案例）</h4>
+    <h4>KZG 證明基準測試（pp=32, 5 段 erf，覆蓋全光譜）</h4>
     <div class="table-wrap">
       <table>
         <thead>
@@ -1104,6 +1104,7 @@
             <th style="text-align:right">V/D</th>
             <th style="text-align:right">&sigma;</th>
             <th style="text-align:right">PD 輸出</th>
+            <th style="text-align:right">erf 段</th>
             <th style="text-align:right">證明時間</th>
             <th style="text-align:right">驗證時間</th>
           </tr>
@@ -1113,25 +1114,46 @@
             <td>投機級（Speculative）</td>
             <td class="num">1.20</td>
             <td class="num">0.30</td>
-            <td class="num accent">0.2662</td>
-            <td class="num">15,134 ms</td>
-            <td class="num green">21 ms</td>
+            <td class="num accent">0.266181</td>
+            <td class="num">0</td>
+            <td class="num">30,004 ms</td>
+            <td class="num green">33 ms</td>
           </tr>
           <tr>
-            <td>困境（Distressed）</td>
-            <td class="num">1.10</td>
-            <td class="num">0.40</td>
-            <td class="num accent">0.4352</td>
-            <td class="num">15,490 ms</td>
-            <td class="num green">26 ms</td>
+            <td>中等投資級（Moderate-IG）</td>
+            <td class="num">1.50</td>
+            <td class="num">0.20</td>
+            <td class="num accent">0.014728</td>
+            <td class="num">1</td>
+            <td class="num">29,747 ms</td>
+            <td class="num green">32 ms</td>
           </tr>
           <tr>
-            <td>邊緣（Borderline）</td>
-            <td class="num">1.30</td>
-            <td class="num">0.25</td>
-            <td class="num accent">0.1304</td>
-            <td class="num">15,028 ms</td>
-            <td class="num green">23 ms</td>
+            <td>投資級（Investment-grade）</td>
+            <td class="num">2.00</td>
+            <td class="num">0.20</td>
+            <td class="num green">0.000150</td>
+            <td class="num">2</td>
+            <td class="num">29,876 ms</td>
+            <td class="num green">32 ms</td>
+          </tr>
+          <tr>
+            <td>A 級</td>
+            <td class="num">2.20</td>
+            <td class="num">0.18</td>
+            <td class="num green">0.000002</td>
+            <td class="num">3</td>
+            <td class="num">29,726 ms</td>
+            <td class="num green">35 ms</td>
+          </tr>
+          <tr>
+            <td>AA 級</td>
+            <td class="num">2.80</td>
+            <td class="num">0.15</td>
+            <td class="num green">0.000000</td>
+            <td class="num">4</td>
+            <td class="num">29,367 ms</td>
+            <td class="num green">31 ms</td>
           </tr>
         </tbody>
       </table>
@@ -1139,15 +1161,15 @@
 
     <div class="metric-row">
       <div class="metric">
-        <div class="metric-val navy">6,944 B</div>
+        <div class="metric-val navy">15,360 B</div>
         <div class="metric-label">證明大小</div>
       </div>
       <div class="metric">
-        <div class="metric-val green">23 ms</div>
+        <div class="metric-val green">33 ms</div>
         <div class="metric-label">平均驗證時間</div>
       </div>
       <div class="metric">
-        <div class="metric-val">~15.2 s</div>
+        <div class="metric-val">~29.7 s</div>
         <div class="metric-label">平均證明時間 (debug)</div>
       </div>
     </div>
@@ -1199,13 +1221,13 @@
     <h4>分段 erf 擴展定義域</h4>
     <div class="callout finding">
       <div class="callout-label">解決方案</div>
-      <p>單段 erf 逼近區間為 [0, 1]，只能處理 d2/&radic;2 &lt; 1 的投機級公司。為覆蓋更廣的信用評等光譜，我們實作了 <strong>3 段分段 Minimax 多項式</strong>，將 erf 定義域擴展到 [0, 3]。每段使用獨立的 Minimax 係數組和預計算偏移量 erf(0)、erf(1)、erf(2)，共用同一個 ByteTable。</p>
+      <p>單段 erf 逼近區間為 [0, 1]，只能處理 d2/&radic;2 &lt; 1 的投機級公司。為覆蓋完整信用評等光譜（CCC 到 AAA），我們實作了 <strong>5 段分段 Minimax 多項式</strong>，將 erf 定義域擴展到 [0, 5]。每段使用獨立的 Minimax 係數組和預計算偏移量 erf(0)&ndash;erf(4)，共用同一個 ByteTable。電路使用 5 列 &times; 4 行的 seg_mux 閘實現分段選取。</p>
     </div>
-    <p style="font-size:.88rem;color:var(--text-light);">覆蓋範圍：d2/&radic;2 &le; 3 → 涵蓋 CCC 到 BBB（PD &ge; 0.001）。A/AA 評等的 d2/&radic;2 超過 3，需進一步擴展到 [0, 5] 或更多段。</p>
+    <p style="font-size:.88rem;color:var(--text-light);">覆蓋範圍：d2/&radic;2 &le; 5 → 涵蓋 CCC 到 AAA 全光譜。第 5 段 [4,5] 信號僅 ~66 ULPs（SNR 12.7x），但該區間 PD 在 pp=32 精度下本質為 0，不影響結果正確性。</p>
 
     <h4>端到端違約機率精度（完整管線輸出 vs 解析解）</h4>
-    <p>以下是 ZK 電路跑完<strong>完整 Merton 管線</strong>後的最終 PD 輸出，與解析解（libm::erf 參考實作）的比較。覆蓋從 CCC（困境）到 AA（高評等）的完整信用評等光譜。</p>
-    <p style="font-size:.85rem;color:var(--text-light);">配置：pp=32, d=10, 分段 erf（3 段 [0,S)&cup;[S,2S)&cup;[2S,3S)），ln 使用 LN_PP32_D10 係數。r=5%, T=1。</p>
+    <p>以下是 ZK 電路跑完<strong>完整 Merton 管線</strong>後的最終 PD 輸出，與解析解（libm::erf 參考實作）的比較。覆蓋從 CCC（困境）到 AAA（最高評等）的完整信用評等光譜。</p>
+    <p style="font-size:.85rem;color:var(--text-light);">配置：pp=32, d=10, 分段 erf（5 段 [0,5S)），ln 使用 LN_PP32_D10 係數。r=5%, T=1。</p>
 
     <div class="table-wrap">
       <table>
@@ -1267,20 +1289,30 @@
             <td class="num">2.20</td>
             <td class="num">0.18</td>
             <td class="num">3.23</td>
-            <td class="num accent">0.00001105</td>
+            <td class="num green">0.00000246</td>
             <td class="num">0.00000246</td>
-            <td class="num accent">+8.6&times;10<sup>&minus;6</sup></td>
-            <td>erf 飽和（d2/&radic;2 &gt; 3S）</td>
+            <td class="num green">0</td>
+            <td>完全一致（8 位小數）— 5 段擴展後修復</td>
           </tr>
           <tr>
             <td>Aa/AA</td>
             <td class="num">2.80</td>
             <td class="num">0.15</td>
             <td class="num">5.04</td>
-            <td class="num accent">0.00001105</td>
+            <td class="num green">0.00000000</td>
             <td class="num">0.00000000</td>
-            <td class="num accent">+1.1&times;10<sup>&minus;5</sup></td>
-            <td>erf 飽和（遠超逼近區間）</td>
+            <td class="num green">0</td>
+            <td>完全一致（PD &lt; 10<sup>&minus;8</sup>，pp=32 精度下為 0）</td>
+          </tr>
+          <tr>
+            <td>Aaa/AAA</td>
+            <td class="num">3.50</td>
+            <td class="num">0.12</td>
+            <td class="num">7.63</td>
+            <td class="num green">0.00000000</td>
+            <td class="num">0.00000000</td>
+            <td class="num green">0</td>
+            <td>完全一致（erf 飽和，PD 本質為 0）</td>
           </tr>
         </tbody>
       </table>
@@ -1288,18 +1320,17 @@
 
     <div class="callout finding">
       <div class="callout-label">端到端精度結論</div>
-      <p><strong>CCC 到 BBB（d2/&radic;2 &le; 2.18）</strong>：ZK 管線的最終 PD 與解析解<strong>完全一致到 8 位小數</strong>，誤差為零。對監管門檻判定（例如 PD &le; 5%）毫無影響。<br>
-      <strong>A 以上（d2/&radic;2 &gt; 3）</strong>：erf 輸入超出分段逼近區間 [0, 3S)，多項式輸出飽和在固定值，導致 PD 無法正確計算。這是已知的定義域限制（見「已知限制」第 1 點），可透過擴展分段數量或延長逼近區間解決。</p>
+      <p><strong>CCC 到 AAA 全光譜覆蓋</strong>：5 段分段 erf 擴展後，ZK 管線的最終 PD 與解析解<strong>在全部 7 個評等等級上完全一致到 8 位小數</strong>，誤差為零。對監管門檻判定（例如 PD &le; 5%）毫無影響。</p>
     </div>
 
     <div class="callout insight">
-      <div class="callout-label">為什麼 CCC&ndash;BBB 能精確匹配而 A/AA 不行</div>
-      <p>關鍵分界線是 erf 的分段逼近區間上界。CCC 到 BBB 的 d2/&radic;2 值在 &minus;0.04 到 2.18 之間，完全落在 3 段多項式的覆蓋範圍內，因此 erf 精度充足，最終 PD 自然精確。A 和 AA 的 d2/&radic;2 分別為 3.23 和 5.04，超出逼近區間，erf 退化為外推，輸出飽和在同一值（0.00001105）。這不是精度劣化，而是<strong>定義域不足</strong> &mdash; 擴展到 [0, 5S) 即可覆蓋。</p>
+      <div class="callout-label">5 段分段 erf 的完整覆蓋</div>
+      <p>5 段 Minimax 多項式覆蓋 erf 輸入 [0, 5S)。A 評等（d2/&radic;2 = 3.23）落在第 4 段，<strong>PD = 0.00000246 與解析解完全匹配</strong>。AA 和 AAA 評等（d2/&radic;2 &gt; 5）的 PD 在 pp=32 精度下本質為 0 &mdash; 這是數學上的正確結果，不是飽和誤差。第 5 段（[4,5]）信號僅 ~66 ULPs，但 SNR 仍達 12.7x，足以區分 PD = 0 和 PD &gt; 0。</p>
     </div>
 
     <div class="callout finding">
       <div class="callout-label">pp=32 的實用性結論</div>
-      <p>pp=32（28.6 有效位元）在實際信用風險場景中已足夠使用。對於監管最關注的評等區間（CCC&ndash;BBB，涵蓋絕大多數需要監控的高風險部位），ZK 管線的 PD 輸出與解析解<strong>完全一致到 8 位小數</strong>。pp=48 的核心層級測試（40.8&ndash;44.1 有效位元）展示了方法的精度擴展潛力，但對當前應用場景而言 pp=32 已足夠。</p>
+      <p>pp=32（28.6 有效位元）在實際信用風險場景中已足夠使用。搭配 5 段分段 erf，ZK 管線的 PD 輸出在<strong>全部 7 個評等等級（CCC 到 AAA）上與解析解完全一致到 8 位小數</strong>。pp=48 的核心層級測試（40.8&ndash;44.1 有效位元）展示了方法的精度擴展潛力，但對當前應用場景而言 pp=32 已足夠。</p>
     </div>
   </div>
 </section>
@@ -1553,7 +1584,7 @@
             <td>證明大小（pp=32）</td>
             <td class="num" style="color:var(--text-light);">N/A</td>
             <td class="num">~60 KB</td>
-            <td class="num green" style="font-weight:800;">~7 KB</td>
+            <td class="num green" style="font-weight:800;">~15 KB</td>
           </tr>
           <tr>
             <td>新增函數</td>
@@ -1622,17 +1653,17 @@
           <tr>
             <td>證明大小</td>
             <td class="num">7,488 B</td>
-            <td class="num">6,944 B</td>
+            <td class="num">15,360 B</td>
           </tr>
           <tr>
             <td>驗證時間</td>
             <td class="num green">8 ms</td>
-            <td class="num green">23 ms</td>
+            <td class="num green">33 ms</td>
           </tr>
           <tr>
             <td>證明時間</td>
             <td class="num">635 ms</td>
-            <td class="num">~15,200 ms (debug)</td>
+            <td class="num">~29,700 ms (debug)</td>
           </tr>
           <tr>
             <td>電路規模 (k)</td>
@@ -1650,7 +1681,7 @@
 
     <div class="callout insight">
       <div class="callout-label">證明大小觀察</div>
-      <p>場景 C 使用兩種函數和更高精度（pp=32 vs pp=24），證明大小反而比場景 A <em>更小</em>（6,944 vs 7,488 bytes）。證明大小主要由 commitment 結構（k 參數）決定，而非電路內部的算術複雜度。</p>
+      <p>場景 C 的 5 段分段 erf 電路（5 個 Horner 核心 + seg_mux 閘）使證明大小增加到 15,360 bytes（較 3 段版本的 6,944 bytes 增加約 2.2 倍），但仍可放入兩個 TCP 封包。驗證時間維持在 33 ms 級別，不受分段數量顯著影響。</p>
     </div>
 
     <div class="callout finding">
@@ -1674,7 +1705,7 @@
     <div class="limitation">
       <div class="lim-num">1</div>
       <div>
-        <p><strong>erf 定義域上界。</strong>目前使用 3 段分段 Minimax 多項式，覆蓋 erf 輸入 [0, 3]（對應 d2/&radic;2 &le; 3）。這足以精確處理 CCC 到 BBB 評等（PD &ge; 0.001，實測零誤差）。但 A/AA 評等（d2/&radic;2 = 3.2&ndash;5.0）超出此範圍，erf 輸出飽和。可透過增加分段數量（例如 5 段覆蓋 [0, 5]）解決。</p>
+        <p><strong>erf 定義域上界 — 已解決。</strong>已實作 5 段分段 Minimax 多項式，覆蓋 erf 輸入 [0, 5]（對應 d2/&radic;2 &le; 5），涵蓋 CCC 到 AAA 完整評等光譜。第 5 段 [4,5] 信號僅 ~66 ULPs（使用降階 d=6 多項式，SNR 12.7x），但該區間 PD 本質為 0，不影響正確性。d2/&radic;2 &gt; 5 的極端情形（理論上可能但極罕見）會飽和在 erf(5) &asymp; 1。</p>
       </div>
     </div>
 
@@ -1688,7 +1719,7 @@
     <div class="limitation">
       <div class="lim-num">3</div>
       <div>
-        <p><strong>Debug 模式證明時間。</strong>場景 C 的 ~15 秒證明時間是在 Rust debug 模式下測量的。Release 模式（含編譯器優化）預計顯著更快，但尚未正式測量。</p>
+        <p><strong>Debug 模式證明時間。</strong>場景 C 的 ~30 秒證明時間（5 段分段 erf）是在 Rust debug 模式下測量的。Release 模式（含編譯器優化）預計顯著更快，但尚未正式測量。</p>
       </div>
     </div>
 
@@ -1708,7 +1739,7 @@
 <div class="footer">
   <p>
     所有實驗以 <strong>Rust</strong> 實作（halo2 + KZG）。
-    測試：<strong>34/34 全部通過</strong>。
+    測試：<strong>51/51 全部通過</strong>。
     係數由 <strong>Python mpmath</strong> Remez 交換算法以 80 位精度生成。
   </p>
   <p style="margin-top:.6rem;font-size:.76rem;color:rgba(255,255,255,.4);">
