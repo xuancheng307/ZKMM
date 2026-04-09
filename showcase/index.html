@@ -589,9 +589,8 @@
   <a href="#s1">研究貢獻</a>
   <a href="#s2">場景 A</a>
   <a href="#s3">場景 C</a>
-  <a href="#s4">消融實驗</a>
-  <a href="#s5">場景比較</a>
-  <a href="#s6">已知限制</a>
+  <a href="#s4">場景比較</a>
+  <a href="#s5">已知限制</a>
 </nav>
 
 <!-- ========== HERO ========== -->
@@ -609,8 +608,7 @@
     <span class="tag">定點數算術</span>
     <span class="tag">Black-Scholes</span>
     <span class="tag">Merton 結構模型</span>
-    <span class="tag">13 種超越函數</span>
-    <span class="tag">637 組配置</span>
+    <span class="tag">端到端金融場景驗證</span>
   </div>
 </div>
 
@@ -961,28 +959,6 @@
       <p>查找表在 pp=16 下的證明時間是 Minimax 的 <strong>26.3 倍</strong>，在 pp&ge;24 下完全不可行。Taylor 和 Minimax 使用<strong>完全相同的電路</strong>，差異純粹來自係數品質：Minimax 在 ln 上改善 762&times;、erf 上改善 489&times;（pp=16） &mdash; 這是零成本的精度提升。</p>
     </div>
 
-    <h4>13 種函數通用驗證（pp=16, d&le;7）</h4>
-    <p>全部 13 種超越函數在基線配置下均達到 <strong>ULP = 1</strong>（最多 1 個最低位元誤差），確認通用核心電路的正確性。</p>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>函數</th><th style="text-align:right">Max ULP</th><th>狀態</th></tr></thead>
-        <tbody>
-          <tr><td>exp(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
-          <tr><td>ln(1+x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
-          <tr><td>erf(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
-          <tr><td>sin(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
-          <tr><td>cos(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
-          <tr><td>tan(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
-          <tr><td>arctan(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
-          <tr><td>arcsin(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
-          <tr><td>sigmoid(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
-          <tr><td>tanh(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
-          <tr><td>softplus(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
-          <tr><td>GELU(x)</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
-          <tr><td>&Phi;(x)（常態 CDF）</td><td class="num green">1</td><td><span class="status ok">PASS</span></td></tr>
-        </tbody>
-      </table>
-    </div>
   </div>
 </section>
 
@@ -1336,280 +1312,11 @@
 </section>
 
 <!-- ============================================================ -->
-<!-- SECTION 4: 消融實驗                                           -->
+<!-- SECTION 4: 場景比較                                           -->
 <!-- ============================================================ -->
 <section id="s4">
   <div class="section-header">
-    <h2><span class="sec-num">4</span> 消融實驗 &mdash; 每個設計決策為什麼重要</h2>
-    <p>逐一隔離各設計決策的效果</p>
-  </div>
-  <div class="card">
-
-    <!-- A1 -->
-    <div class="ablation-header">
-      <span class="ab-tag">A1</span>
-      <h3>Taylor vs Minimax &mdash; 關鍵對比</h3>
-    </div>
-    <p>這不是邊際優化。以下數據顯示，Minimax 逼近是高精度 ZK 定點超越函數的<strong>必要條件</strong> &mdash; 而非僅僅是對 Taylor 級數的改進。</p>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>配置</th>
-            <th style="text-align:right">Taylor ULP</th>
-            <th style="text-align:right">Minimax ULP</th>
-            <th style="text-align:right">改善倍率</th>
-            <th style="text-align:right">Taylor 有效位元</th>
-            <th style="text-align:right">Minimax 有效位元</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>ln pp=32 d=10</td>
-            <td class="data-bar-cell"><span class="bar red" style="width:100%"></span><span class="val" style="color:var(--accent)">204,063,608</span></td>
-            <td class="data-bar-cell"><span class="bar green" style="width:0.000001%"></span><span class="val" style="color:#27ae60">10.4</span></td>
-            <td class="num accent">19.5M&times;</td>
-            <td class="num">4.4</td>
-            <td class="num green">28.6</td>
-          </tr>
-          <tr>
-            <td>ln pp=48 d=14</td>
-            <td class="data-bar-cell"><span class="bar red" style="width:100%"></span><span class="val" style="color:var(--accent)">9,694,560,262,569</span></td>
-            <td class="data-bar-cell"><span class="bar green" style="width:0.000001%"></span><span class="val" style="color:#27ae60">142.5</span></td>
-            <td class="num accent">68.0B&times;</td>
-            <td class="num">4.9</td>
-            <td class="num green">40.8</td>
-          </tr>
-          <tr>
-            <td>erf pp=32 d=10</td>
-            <td class="data-bar-cell"><span class="bar red" style="width:33%"></span><span class="val" style="color:var(--accent)">3,211,380</span></td>
-            <td class="data-bar-cell"><span class="bar green" style="width:0.0001%"></span><span class="val" style="color:#27ae60">8.0</span></td>
-            <td class="num accent">402K&times;</td>
-            <td class="num">10.4</td>
-            <td class="num green">29.0</td>
-          </tr>
-          <tr>
-            <td>erf pp=48 d=14</td>
-            <td class="data-bar-cell"><span class="bar red" style="width:60%"></span><span class="val" style="color:var(--accent)">3,780,048,854</span></td>
-            <td class="data-bar-cell"><span class="bar green" style="width:0.0001%"></span><span class="val" style="color:#27ae60">15.2</span></td>
-            <td class="num accent">248M&times;</td>
-            <td class="num">16.2</td>
-            <td class="num green">44.1</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="callout">
-      <div class="callout-label">關鍵洞察</div>
-      <p>改善倍率<strong>隨精度增長</strong>。在 pp=16 時兩種方法可能看起來差不多。在 pp=48 時，Taylor 的 ln 只有 4.9 個有效位元，而 Minimax 達到 40.8 位元。<strong>Minimax 不是優化 &mdash; 是必要條件。</strong></p>
-    </div>
-
-    <!-- A2 -->
-    <div class="ablation-header">
-      <span class="ab-tag">A2</span>
-      <h3>延遲截斷溢出</h3>
-    </div>
-    <p>延遲截斷（在 Horner 鏈中累積全精度中間值，最後才截斷一次）可以節省約束，但會撞上硬牆：BN254 有限域的 253 位元容量。</p>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>配置</th>
-            <th style="text-align:right">溢出步驟</th>
-            <th style="text-align:right">最大所需位元</th>
-            <th style="text-align:right">BN254 容量</th>
-            <th style="text-align:right">餘量</th>
-            <th>狀態</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>pp=24 d=8</td>
-            <td class="num green">不溢出</td>
-            <td class="num">212</td>
-            <td class="num">253</td>
-            <td class="num green">+41 bits</td>
-            <td><span class="status ok">安全</span></td>
-          </tr>
-          <tr>
-            <td>pp=32 d=10</td>
-            <td class="num accent">第 8 步</td>
-            <td class="num accent">347</td>
-            <td class="num">253</td>
-            <td class="num accent">&minus;94 bits</td>
-            <td><span class="status overflow">溢出</span></td>
-          </tr>
-          <tr>
-            <td>pp=48 d=14</td>
-            <td class="num accent">第 5 步</td>
-            <td class="num accent">713</td>
-            <td class="num">253</td>
-            <td class="num accent">&minus;460 bits</td>
-            <td><span class="status overflow">溢出</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="callout finding">
-      <div class="callout-label">解決方案</div>
-      <p>逐步截斷使中間值保持有界：48 bits（pp=24）、64 bits（pp=32）、96 bits（pp=48） &mdash; 始終在 BN254 的 253 位元容量之內。這是 pp&ge;32 下唯一可行的策略。</p>
-    </div>
-
-    <!-- A3 -->
-    <div class="ablation-header">
-      <span class="ab-tag">A3</span>
-      <h3>精度隨 pp 的縮放行為</h3>
-    </div>
-    <p>有效位元大致隨精度參數 pp 線性增長。但不同函數之間的差距在高精度下急劇擴大 &mdash; 這正是係數條件數效應的體現。</p>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>指標</th>
-            <th style="text-align:right">pp=16 d=6</th>
-            <th style="text-align:right">pp=24 d=8</th>
-            <th style="text-align:right">pp=32 d=10</th>
-            <th style="text-align:right">pp=48 d=14</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>ln Max ULP</td>
-            <td class="num">4.3</td>
-            <td class="num">6.2</td>
-            <td class="num">10.4</td>
-            <td class="num accent">142.5</td>
-          </tr>
-          <tr>
-            <td>ln 有效位元</td>
-            <td class="data-bar-cell"><span class="bar blue" style="width:31%"></span><span class="val">13.9</span></td>
-            <td class="data-bar-cell"><span class="bar blue" style="width:49%"></span><span class="val">21.4</span></td>
-            <td class="data-bar-cell"><span class="bar blue" style="width:65%"></span><span class="val">28.6</span></td>
-            <td class="data-bar-cell"><span class="bar blue" style="width:93%"></span><span class="val">40.8</span></td>
-          </tr>
-          <tr>
-            <td>erf Max ULP</td>
-            <td class="num">4.4</td>
-            <td class="num">6.8</td>
-            <td class="num green">8.0</td>
-            <td class="num green">15.2</td>
-          </tr>
-          <tr>
-            <td>erf 有效位元</td>
-            <td class="data-bar-cell"><span class="bar green" style="width:31%"></span><span class="val">13.9</span></td>
-            <td class="data-bar-cell"><span class="bar green" style="width:48%"></span><span class="val">21.2</span></td>
-            <td class="data-bar-cell"><span class="bar green" style="width:66%"></span><span class="val">29.0</span></td>
-            <td class="data-bar-cell"><span class="bar green" style="width:100%"></span><span class="val">44.1</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="callout insight">
-      <div class="callout-label">觀察</div>
-      <p>在 pp=16 時，ln 和 erf 精度幾乎相同（13.9 bits）。在 pp=48 時，erf 達到 44.1 bits 而 ln 只有 40.8 bits &mdash; 差距不斷擴大，揭示了函數特有的條件數效應。</p>
-    </div>
-
-    <!-- A4 -->
-    <div class="ablation-header">
-      <span class="ab-tag">A4</span>
-      <h3>係數條件數 &mdash; 新發現</h3>
-    </div>
-    <p>在完全相同的核心參數下（pp=48, d=14），<strong>同一個電路</strong>對不同函數產生截然不同的精度。原因是 Minimax 係數本身的結構。</p>
-
-    <div class="compare-grid">
-      <div class="compare-box">
-        <h4 style="color:var(--accent);">ln(1+x) &mdash; 142 ULP</h4>
-        <p style="font-size:.88rem;">全部 14 個係數都有顯著幅度。交替正負號在定點 Horner 求值中引起消去效應，每步截斷誤差逐步累積。</p>
-        <div style="margin-top:.6rem;">
-          <div class="metric-row" style="margin:0;">
-            <div class="metric"><div class="metric-val">14</div><div class="metric-label">活躍係數</div></div>
-            <div class="metric"><div class="metric-val accent">142</div><div class="metric-label">Max ULP</div></div>
-          </div>
-        </div>
-      </div>
-      <div class="compare-box">
-        <h4 style="color:#27ae60;">erf(x) &mdash; 15 ULP</h4>
-        <p style="font-size:.88rem;">只有 ~7 個係數有顯著幅度（偶數次項因奇函數性質接近零）。活躍項少 = 截斷步驟少 = 誤差累積小。</p>
-        <div style="margin-top:.6rem;">
-          <div class="metric-row" style="margin:0;">
-            <div class="metric"><div class="metric-val green">~7</div><div class="metric-label">活躍係數</div></div>
-            <div class="metric"><div class="metric-val green">15</div><div class="metric-label">Max ULP</div></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="callout">
-      <div class="callout-label">精度落差：9.4 倍</div>
-      <p>同一個核心。同一組參數。同一個電路。唯一的差異是載入的係數向量。這個發現在 <strong>ZK 定點數文獻中沒有先例</strong>，對電路設計者選擇在何種精度目標下支援何種函數具有直接的指導意義。</p>
-    </div>
-
-    <!-- A5 -->
-    <div class="ablation-header">
-      <span class="ab-tag">A5</span>
-      <h3>查找表方法比較</h3>
-    </div>
-    <p>將本文的多項式 + ByteTable 方法與兩種主要替代方案進行比較。</p>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>維度</th>
-            <th>直接查找表</th>
-            <th>分段查找表</th>
-            <th style="background:var(--teal);">本文（多項式 + ByteTable）</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>支援的最大 pp</td>
-            <td class="num">16</td>
-            <td class="num">~28</td>
-            <td class="num green" style="font-weight:800;">48+</td>
-          </tr>
-          <tr>
-            <td>表項數（pp=32）</td>
-            <td class="num"><span class="status impossible">不可行</span></td>
-            <td class="num">~1,280 / 函數</td>
-            <td class="num green" style="font-weight:800;">256（通用）</td>
-          </tr>
-          <tr>
-            <td>證明大小（pp=32）</td>
-            <td class="num" style="color:var(--text-light);">N/A</td>
-            <td class="num">~60 KB</td>
-            <td class="num green" style="font-weight:800;">~15 KB</td>
-          </tr>
-          <tr>
-            <td>新增函數</td>
-            <td>新增一張巨大表</td>
-            <td>新增分段表</td>
-            <td style="color:#27ae60;font-weight:600;">只加一組係數</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="callout finding">
-      <div class="callout-label">優勢</div>
-      <p>通用的 ByteTable[0..255] 被<em>所有</em>函數共享。直接查找表無法達到 pp=32（需要 43 億行）。分段查找表擴展性較好，但仍需逐函數建表，且證明大小為本文方法的 8 倍。</p>
-    </div>
-
-  </div>
-</section>
-
-<!-- ============================================================ -->
-<!-- SECTION 5: 場景比較                                           -->
-<!-- ============================================================ -->
-<section id="s5">
-  <div class="section-header">
-    <h2><span class="sec-num">5</span> 場景比較</h2>
+    <h2><span class="sec-num">4</span> 場景比較</h2>
     <p>兩個場景的並排總結</p>
   </div>
   <div class="card">
@@ -1693,11 +1400,11 @@
 </section>
 
 <!-- ============================================================ -->
-<!-- SECTION 6: 已知限制                                           -->
+<!-- SECTION 5: 已知限制                                           -->
 <!-- ============================================================ -->
-<section id="s6">
+<section id="s5">
   <div class="section-header">
-    <h2><span class="sec-num">6</span> 已知限制</h2>
+    <h2><span class="sec-num">5</span> 已知限制</h2>
     <p>誠實評估目前的範疇邊界</p>
   </div>
   <div class="card">
