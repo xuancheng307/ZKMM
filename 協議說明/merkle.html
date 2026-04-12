@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Merkle Tree 實作 — ZKMM 協議</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<style>
+  :root {
+    --primary: #1a365d;
+    --accent: #276749;
+    --accent-light: #c6f6d5;
+    --light-bg: #f7fafc;
+    --border: #e2e8f0;
+    --highlight: #f0fff4;
+    --warn-bg: #fffaf0;
+    --success-bg: #f0fff4;
+    --code-bg: #edf2f7;
+    --purple-bg: #faf5ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Noto Serif TC", "Times New Roman", Georgia, serif;
+    line-height: 1.8;
+    color: #2d3748;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    font-size: 17px;
+  }
+
+  h1 {
+    font-size: 28px;
+    color: var(--primary);
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 12px;
+    margin: 48px 0 24px 0;
+  }
+  h1:first-of-type { margin-top: 0; }
+
+  h2 {
+    font-size: 22px;
+    color: var(--primary);
+    margin: 36px 0 16px 0;
+    padding-left: 12px;
+    border-left: 4px solid var(--accent);
+  }
+
+  h3 {
+    font-size: 18px;
+    color: #4a5568;
+    margin: 24px 0 12px 0;
+  }
+
+  p { margin: 12px 0; }
+
+  .subtitle {
+    font-size: 16px;
+    color: #718096;
+    margin-bottom: 32px;
+  }
+
+  .key-insight {
+    background: var(--highlight);
+    border-left: 4px solid var(--accent);
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .key-insight strong { color: var(--accent); }
+
+  .problem-box {
+    background: var(--warn-bg);
+    border-left: 4px solid #ed8936;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  .result-box {
+    background: var(--success-bg);
+    border-left: 4px solid #38a169;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  .purple-box {
+    background: var(--purple-bg);
+    border-left: 4px solid #805ad5;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 15px;
+  }
+  th {
+    background: var(--primary);
+    color: white;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:nth-child(even) { background: var(--light-bg); }
+  td.num { text-align: center; font-family: monospace; }
+  td.em { font-weight: bold; color: var(--accent); }
+
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 15px;
+  }
+
+  pre {
+    background: #1a202c;
+    color: #e2e8f0;
+    padding: 16px 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 16px 0;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+
+  .section-num {
+    color: var(--accent);
+    margin-right: 8px;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 40px 0;
+  }
+
+  /* Tree diagram */
+  .tree-diagram {
+    background: var(--code-bg);
+    border: 2px solid var(--border);
+    padding: 24px;
+    margin: 20px 0;
+    border-radius: 8px;
+    text-align: center;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .tree-diagram .root { color: #e53e3e; font-weight: bold; }
+  .tree-diagram .internal { color: #2b6cb0; }
+  .tree-diagram .leaf { color: #276749; font-weight: bold; }
+  .tree-diagram .caption {
+    font-family: "Noto Serif TC", serif;
+    font-size: 14px;
+    color: #718096;
+    margin-top: 8px;
+    text-align: center;
+    white-space: normal;
+  }
+
+  /* Pipeline */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 24px 0;
+    flex-wrap: wrap;
+  }
+  .pipeline .step {
+    background: var(--accent);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+    min-width: 100px;
+  }
+  .pipeline .arrow {
+    font-size: 24px;
+    color: #a0aec0;
+  }
+
+  /* Sponge diagram */
+  .sponge-flow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 16px 0;
+    flex-wrap: wrap;
+    font-size: 14px;
+    font-family: "JetBrains Mono", monospace;
+  }
+  .sponge-flow .state {
+    background: #ebf8ff;
+    border: 1px solid #90cdf4;
+    padding: 6px 10px;
+    border-radius: 6px;
+    text-align: center;
+  }
+  .sponge-flow .absorb {
+    background: #c6f6d5;
+    border: 1px solid #68d391;
+    padding: 6px 10px;
+    border-radius: 6px;
+    text-align: center;
+  }
+  .sponge-flow .perm {
+    background: #e9d8fd;
+    border: 1px solid #b794f4;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-weight: bold;
+  }
+  .sponge-flow .arr {
+    color: #a0aec0;
+    font-size: 18px;
+  }
+
+  .site-nav {
+    display: flex; flex-wrap: wrap;
+    background: #1a365d; border-radius: 8px; overflow: hidden;
+    margin-bottom: 32px;
+    font-family: -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 14px;
+  }
+  .site-nav a {
+    color: #cbd5e0; text-decoration: none;
+    padding: 10px 18px; transition: background 0.2s;
+  }
+  .site-nav a:hover { background: #2b6cb0; color: #fff; }
+  .site-nav a.active { background: #276749; color: #fff; font-weight: 600; }
+
+  @media print {
+    body { font-size: 12pt; padding: 0; }
+    table { break-inside: avoid; }
+    h1 { break-before: page; }
+  }
+  @media (max-width: 700px) {
+    .pipeline { flex-direction: column; }
+    .sponge-flow { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="../index.html">ZKMM</a>
+  <a href="index.html">協議總覽</a>
+  <a href="proof1.html">Proof #1 技術</a>
+  <a href="proof2.html">Proof #2 技術</a>
+  <a href="merkle.html" class="active">Merkle Tree</a>
+</nav>
+
+<!-- ===== Cover ===== -->
+<div style="text-align:center; padding: 40px 0 32px 0;">
+  <h1 style="border:none; font-size:26px; margin:0;">Merkle Tree 實作細節</h1>
+  <p style="color: #4a5568; margin-top: 8px;">
+    電路內 Poseidon Merkle 樹 — 從葉節點雜湊到根驗證
+  </p>
+  <p class="subtitle">
+    持倉狀態樹、市場數據樹、交易批次樹的統一架構
+  </p>
+</div>
+
+<hr>
+
+<!-- ===== 1. 為何需要 Merkle Tree ===== -->
+<h1><span class="section-num">1</span>為什麼需要 Merkle Tree？</h1>
+
+<p>
+  在 ZKMM 協議中，監管機構需要驗證基金的持倉狀態和市場數據是否正確，但<strong>不能</strong>看到具體持倉細節。Merkle 樹提供了完美的解決方案：
+</p>
+
+<div class="key-insight">
+  <strong>核心思想：</strong>將大量數據壓縮為一個根雜湊（root hash）作為公開輸入。電路內部驗證每筆數據確實屬於該根雜湊對應的樹 &mdash; 而驗證者只看到根雜湊，看不到任何具體數據。
+</div>
+
+<p>協議中使用<strong>三棵 Merkle 樹</strong>：</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>樹名稱</th>
+      <th>葉節點內容</th>
+      <th>欄位數</th>
+      <th>用途</th>
+      <th>所屬證明</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="em">Position State Tree</td>
+      <td>基金持倉部位</td>
+      <td class="num">5</td>
+      <td>承諾所有持倉</td>
+      <td>Proof #1 &amp; #2</td>
+    </tr>
+    <tr>
+      <td class="em">Market Data Tree</td>
+      <td>市場行情數據</td>
+      <td class="num">8</td>
+      <td>承諾價格/利率/結算價</td>
+      <td>Proof #1</td>
+    </tr>
+    <tr>
+      <td class="em">Trade Action Tree</td>
+      <td>簽章交易記錄</td>
+      <td>可變</td>
+      <td>承諾每筆交易</td>
+      <td>Proof #2</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr>
+
+<!-- ===== 2. 樹結構 ===== -->
+<h1><span class="section-num">2</span>樹的結構與參數</h1>
+
+<h2>2.1 基本參數</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>參數</th>
+      <th>值</th>
+      <th>說明</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>TREE_DEPTH</code></td>
+      <td class="num">7</td>
+      <td>樹深度</td>
+    </tr>
+    <tr>
+      <td><code>N_MAX</code></td>
+      <td class="num">128</td>
+      <td>$2^7 = 128$，最大葉節點數</td>
+    </tr>
+    <tr>
+      <td><code>LEAF_FIELDS</code></td>
+      <td class="num">5</td>
+      <td>Position 葉節點欄位數</td>
+    </tr>
+    <tr>
+      <td><code>MARKET_LEAF_FIELDS</code></td>
+      <td class="num">8</td>
+      <td>Market Data 葉節點欄位數</td>
+    </tr>
+    <tr>
+      <td>雜湊函數</td>
+      <td>Poseidon</td>
+      <td>$t=3$, $R_F=8$, $R_P=57$</td>
+    </tr>
+    <tr>
+      <td>每次置換列數</td>
+      <td class="num">66</td>
+      <td>$R_F + R_P + 1 = 66$ 列/置換</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>2.2 完整二元樹結構</h2>
+
+<div class="tree-diagram"><span class="root">                         Root = H(H₀₁, H₂₃)</span>
+                        ╱                  ╲
+              <span class="internal">H₀₁ = H(H₀, H₁)</span>        <span class="internal">H₂₃ = H(H₂, H₃)</span>
+              ╱          ╲          ╱          ╲
+        <span class="internal">H₀ = H(L₀,L₁)</span>  <span class="internal">H₁ = H(L₂,L₃)</span>  <span class="internal">H₂ = H(L₄,L₅)</span>  <span class="internal">H₃ = H(L₆,L₇)</span>
+           ╱  ╲      ╱  ╲      ╱  ╲      ╱  ╲
+         <span class="leaf">L₀  L₁  L₂  L₃  L₄  L₅  L₆  L₇</span>
+<div class="caption">圖：depth=3 的完整二元 Merkle 樹（示意，實際 depth=7 共 128 葉）。每個 H() 是一次 Poseidon 置換。</div></div>
+
+<p>
+  每個內部節點的計算方式為 <code>H(left, right)</code>：將左右子節點的雜湊值作為輸入，經過一次 Poseidon 海綿吸收得到父節點雜湊值。
+</p>
+
+<h2>2.3 Merkle 路徑（Membership Proof）</h2>
+
+<p>
+  要證明某個葉節點 $L_i$ 屬於根 $R$ 對應的樹，需要提供一條<strong>認證路徑</strong>（authentication path）：
+</p>
+
+<div class="key-insight">
+  <strong>Merkle 路徑 = </strong>從葉到根途中，每層的<em>兄弟節點雜湊值</em>（sibling hash）加上<em>位置位元</em>（position bit，標記自己是左子還是右子）。
+</div>
+
+<p>
+  以 depth=3、驗證 $L_5$（index=5，二進位 <code>101</code>）為例：
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>層級</th>
+      <th>position bit</th>
+      <th>含義</th>
+      <th>兄弟節點</th>
+      <th>計算</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="num">0（葉層）</td>
+      <td class="num">1</td>
+      <td>$L_5$ 是右子</td>
+      <td>$L_4$</td>
+      <td>$h_0 = H(L_4, L_5)$</td>
+    </tr>
+    <tr>
+      <td class="num">1</td>
+      <td class="num">0</td>
+      <td>$h_0$ 是左子</td>
+      <td>$H_3 = H(L_6, L_7)$</td>
+      <td>$h_1 = H(h_0, H_3)$</td>
+    </tr>
+    <tr>
+      <td class="num">2</td>
+      <td class="num">1</td>
+      <td>$h_1$ 是右子</td>
+      <td>$H_{01}$</td>
+      <td>$h_2 = H(H_{01}, h_1)$</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>驗證：$h_2 \stackrel{?}{=} \text{Root}$。如果相等，則 $L_5$ 確實屬於該樹。</p>
+
+<div class="result-box">
+  <strong>複雜度：</strong>驗證一條路徑只需 $d$ 次雜湊（$d$ = 深度），與葉節點總數 $N$ 無關。$N=128$ 時只需 7 次 Poseidon 置換。
+</div>
+
+<hr>
+
+<!-- ===== 3. 葉節點雜湊 ===== -->
+<h1><span class="section-num">3</span>葉節點雜湊：Poseidon 海綿</h1>
+
+<p>
+  葉節點不是單一域元素，而是由多個欄位組成的結構體。需要先將所有欄位雜湊為一個域元素，再放入 Merkle 樹。
+</p>
+
+<h2>3.1 Position 葉節點（5 欄位）</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>欄位</th>
+      <th>型別</th>
+      <th>說明</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="num">0</td>
+      <td><code>w</code></td>
+      <td>fp24 (signed)</td>
+      <td>持有數量（2's complement 表示負數）</td>
+    </tr>
+    <tr>
+      <td class="num">1</td>
+      <td><code>k</code></td>
+      <td>fp24</td>
+      <td>履約價（equity 為 0）</td>
+    </tr>
+    <tr>
+      <td class="num">2</td>
+      <td><code>expiry_date</code></td>
+      <td>整數</td>
+      <td>到期日（days since epoch；equity 為 0）</td>
+    </tr>
+    <tr>
+      <td class="num">3</td>
+      <td><code>asset_type</code></td>
+      <td>列舉</td>
+      <td>0 = 歐式 Call, 1 = 歐式 Put, 2 = Equity</td>
+    </tr>
+    <tr>
+      <td class="num">4</td>
+      <td><code>underlying_id</code></td>
+      <td>整數</td>
+      <td>標的資產編號</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>海綿雜湊流程（3 輪吸收）</h3>
+
+<p>使用 Poseidon 海綿模式（$t=3$, rate $r=2$, capacity $c=1$），將 5 個欄位分組吸收：</p>
+
+<div class="sponge-flow">
+  <span class="state">[0, 0, 0]</span>
+  <span class="arr">&rarr;</span>
+  <span class="absorb">+[w, k]</span>
+  <span class="arr">&rarr;</span>
+  <span class="perm">&pi;</span>
+  <span class="arr">&rarr;</span>
+  <span class="absorb">+[expiry, type]</span>
+  <span class="arr">&rarr;</span>
+  <span class="perm">&pi;</span>
+  <span class="arr">&rarr;</span>
+  <span class="absorb">+[id, 0]</span>
+  <span class="arr">&rarr;</span>
+  <span class="perm">&pi;</span>
+  <span class="arr">&rarr;</span>
+  <span class="state">output = s[1]</span>
+</div>
+
+<p>每次吸收將一對欄位加到狀態的速率部分：</p>
+
+$$\text{state}[1] \mathrel{+}= \text{field}[2i], \quad \text{state}[2] \mathrel{+}= \text{field}[2i+1]$$
+
+<p>然後施加完整的 Poseidon 置換 $\pi$（65 輪：4 full + 57 partial + 4 full）。5 個欄位需要 $\lceil 5/2 \rceil = 3$ 次吸收，最後一次的第二個位置填 0。</p>
+
+<div class="purple-box">
+  <strong>對應實作：</strong><code>hash_position_leaf()</code> — 迴圈每次取 2 個欄位加入 state[1] 和 state[2]，然後調用 <code>permute()</code>。最終輸出 <code>state[1]</code>。
+</div>
+
+<h2>3.2 Market Data 葉節點（8 欄位）</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>欄位</th>
+      <th>型別</th>
+      <th>說明</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="num">0</td><td><code>underlying_id</code></td><td>整數</td><td>標的資產編號</td></tr>
+    <tr><td class="num">1</td><td><code>strike</code></td><td>fp24</td><td>履約價（合約鍵值）</td></tr>
+    <tr><td class="num">2</td><td><code>expiry_date</code></td><td>整數</td><td>到期日（合約鍵值）</td></tr>
+    <tr><td class="num">3</td><td><code>asset_type</code></td><td>列舉</td><td>資產類型（合約鍵值）</td></tr>
+    <tr><td class="num">4</td><td><code>spot</code></td><td>fp24</td><td>現貨價格 $S$</td></tr>
+    <tr><td class="num">5</td><td><code>r</code></td><td>fp24</td><td>無風險利率</td></tr>
+    <tr><td class="num">6</td><td><code>q</code></td><td>fp24</td><td>股利率</td></tr>
+    <tr><td class="num">7</td><td><code>settle_price</code></td><td>fp24</td><td>官方結算價格</td></tr>
+  </tbody>
+</table>
+
+<p>8 個欄位需要 $\lceil 8/2 \rceil = 4$ 次海綿吸收，流程與 Position 葉節點相同但多一輪：</p>
+
+<div class="sponge-flow">
+  <span class="state">[0, 0, 0]</span>
+  <span class="arr">&rarr;</span>
+  <span class="absorb">+[id, strike]</span>
+  <span class="arr">&rarr;</span>
+  <span class="perm">&pi;</span>
+  <span class="arr">&rarr;</span>
+  <span class="absorb">+[expiry, type]</span>
+  <span class="arr">&rarr;</span>
+  <span class="perm">&pi;</span>
+  <span class="arr">&rarr;</span>
+  <span class="absorb">+[spot, r]</span>
+  <span class="arr">&rarr;</span>
+  <span class="perm">&pi;</span>
+  <span class="arr">&rarr;</span>
+  <span class="absorb">+[q, settle]</span>
+  <span class="arr">&rarr;</span>
+  <span class="perm">&pi;</span>
+  <span class="arr">&rarr;</span>
+  <span class="state">output = s[1]</span>
+</div>
+
+<h2>3.3 Dummy 葉節點</h2>
+
+<p>
+  當基金的實際持倉數量少於 $N_{\max} = 128$ 時，剩餘的葉節點以<strong>空白部位</strong>（dummy leaf）填充。Dummy 的設計需要避免影響計算正確性：
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>欄位</th>
+      <th>Dummy 值</th>
+      <th>設計原因</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>w</code></td>
+      <td class="num">0</td>
+      <td>持有量為零 &rarr; 對 Delta 無貢獻</td>
+    </tr>
+    <tr>
+      <td><code>k</code></td>
+      <td class="num">$1 \times 2^{24}$（= $S$, ATM）</td>
+      <td>避免 $K/S$ 產生除以零</td>
+    </tr>
+    <tr>
+      <td><code>expiry_date</code></td>
+      <td class="num">0</td>
+      <td>不影響時間計算</td>
+    </tr>
+    <tr>
+      <td><code>asset_type</code></td>
+      <td class="num">0（EU Call）</td>
+      <td>任意合法值</td>
+    </tr>
+    <tr>
+      <td><code>underlying_id</code></td>
+      <td class="num">0</td>
+      <td>指向預設標的</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="problem-box">
+  <strong>為什麼 <code>k</code> 不能設為 0？</strong>Proof #1 電路中，Black-Scholes 計算涉及 $d_1 = \frac{\ln(S/K) + \ldots}{\sigma\sqrt{T}}$。若 $K = 0$，則 $\ln(S/K) \to \infty$，導致電路中的定點運算溢出。設置 $K = S$（ATM）使得 $\ln(S/K) = 0$，安全地避開此問題。
+</div>
+
+<hr>
+
+<!-- ===== 4. 內部節點雜湊 ===== -->
+<h1><span class="section-num">4</span>內部節點：2-to-1 Poseidon 雜湊</h1>
+
+<p>Merkle 樹的每個內部節點將兩個子雜湊壓縮為一個父雜湊：</p>
+
+$$\text{parent} = H_{\text{2to1}}(\text{left}, \text{right}) = \text{Poseidon}([0, \text{left}, \text{right}]).\text{squeeze}()$$
+
+<p>具體步驟：</p>
+<ol>
+  <li>初始狀態 $[0, 0, 0]$</li>
+  <li>吸收：$\text{state}[1] \mathrel{+}= \text{left}$, $\text{state}[2] \mathrel{+}= \text{right}$</li>
+  <li>執行一次完整 Poseidon 置換 $\pi$（66 列）</li>
+  <li>輸出 $\text{state}[1]$</li>
+</ol>
+
+<div class="result-box">
+  <strong>效率：</strong>每個內部節點只需 1 次 Poseidon 置換 = <strong>66 列</strong>。整條 Merkle 路徑（7 層）= $7 \times 66 = 462$ 列。加上葉節點雜湊（3 次置換 = 198 列），一次完整驗證共 $\approx 660$ 列。
+</div>
+
+<hr>
+
+<!-- ===== 5. 電路內 Merkle 驗證 ===== -->
+<h1><span class="section-num">5</span>電路內 Merkle 路徑驗證</h1>
+
+<p>
+  在零知識電路中驗證 Merkle 路徑需要三個核心元件：葉節點雜湊、條件交換閘、Poseidon 置換。
+</p>
+
+<h2>5.1 電路佈局</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>元件</th>
+      <th>Advice 列</th>
+      <th>Selector</th>
+      <th>功能</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Poseidon state</td>
+      <td><code>s[0], s[1], s[2]</code></td>
+      <td>&mdash;</td>
+      <td>Poseidon 狀態暫存器</td>
+    </tr>
+    <tr>
+      <td>absorb</td>
+      <td><code>absorb[0], absorb[1]</code></td>
+      <td><code>q_absorb</code></td>
+      <td>海綿吸收值（欄位 / 兄弟節點 / 當前雜湊）</td>
+    </tr>
+    <tr>
+      <td>bit</td>
+      <td><code>bit</code></td>
+      <td><code>q_swap</code></td>
+      <td>位置位元（0=左, 1=右）</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>5.2 條件交換閘（Merkle Swap Gate）</h2>
+
+<p>
+  在每層 Merkle 路徑中，需要根據 position bit $b$ 決定<strong>誰是左子、誰是右子</strong>：
+</p>
+
+<div class="key-insight">
+  <strong>若 $b = 0$</strong>（當前節點是左子）：$\text{left} = \text{cur}$, $\text{right} = \text{sib}$<br>
+  <strong>若 $b = 1$</strong>（當前節點是右子）：$\text{left} = \text{sib}$, $\text{right} = \text{cur}$
+</div>
+
+<p>電路中以三個約束實現此邏輯（無需條件分支）：</p>
+
+$$b \cdot (1 - b) = 0 \quad \text{（布林約束：確保 } b \in \{0, 1\}\text{）}$$
+$$\text{left} = \text{cur} + b \cdot (\text{sib} - \text{cur})$$
+$$\text{right} = \text{sib} + b \cdot (\text{cur} - \text{sib})$$
+
+<p>
+  當 $b = 0$：$\text{left} = \text{cur}$, $\text{right} = \text{sib}$。<br>
+  當 $b = 1$：$\text{left} = \text{cur} + (\text{sib} - \text{cur}) = \text{sib}$, $\text{right} = \text{sib} + (\text{cur} - \text{sib}) = \text{cur}$。
+</p>
+
+<div class="purple-box">
+  <strong>為什麼不用 if-else？</strong>算術電路沒有分支指令。所有路徑都必須執行。Swap gate 以純代數方式實現條件選擇，每層只需 3 個約束。
+</div>
+
+<h2>5.3 完整驗證流程</h2>
+
+<p>一次 Merkle 驗證的完整電路流程：</p>
+
+<h3>階段一：葉節點雜湊（Leaf Hashing）</h3>
+
+<div class="pipeline">
+  <span class="step">初始化<br><small>[0, 0, 0]</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="step">吸收 pair 1<br><small>+ [f₀, f₁]</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="step" style="background:#805ad5;">Poseidon &pi;<br><small>66 列</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="step">吸收 pair 2<br><small>+ [f₂, f₃]</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="step" style="background:#805ad5;">Poseidon &pi;<br><small>66 列</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="step">...</span>
+  <span class="arrow">&rarr;</span>
+  <span class="step" style="background:#e53e3e;">leaf_hash<br><small>= s[1]</small></span>
+</div>
+
+<h3>階段二：路徑驗證（Path Verification）</h3>
+
+<p>對每一層 $\ell = 0, 1, \ldots, d-1$：</p>
+
+<div class="pipeline">
+  <span class="step">讀入<br><small>cur, sib, bit</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="step" style="background:#276749;">Swap Gate<br><small>3 約束</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="step">吸收<br><small>[left, right]</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="step" style="background:#805ad5;">Poseidon &pi;<br><small>66 列</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="step" style="background:#e53e3e;">next_hash<br><small>= s[1]</small></span>
+</div>
+
+<p>最後一層的 <code>next_hash</code> 即為計算出的根雜湊，與公開輸入的 <code>state_root</code> 或 <code>market_data_root</code> 進行約束等式檢查。</p>
+
+<h2>5.4 電路返回值</h2>
+
+<p>Merkle 驗證函數返回三個關鍵的已賦值單元（<code>AssignedCell</code>），供後續電路使用：</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>返回值</th>
+      <th>用途</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>leaf_cells[]</code></td>
+      <td>個別葉節點欄位的 cell &mdash; 傳遞給 Delta 計算、時間驗證等後續電路</td>
+    </tr>
+    <tr>
+      <td><code>leaf_hash_cell</code></td>
+      <td>葉節點雜湊值 &mdash; 用於跨電路一致性檢查</td>
+    </tr>
+    <tr>
+      <td><code>root_cell</code></td>
+      <td>根雜湊值 &mdash; 約束到 instance 列（公開輸入）</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="key-insight">
+  <strong>一魚兩吃：</strong>Merkle 驗證不僅確認葉節點「屬於」承諾的樹，同時<em>將每個欄位暴露為已賦值 cell</em>，使後續電路可以直接引用這些欄位值 &mdash; 無需重複輸入或額外的等式約束。
+</div>
+
+<hr>
+
+<!-- ===== 6. 約束計數 ===== -->
+<h1><span class="section-num">6</span>約束計數分析</h1>
+
+<h2>6.1 每次驗證的列數</h2>
+
+<p>電路列數計算公式：</p>
+
+$$\text{merkle\_rows}(n_f, d) = \left(\left\lceil \frac{n_f}{2} \right\rceil + d\right) \times 66$$
+
+<p>其中 $n_f$ = 葉節點欄位數，$d$ = 樹深度，66 = Poseidon 每次置換的列數。</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>樹類型</th>
+      <th>欄位數 $n_f$</th>
+      <th>海綿輪數</th>
+      <th>路徑層數 $d$</th>
+      <th>總置換次數</th>
+      <th>總列數</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="em">Position</td>
+      <td class="num">5</td>
+      <td class="num">3</td>
+      <td class="num">7</td>
+      <td class="num">10</td>
+      <td class="num">660</td>
+    </tr>
+    <tr>
+      <td class="em">Market Data</td>
+      <td class="num">8</td>
+      <td class="num">4</td>
+      <td class="num">7</td>
+      <td class="num">11</td>
+      <td class="num">726</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>6.2 在完整電路中的佔比</h2>
+
+<p>在 Proof #1 中，每個持倉部位需要<strong>兩次</strong> Merkle 驗證（一次 Position + 一次 Market Data）：</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>元件</th>
+      <th>列數/部位</th>
+      <th>佔比</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Position Merkle 驗證</td>
+      <td class="num">660</td>
+      <td class="num">~33%</td>
+    </tr>
+    <tr>
+      <td>Market Data Merkle 驗證</td>
+      <td class="num">726</td>
+      <td class="num">~36%</td>
+    </tr>
+    <tr>
+      <td>Delta 計算 + 合規檢查</td>
+      <td class="num">~631</td>
+      <td class="num">~31%</td>
+    </tr>
+    <tr>
+      <td><strong>總計</strong></td>
+      <td class="num"><strong>~2,017</strong></td>
+      <td class="num"><strong>100%</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="problem-box">
+  <strong>觀察：</strong>Merkle 驗證佔了每個部位約 <strong>69%</strong> 的電路列數。這是因為 Poseidon 置換本身需要 66 列（65 輪 + 1 列初始化），而每次驗證需要 10-11 次置換。Poseidon 的「電路友好」是相對於 SHA-256（~25,000 列/次）而言 &mdash; 在絕對數量上，Poseidon 仍是 Merkle 驗證的主要成本。
+</div>
+
+<hr>
+
+<!-- ===== 7. 為什麼不用 Lookup ===== -->
+<h1><span class="section-num">7</span>設計決策：為什麼不用 Lookup Table？</h1>
+
+<p>
+  Halo2 提供強大的 <strong>Lookup Argument</strong>，可以用查找表代替部分約束。為什麼 Market Data 不直接用 lookup table 查詢，而是用 Merkle 樹？
+</p>
+
+<div class="problem-box">
+  <strong>問題：</strong>Lookup table 是 <code>setup</code> 階段固定的（寫入 fixed column）。Market Data（現貨價格、利率等）<em>每天都在變</em>。如果用 lookup，每天都需要重新跑 setup &mdash; 產生新的 Proving Key 和 Verifying Key。
+</div>
+
+<div class="result-box">
+  <strong>Merkle 解決方案：</strong>Market Data 放在 <strong>witness</strong>（private input）中，由 Merkle 證明綁定到公開的 <code>market_data_root</code>。Setup / VK / PK 不隨數據改變 &mdash; 只有 root 作為 instance 更新。這實現了<strong>一次 setup，永久使用</strong>。
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>面向</th>
+      <th>Lookup Table 方式</th>
+      <th>Merkle Tree 方式（我們的選擇）</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>數據位置</td>
+      <td>Fixed column（setup 時固定）</td>
+      <td>Advice column（每次證明可變）</td>
+    </tr>
+    <tr>
+      <td>數據更新</td>
+      <td>需要重新 setup</td>
+      <td>只更新 root（instance）</td>
+    </tr>
+    <tr>
+      <td>VK / PK</td>
+      <td>隨數據變化</td>
+      <td>固定不變</td>
+    </tr>
+    <tr>
+      <td>每筆查詢約束</td>
+      <td>~1 行（lookup 非常便宜）</td>
+      <td>~726 行（完整 Merkle 路徑）</td>
+    </tr>
+    <tr>
+      <td>適用場景</td>
+      <td>靜態數據（範圍檢查、S-box）</td>
+      <td>動態數據（每日價格、利率）</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr>
+
+<!-- ===== 8. 跨樹約束 ===== -->
+<h1><span class="section-num">8</span>跨樹約束</h1>
+
+<p>
+  在 Proof #1 中，Position 樹和 Market Data 樹之間存在<strong>語義關聯</strong>：每個持倉的市場數據必須與持倉的合約參數匹配。
+</p>
+
+<h2>8.1 跨樹一致性約束</h2>
+
+<p>電路中強制以下等式：</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Position 欄位</th>
+      <th>$=$</th>
+      <th>Market Data 欄位</th>
+      <th>意義</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>underlying_id</code></td>
+      <td>$=$</td>
+      <td><code>underlying_id</code></td>
+      <td>同一標的資產</td>
+    </tr>
+    <tr>
+      <td><code>k</code></td>
+      <td>$=$</td>
+      <td><code>strike</code></td>
+      <td>同一履約價</td>
+    </tr>
+    <tr>
+      <td><code>expiry_date</code></td>
+      <td>$=$</td>
+      <td><code>expiry_date</code></td>
+      <td>同一到期日</td>
+    </tr>
+    <tr>
+      <td><code>asset_type</code></td>
+      <td>$=$</td>
+      <td><code>asset_type</code></td>
+      <td>同一合約類型</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+  這些約束確保基金不能為某個持倉「搭配」錯誤的市場數據 &mdash; 例如用低波動度的數據來隱瞞高風險部位。
+</p>
+
+<h2>8.2 公開輸入綁定</h2>
+
+<p>兩棵樹的根雜湊分別綁定到 Proof #1 的公開輸入：</p>
+
+<div class="pipeline">
+  <span class="step">Position Merkle 驗證</span>
+  <span class="arrow">&rarr;</span>
+  <span class="step" style="background:#e53e3e;">root_cell</span>
+  <span class="arrow">&rarr;</span>
+  <span class="step" style="background:#2b6cb0;">instance[0]<br><small>state_root</small></span>
+</div>
+<div class="pipeline" style="margin-top: 8px;">
+  <span class="step">Market Data Merkle 驗證</span>
+  <span class="arrow">&rarr;</span>
+  <span class="step" style="background:#e53e3e;">root_cell</span>
+  <span class="arrow">&rarr;</span>
+  <span class="step" style="background:#2b6cb0;">instance[1]<br><small>market_data_root</small></span>
+</div>
+
+<p>
+  <code>constrain_instance(root_cell, instance, 0)</code> 將電路內計算出的根雜湊與公開的 <code>state_root</code> 綁定。驗證者只需檢查 instance 值 &mdash; 無需知道樹的內容。
+</p>
+
+<hr>
+
+<!-- ===== 9. 測試驗證 ===== -->
+<h1><span class="section-num">9</span>測試驗證</h1>
+
+<p>Merkle 樹的正確性通過以下測試案例驗證（全部通過）：</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>測試</th>
+      <th>內容</th>
+      <th>結果</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>128 葉完整樹</td>
+      <td>建構 128 葉樹，驗證 index 42 的路徑</td>
+      <td style="color:#38a169; font-weight:bold;">PASS</td>
+    </tr>
+    <tr>
+      <td>首葉驗證</td>
+      <td>驗證 index 0（最左端，所有 bit=0）</td>
+      <td style="color:#38a169; font-weight:bold;">PASS</td>
+    </tr>
+    <tr>
+      <td>末葉驗證</td>
+      <td>驗證 index 127（最右端，所有 bit=1）</td>
+      <td style="color:#38a169; font-weight:bold;">PASS</td>
+    </tr>
+    <tr>
+      <td>錯誤根偵測</td>
+      <td>正確葉+路徑，但篡改根雜湊</td>
+      <td style="color:#e53e3e; font-weight:bold;">正確拒絕</td>
+    </tr>
+    <tr>
+      <td>錯誤葉偵測</td>
+      <td>修改葉節點欄位，使用原始路徑</td>
+      <td style="color:#e53e3e; font-weight:bold;">正確拒絕</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="result-box">
+  <strong>安全性保證：</strong>任何對葉節點內容或路徑的篡改都會被偵測。碰撞抗性由 Poseidon 的代數安全性保證（128 位元安全等級）。
+</div>
+
+<hr>
+
+<!-- ===== Summary ===== -->
+<h1><span class="section-num">10</span>總結</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th>面向</th>
+      <th>規格</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>樹深度</td><td>7（128 葉）</td></tr>
+    <tr><td>雜湊函數</td><td>Poseidon（$t=3$, 65 輪, $x^5$ S-box）</td></tr>
+    <tr><td>每次置換</td><td>66 列</td></tr>
+    <tr><td>Position 驗證</td><td>10 次置換 = 660 列</td></tr>
+    <tr><td>Market Data 驗證</td><td>11 次置換 = 726 列</td></tr>
+    <tr><td>跨樹約束</td><td>4 個欄位等式（id, strike, expiry, type）</td></tr>
+    <tr><td>Dummy 葉節點</td><td>$w=0$, $K=S$（ATM），零貢獻</td></tr>
+    <tr><td>Setup 穩定性</td><td>Merkle witness &rarr; VK/PK 不隨數據更新</td></tr>
+    <tr><td>測試</td><td>5 項測試全部通過</td></tr>
+  </tbody>
+</table>
+
+<hr>
+<p style="text-align:center; font-size:14px; color:#a0aec0; margin-top:32px;">
+  ZKMM Protocol &mdash; Merkle Tree Implementation
+</p>
+
+</body>
+</html>
