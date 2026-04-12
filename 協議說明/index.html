@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>金融隱私合規協議 — 完整說明</title>
+<style>
+  :root {
+    --primary: #1a365d;
+    --accent: #2b6cb0;
+    --light-bg: #f7fafc;
+    --border: #e2e8f0;
+    --highlight: #ebf8ff;
+    --warn-bg: #fffaf0;
+    --success-bg: #f0fff4;
+    --code-bg: #edf2f7;
+    --purple-bg: #faf5ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Noto Serif TC", "Times New Roman", Georgia, serif;
+    line-height: 1.8;
+    color: #2d3748;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    font-size: 17px;
+  }
+
+  h1 {
+    font-size: 28px;
+    color: var(--primary);
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 12px;
+    margin: 48px 0 24px 0;
+  }
+  h1:first-of-type { margin-top: 0; }
+
+  h2 {
+    font-size: 22px;
+    color: var(--primary);
+    margin: 36px 0 16px 0;
+    padding-left: 12px;
+    border-left: 4px solid var(--accent);
+  }
+
+  h3 {
+    font-size: 18px;
+    color: #4a5568;
+    margin: 24px 0 12px 0;
+  }
+
+  p { margin: 12px 0; }
+
+  .subtitle {
+    font-size: 16px;
+    color: #718096;
+    margin-bottom: 32px;
+  }
+
+  .key-insight {
+    background: var(--highlight);
+    border-left: 4px solid var(--accent);
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .key-insight strong { color: var(--accent); }
+
+  .problem-box {
+    background: var(--warn-bg);
+    border-left: 4px solid #ed8936;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  .result-box {
+    background: var(--success-bg);
+    border-left: 4px solid #38a169;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  .purple-box {
+    background: var(--purple-bg);
+    border-left: 4px solid #805ad5;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 15px;
+  }
+  th {
+    background: var(--primary);
+    color: white;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:nth-child(even) { background: var(--light-bg); }
+  td.num { text-align: center; font-family: monospace; }
+  td.em { font-weight: bold; color: var(--accent); }
+
+  .figure-placeholder {
+    background: var(--code-bg);
+    border: 2px dashed #a0aec0;
+    padding: 24px;
+    margin: 20px 0;
+    text-align: center;
+    border-radius: 8px;
+    color: #718096;
+    font-style: italic;
+  }
+  .figure-placeholder .label {
+    font-weight: bold;
+    color: var(--primary);
+    font-style: normal;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .pipeline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 24px 0;
+    flex-wrap: wrap;
+  }
+  .pipeline .step {
+    background: var(--accent);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+    min-width: 120px;
+  }
+  .pipeline .step.ours {
+    background: #2f855a;
+    border: 2px solid #276749;
+  }
+  .pipeline .step.external {
+    background: #a0aec0;
+    color: #2d3748;
+  }
+  .pipeline .step.proof1 {
+    background: #6366f1;
+  }
+  .pipeline .step.proof2 {
+    background: #0891b2;
+  }
+  .pipeline .arrow {
+    font-size: 24px;
+    color: #a0aec0;
+  }
+
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .compare .col {
+    padding: 16px;
+    border-radius: 8px;
+  }
+  .compare .before {
+    background: #fff5f5;
+    border: 1px solid #feb2b2;
+  }
+  .compare .after {
+    background: #f0fff4;
+    border: 1px solid #9ae6b4;
+  }
+  .compare .col-title {
+    font-weight: bold;
+    margin-bottom: 8px;
+    font-size: 15px;
+  }
+
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 15px;
+  }
+
+  .math {
+    font-family: "Times New Roman", serif;
+    font-style: italic;
+  }
+
+  .section-num {
+    color: var(--accent);
+    margin-right: 8px;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 40px 0;
+  }
+
+  /* Role cards */
+  .role-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .role-card {
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: white;
+  }
+  .role-card h3 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+  }
+  .role-card p {
+    font-size: 14px;
+    margin: 4px 0;
+    color: #4a5568;
+  }
+  .role-card.fund { border-top: 3px solid #6366f1; }
+  .role-card.regulator { border-top: 3px solid #f59e0b; }
+  .role-card.exchange { border-top: 3px solid #06b6d4; }
+
+  /* Trust layer */
+  .trust-layers {
+    margin: 20px 0;
+  }
+  .trust-layer {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 16px 20px;
+    border-left: 3px solid var(--accent);
+    margin-bottom: 4px;
+    background: white;
+  }
+  .trust-layer .layer-num {
+    font-family: monospace;
+    font-weight: 900;
+    font-size: 20px;
+    color: var(--accent);
+    min-width: 32px;
+  }
+  .trust-layer .layer-body h4 { margin: 0 0 4px 0; font-size: 16px; }
+  .trust-layer .layer-body p { margin: 0; font-size: 14px; color: #4a5568; }
+
+  /* Flow steps */
+  .flow-steps {
+    margin: 20px 0;
+    counter-reset: flow-step;
+  }
+  .flow-step {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .flow-step::before {
+    counter-increment: flow-step;
+    content: counter(flow-step);
+    background: var(--accent);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .flow-step .step-who {
+    font-weight: 700;
+    font-size: 13px;
+    min-width: 64px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .flow-step .step-who.fund { background: #ede9fe; color: #6366f1; }
+  .flow-step .step-who.exchange { background: #e0f2fe; color: #0891b2; }
+  .flow-step .step-who.data { background: #dcfce7; color: #16a34a; }
+  .flow-step .step-who.regulator { background: #fef3c7; color: #d97706; }
+  .flow-step .step-body h4 { margin: 0; font-size: 15px; }
+  .flow-step .step-body p { margin: 4px 0 0; font-size: 14px; color: #4a5568; }
+
+  .site-nav {
+    display: flex; flex-wrap: wrap;
+    background: #1a365d; border-radius: 8px; overflow: hidden;
+    margin-bottom: 32px;
+    font-family: -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 14px;
+  }
+  .site-nav a {
+    color: #cbd5e0; text-decoration: none;
+    padding: 10px 18px; transition: background 0.2s;
+  }
+  .site-nav a:hover { background: #2b6cb0; color: #fff; }
+  .site-nav a.active { background: #2b6cb0; color: #fff; font-weight: 600; }
+
+  @media print {
+    body { font-size: 12pt; padding: 0; }
+    .figure-placeholder { break-inside: avoid; }
+    table { break-inside: avoid; }
+    h1 { break-before: page; }
+  }
+  @media (max-width: 700px) {
+    .role-cards { grid-template-columns: 1fr; }
+    .compare { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="../index.html">ZKMM</a>
+  <a href="index.html" class="active">協議總覽</a>
+  <a href="proof1.html">Proof #1 技術</a>
+  <a href="proof2.html">Proof #2 技術</a>
+</nav>
+
+<!-- ===== Cover ===== -->
+<div style="text-align:center; padding: 40px 0 32px 0;">
+  <h1 style="border:none; font-size:26px; margin:0;">金融隱私合規協議</h1>
+  <p style="font-size:20px; color:var(--primary); margin:16px 0 8px 0;">
+    Privacy-Preserving Financial Compliance Protocol
+  </p>
+  <p style="font-size:15px; color:#718096;">
+    基於零知識證明的對沖基金 Delta 風險監管架構<br>
+    Zero-Knowledge Delta Hedging Compliance for Regulated Funds
+  </p>
+</div>
+
+<hr>
+
+<!-- ===== 1. 問題與動機 ===== -->
+<h1><span class="section-num">1</span>問題與動機</h1>
+
+<p>金融監管機構需要驗證對沖基金的 Delta 風險是否在合規範圍內。傳統做法要求基金向監管披露完整的持倉明細 — 這會洩露基金的交易策略，造成不可逆的競爭劣勢。</p>
+
+<div class="problem-box">
+  <strong>核心矛盾：</strong>監管機構需要驗證合規，但基金需要保護商業機密。傳統方法中，這兩個需求不可能同時滿足。
+</div>
+
+<div class="result-box">
+  <strong>零知識解決方案：</strong>基金生成一個密碼學證明（proof），使監管機構在<strong>不看到任何持倉資訊</strong>的情況下，確信基金的 Delta 風險在法定範圍內。證明的存在本身就代表合規 — 無法生成 proof 就是不合規。
+</div>
+
+<h2>本協議保證什麼</h2>
+<ol style="padding-left: 24px;">
+  <li><strong>Delta 合規</strong> — 投資組合的加權 Delta 總和在監管門檻 &tau; 以內</li>
+  <li><strong>持倉真實性</strong> — 每筆持倉都可追溯到交易所簽名的合法交易</li>
+  <li><strong>市場參數正確</strong> — 計算所用的股價、利率、股息率來自公開可驗證的數據源</li>
+  <li><strong>隱波動率合理</strong> — 隱含波動率 &sigma; 由結算價格鎖定，基金無法捏造</li>
+  <li><strong>完全隱私</strong> — 監管機構不知道基金操作哪些標的、持倉多少、策略為何</li>
+</ol>
+
+<hr>
+
+<!-- ===== 2. 三方角色 ===== -->
+<h1><span class="section-num">2</span>三方角色</h1>
+
+<div class="role-cards">
+  <div class="role-card fund">
+    <h3>&#x1F3E2; 對沖基金 (Fund)</h3>
+    <p><strong>角色</strong>：受監管的證明者（Prover）</p>
+    <p><strong>職責</strong>：維護持倉狀態、生成兩個 ZK 證明</p>
+    <p><strong>隱私</strong>：持倉明細、交易策略永不外洩</p>
+    <p><strong>計算量</strong>：5-10 分鐘/次（每日一次）</p>
+  </div>
+  <div class="role-card regulator">
+    <h3>&#x1F3DB; 監管機構 (Regulator)</h3>
+    <p><strong>角色</strong>：驗證者（Verifier）</p>
+    <p><strong>職責</strong>：驗證 proof、執行隨機抽查</p>
+    <p><strong>所見</strong>：僅 Merkle roots + 門檻值</p>
+    <p><strong>計算量</strong>：&lt; 30 毫秒驗證</p>
+  </div>
+  <div class="role-card exchange">
+    <h3>&#x1F4B1; 交易所 (Exchanges)</h3>
+    <p><strong>角色</strong>：數據簽名者</p>
+    <p><strong>職責</strong>：簽署每筆交易（EdDSA）</p>
+    <p><strong>所見</strong>：僅自己執行的交易</p>
+    <p><strong>計算量</strong>：微秒級簽名</p>
+  </div>
+</div>
+
+<div class="key-insight">
+  <strong>隱私分離原則：</strong>沒有任何一方能看到基金的完整持倉。基金知道自己的全貌，但只提交加密承諾。交易所各自只看到自己執行的部分交易。監管機構只看到 Merkle root（幾個 hash 值）和一個 proof。
+</div>
+
+<hr>
+
+<!-- ===== 3. 四層信任模型 ===== -->
+<h1><span class="section-num">3</span>四層信任模型</h1>
+
+<p>協議的安全性建立在四層互相支撐的機制上。每一層獨立運作，即使某一層被突破，其他層仍提供保護。</p>
+
+<div class="trust-layers">
+  <div class="trust-layer">
+    <div class="layer-num">L1</div>
+    <div class="layer-body">
+      <h4>Trust Anchor（信任錨點）</h4>
+      <p>監管機構簽署 Genesis 承諾，定義初始狀態（空持倉）和參與規則。State(0) = empty tree root，由監管機構的 EdDSA 簽名保證。</p>
+    </div>
+  </div>
+  <div class="trust-layer">
+    <div class="layer-num">L2</div>
+    <div class="layer-body">
+      <h4>Cryptographic Integrity（密碼學完整性）</h4>
+      <p>交易所的 EdDSA 簽名保證每筆交易的真實性。Poseidon Merkle tree 保證持倉和市場數據的完整性。偽造任何數據在計算上不可行。</p>
+    </div>
+  </div>
+  <div class="trust-layer">
+    <div class="layer-num">L3</div>
+    <div class="layer-body">
+      <h4>Computational Correctness（計算正確性）</h4>
+      <p>兩個零知識證明（Proof #1 + Proof #2）保證所有計算邏輯的正確性。電路在數學上保證：如果 proof 通過驗證，那麼聲明一定為真。</p>
+    </div>
+  </div>
+  <div class="trust-layer">
+    <div class="layer-num">L4</div>
+    <div class="layer-body">
+      <h4>Deterrence（嚇阻）</h4>
+      <p>監管機構可隨時要求基金開示特定持倉進行抽查。若抽查結果與 proof 承諾的狀態不一致，基金面臨法律後果。這一層是唯一需要信任的部分（人的行為），但有法律約束力。</p>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<!-- ===== 4. 三棵 Merkle Tree ===== -->
+<h1><span class="section-num">4</span>資料結構：三棵 Merkle Tree</h1>
+
+<p>整個協議建立在三棵 Poseidon Merkle tree 上。每棵樹承諾不同類型的數據，由不同角色維護。</p>
+
+<h2>4.1 Position State Tree（持倉狀態樹）</h2>
+<p>記錄基金在每個結算時點的所有持倉。每片葉子代表一筆部位。</p>
+
+<table>
+  <thead><tr><th>欄位</th><th>型別</th><th>意義</th><th>性質</th></tr></thead>
+  <tbody>
+    <tr><td><code>w</code></td><td>fp24 signed</td><td>持倉數量（正=多，負=空，0=dummy）</td><td>靜態</td></tr>
+    <tr><td><code>K</code></td><td>fp24</td><td>履約價格（equity 為 0）</td><td>靜態</td></tr>
+    <tr><td><code>expiry_date</code></td><td>integer</td><td>到期日（days since epoch，equity 為 0）</td><td>靜態</td></tr>
+    <tr><td><code>asset_type</code></td><td>integer</td><td>0 = EU call, 1 = EU put, 2 = equity</td><td>靜態</td></tr>
+    <tr><td><code>underlying_id</code></td><td>integer</td><td>標的資產識別碼</td><td>靜態</td></tr>
+  </tbody>
+</table>
+
+<div class="key-insight">
+  <strong>靜態葉節點原則：</strong>每片葉子從建立到移除，所有欄位<strong>永不改變</strong>。葉節點只存開倉時就確定的合約條款。部分平倉 = Proof #2 移除舊葉子 + 建立新葉子（reduced w）。這保證了 Merkle root 的唯一性和可驗證性。
+</div>
+
+<p><strong>規格</strong>：深度 7，最大 128 片葉子（N<sub>max</sub>），不足以 dummy（w=0）填充，Poseidon hash。</p>
+
+<h2>4.2 Market Data Table（市場數據表）</h2>
+<p>提供市場參數的公開可驗證來源，消除「基金填假市場數據」的信任缺口。</p>
+
+<table>
+  <thead><tr><th>欄位</th><th>型別</th><th>意義</th><th>更新頻率</th></tr></thead>
+  <tbody>
+    <tr><td><code>underlying_id</code></td><td>integer</td><td>標的資產識別碼</td><td>固定</td></tr>
+    <tr><td><code>strike</code></td><td>fp24</td><td>履約價格（合約查詢 key）</td><td>固定</td></tr>
+    <tr><td><code>expiry_date</code></td><td>integer</td><td>到期日（合約查詢 key）</td><td>固定</td></tr>
+    <tr><td><code>asset_type</code></td><td>integer</td><td>選擇權類型（call/put 有不同結算價）</td><td>固定</td></tr>
+    <tr><td><code>spot</code></td><td>fp24</td><td>標的股價 S（收盤價）</td><td>每日</td></tr>
+    <tr><td><code>r</code></td><td>fp24</td><td>無風險利率</td><td>每日</td></tr>
+    <tr><td><code>q</code></td><td>fp24</td><td>股息率</td><td>每日</td></tr>
+    <tr><td><code>settle_price</code></td><td>fp24</td><td>選擇權結算價格</td><td>每日</td></tr>
+  </tbody>
+</table>
+
+<div class="purple-box">
+  <strong>查詢 key = (underlying_id, strike, expiry_date, asset_type)。</strong>同一 (K, expiry_date) 的 call 和 put 有不同的結算價格，因此 <code>asset_type</code> 是 key 的一部分。
+</div>
+
+<p><strong>規格</strong>：深度約 20（百萬級條目），每日收盤後重新發布，Poseidon hash。電路結構和 VK 不受影響 — 僅 root 值更新。</p>
+
+<h2>4.3 Trade Action Tree（交易動作樹）</h2>
+<p>記錄結算期內所有已簽名的交易動作。由 Proof #2 使用，驅動 Position State Tree 的更新。</p>
+
+<p>每片葉子 = 一筆已簽名交易，包含交易參數 + 交易所 EdDSA 簽名。交易所各自只簽署自己執行的交易 — 沒有任何一家交易所看到基金的完整組合。</p>
+
+<div class="key-insight">
+  <strong>三棵樹的關係：</strong>Trade Action Tree 驅動 Position State Tree 的更新（由 Proof #2 保證）。Position State Tree 的每筆部位透過 underlying_id + 合約條款連結到 Market Data Table（由 Proof #1 內的 Merkle 驗證保證）。三棵樹的 root 全部作為公開輸入 — 驗證者只看到三個 hash 值，看不到任何內容。
+</div>
+
+<hr>
+
+<!-- ===== 5. 兩個 ZK 證明 ===== -->
+<h1><span class="section-num">5</span>兩個零知識證明</h1>
+
+<p>本協議使用兩個獨立的 ZK 證明，各自負責不同的安全保證。兩者獨立生成、獨立驗證，不需要遞歸證明組合。</p>
+
+<div class="compare">
+  <div class="col" style="background: #ede9fe; border: 1px solid #c4b5fd;">
+    <div class="col-title" style="color: #6366f1;">Proof #1: Delta Compliance</div>
+    <p style="font-size: 14px;"><strong>證明什麼</strong>：投資組合的 Delta 風險在合規範圍內</p>
+    <p style="font-size: 14px;"><strong>公開輸入</strong>：state_root, market_data_root, threshold, today</p>
+    <p style="font-size: 14px;"><strong>核心技術</strong>：Black-Scholes Delta (ln, erf, exp)、Merkle 驗證、&sigma; 正向驗證</p>
+    <p style="font-size: 14px;"><strong>頻率</strong>：每日結算一次</p>
+    <p style="font-size: 14px;"><a href="proof1.html" style="color: #6366f1;">技術細節 &rarr;</a></p>
+  </div>
+  <div class="col" style="background: #e0f2fe; border: 1px solid #7dd3fc;">
+    <div class="col-title" style="color: #0891b2;">Proof #2: State Transition</div>
+    <p style="font-size: 14px;"><strong>證明什麼</strong>：持倉狀態的每次變化都來自合法交易</p>
+    <p style="font-size: 14px;"><strong>公開輸入</strong>：state_root_prev, state_root, batch_root</p>
+    <p style="font-size: 14px;"><strong>核心技術</strong>：EdDSA 簽名驗證、BabyJubjub 曲線、增量式 Merkle 更新</p>
+    <p style="font-size: 14px;"><strong>頻率</strong>：每個結算期</p>
+    <p style="font-size: 14px;"><a href="proof2.html" style="color: #0891b2;">技術細節 &rarr;</a></p>
+  </div>
+</div>
+
+<h2>5.1 完整的零知識陳述</h2>
+
+<div class="key-insight" style="font-size: 15px; line-height: 2;">
+  <strong>Proof #1</strong>：「我知道一組持倉和對應的 Merkle paths，使得：<br>
+  &ensp;(1) 每筆持倉都在 <code>state_root</code> 承諾的 Merkle tree 中；<br>
+  &ensp;(2) 每筆持倉的市場參數 (S, r, q, settle_price) 來自 <code>market_data_root</code> 承諾的公開數據表；<br>
+  &ensp;(3) 每筆 &sigma;<sub>i</sub> 滿足 BS(S, K, T, r, q, &sigma;) &asymp; settle_price（&sigma; 由結算價鎖定）；<br>
+  &ensp;(4) T<sub>i</sub> 在電路內由 (expiry_date<sub>i</sub> &minus; today) / 365 計算；<br>
+  &ensp;(5) |&Sigma; w<sub>i</sub> &middot; &Delta;<sub>i</sub>| &le; &tau;。」
+</div>
+
+<div class="key-insight" style="font-size: 15px; line-height: 2; border-left-color: #0891b2;">
+  <strong style="color: #0891b2;">Proof #2</strong>：「我知道一批交易 Trades(T)，使得：<br>
+  &ensp;(1) 每筆交易都有合法交易所的 EdDSA 簽名；<br>
+  &ensp;(2) 所有交易的承諾 = 交易所公布的 <code>batch_root</code>；<br>
+  &ensp;(3) 依序套用交易到 State(T&minus;1) 得到 State(T)。」
+</div>
+
+<h2>5.2 Proof 之間的銜接</h2>
+<p>Proof #2 的輸出（verified <code>state_root</code>）成為 Proof #1 的公開輸入。兩者不需要遞歸組合 — 驗證者分別驗證兩個 proof，只需確認兩個 proof 中的 <code>state_root</code> 值一致。</p>
+
+<div class="pipeline">
+  <div class="step proof2">Proof #2 驗證<br><small>State(T-1) &rarr; State(T)</small></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step external">state_root<br><small>（共享公開輸入）</small></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step proof1">Proof #1 驗證<br><small>|&Delta;| &le; &tau;</small></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step ours">合規確認<br><small>&lt; 30ms</small></div>
+</div>
+
+<hr>
+
+<!-- ===== 6. 每日結算流程 ===== -->
+<h1><span class="section-num">6</span>每日結算流程</h1>
+
+<div class="flow-steps">
+  <div class="flow-step">
+    <div class="step-who exchange">交易所</div>
+    <div class="step-body">
+      <h4>交易所簽署每筆交易</h4>
+      <p>基金在各交易所執行交易。每筆交易由執行交易所用 EdDSA (BabyJubjub + Poseidon) 簽名。各交易所只看到自己執行的交易。</p>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="step-who fund">基金</div>
+    <div class="step-body">
+      <h4>建構 Trade Action Tree</h4>
+      <p>收集本期所有已簽名交易，組織成 Merkle tree，計算 batch_root。</p>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="step-who fund">基金</div>
+    <div class="step-body">
+      <h4>計算狀態轉移 State(T) = State(T&minus;1) + apply(Trades)</h4>
+      <p>將交易效果套用到上期持倉，得到本期持倉狀態樹。</p>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="step-who fund">基金</div>
+    <div class="step-body">
+      <h4>生成 Proof #2（State Transition）</h4>
+      <p>證明每筆交易都有交易所簽名，且 State(T) = State(T&minus;1) + Trades(T)。</p>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="step-who data">數據源</div>
+    <div class="step-body">
+      <h4>發布 Market Data Table</h4>
+      <p>數據提供者在收盤後發布當日市場數據（S, r, q, settle_price），建構 Merkle tree 並公布 market_data_root。</p>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="step-who fund">基金</div>
+    <div class="step-body">
+      <h4>計算 &sigma; 並生成 Proof #1（Delta Compliance）</h4>
+      <p>用 Newton-Raphson 反推每筆持倉的 &sigma;，在電路內驗證 BS(&sigma;) &asymp; settle_price，計算 Delta，驗證 |&Delta;<sub>total</sub>| &le; &tau;。</p>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="step-who fund">基金</div>
+    <div class="step-body">
+      <h4>提交給監管機構</h4>
+      <p>提交：Proof #1 + Proof #2 + 公開輸入（roots, &tau;, today）。</p>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="step-who regulator">監管</div>
+    <div class="step-body">
+      <h4>驗證（毫秒級）</h4>
+      <p>Proof #1 通過 &rarr; Delta 合規。Proof #2 通過 &rarr; 持倉真實。兩者的 state_root 一致 &rarr; 合規確認。</p>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<!-- ===== 7. 隱私保證 ===== -->
+<h1><span class="section-num">7</span>隱私保證</h1>
+
+<table>
+  <thead>
+    <tr><th>角色</th><th>能看到什麼</th><th>看不到什麼</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>監管機構</strong></td>
+      <td>state_root, market_data_root, &tau;, today, proof 驗證結果</td>
+      <td>持倉明細、交易歷史、標的資產、持倉數量、Delta 數值</td>
+    </tr>
+    <tr>
+      <td><strong>交易所 A</strong></td>
+      <td>自己執行的交易</td>
+      <td>其他交易所的交易、基金完整持倉、其他標的</td>
+    </tr>
+    <tr>
+      <td><strong>數據提供者</strong></td>
+      <td>市場公開數據（本就公開）</td>
+      <td>基金查詢了哪些條目（哪些標的被使用）</td>
+    </tr>
+    <tr>
+      <td><strong>外部觀察者</strong></td>
+      <td>無</td>
+      <td>一切</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="result-box">
+  <strong>零知識的核心價值：</strong>合規驗證不需要看到任何敏感資訊。proof 的存在本身就是合規的數學證據。即使監管機構的驗證系統被入侵，攻擊者也只能看到幾個 hash 值 — 無法還原任何持倉資訊。
+</div>
+
+<hr>
+
+<!-- ===== 8. 攻擊防禦 ===== -->
+<h1><span class="section-num">8</span>攻擊防禦矩陣</h1>
+
+<table>
+  <thead>
+    <tr><th>攻擊向量</th><th>描述</th><th>防禦機制</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>偽造 &sigma;</strong></td>
+      <td>基金提供讓 Delta 最小的假 &sigma;</td>
+      <td>&sigma; 正向驗證：BS(&sigma;) &asymp; settle_price，偏差超過容許值則 proof 失敗</td>
+    </tr>
+    <tr>
+      <td><strong>偽造市場數據</strong></td>
+      <td>基金使用假的 S, r, q</td>
+      <td>Market Data Merkle：參數必須來自 market_data_root 承諾的公開數據表</td>
+    </tr>
+    <tr>
+      <td><strong>隱藏持倉</strong></td>
+      <td>基金在 proof 中跳過高風險持倉</td>
+      <td>Proof #2 保證 state_root 完整性；N<sub>max</sub> dummy 填充消除長度洩漏</td>
+    </tr>
+    <tr>
+      <td><strong>憑空創造交易</strong></td>
+      <td>基金偽造不存在的交易</td>
+      <td>每筆交易需要交易所 EdDSA 簽名，電路內驗證</td>
+    </tr>
+    <tr>
+      <td><strong>重複計算持倉</strong></td>
+      <td>同一低風險持倉被重複包含</td>
+      <td>Proof #2 保證 State Tree 唯一性 + L4 隨機抽查</td>
+    </tr>
+    <tr>
+      <td><strong>操縱 T<sub>i</sub></strong></td>
+      <td>基金調整到期時間讓 Delta 變小</td>
+      <td>T<sub>i</sub> 在電路內計算：T<sub>i</sub> &times; 365 == expiry_date<sub>i</sub> &minus; today</td>
+    </tr>
+    <tr>
+      <td><strong>交易所串通</strong></td>
+      <td>交易所替基金簽署虛假交易</td>
+      <td>L4 隨機抽查 + 法律嚇阻。多交易所分散風險</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr>
+
+<!-- ===== 9. 技術規格 ===== -->
+<h1><span class="section-num">9</span>技術規格摘要</h1>
+
+<table>
+  <thead>
+    <tr><th>項目</th><th>規格</th><th>備註</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>證明系統</td><td>Halo2 (PLONKish)</td><td>支援自訂閘 + Lookup</td></tr>
+    <tr><td>承諾方案</td><td>KZG (BN254)</td><td>常數大小 proof，毫秒級驗證</td></tr>
+    <tr><td>Hash 函數</td><td>Poseidon (t=3, &alpha;=5)</td><td>ZK-friendly，約 64 constraints/permutation</td></tr>
+    <tr><td>簽名方案</td><td>EdDSA (BabyJubjub + Poseidon)</td><td>ZK-native，無非原生域運算</td></tr>
+    <tr><td>定點精度</td><td>pp = 24 (2<sup>24</sup> = 16,777,216)</td><td>6-7 位十進制精度</td></tr>
+    <tr><td>近似方法</td><td>Minimax 多項式 + Horner 求值</td><td>最優均勻逼近，1 ULP 精度</td></tr>
+    <tr><td>超越函數</td><td>ln, erf, exp（17 步 Delta 管線）</td><td>本論文核心貢獻</td></tr>
+    <tr><td>最大持倉數</td><td>N<sub>max</sub> = 128（depth 7）</td><td>可調整</td></tr>
+    <tr><td>Proof #1 PI</td><td class="num">4</td><td>state_root, market_data_root, &tau;, today</td></tr>
+    <tr><td>Proof #2 PI</td><td class="num">3</td><td>state_root_prev, state_root, batch_root</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<div style="text-align: center; padding: 32px 0; color: #718096; font-size: 14px;">
+  <p><a href="../index.html" style="color: var(--accent); text-decoration: none;">ZKMM</a> &mdash; Zero-Knowledge Machine Learning Research</p>
+  <p style="margin-top: 8px;">
+    <a href="proof1.html" style="color: var(--accent); text-decoration: none;">Proof #1 技術細節</a>
+    &ensp;|&ensp;
+    <a href="proof2.html" style="color: var(--accent); text-decoration: none;">Proof #2 技術細節</a>
+  </p>
+</div>
+
+</body>
+</html>

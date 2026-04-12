@@ -516,6 +516,181 @@
     </div>
 
     <!-- ============================================================ -->
+    <!-- 1.3b TWISTED EDWARDS CURVES & BABYJUBJUB                      -->
+    <!-- ============================================================ -->
+    <h3 id="twisted-edwards">扭曲 Edwards 形式</h3>
+    <p>
+      前面討論的 Weierstrass 形式是橢圓曲線的標準表示法，但它有一個實作上的缺點：點加法需要<em>分情形處理</em>（$P \neq Q$、$P = Q$、$P = -Q$），在電路中會產生額外的條件分支。<strong>扭曲 Edwards 形式</strong>（Twisted Edwards form）提供了一個更優雅的替代方案。
+    </p>
+    <p>
+      定義在 $\mathbb{F}_p$ 上的扭曲 Edwards 曲線為：
+    </p>
+    $$E_{\text{tw}}: ax^2 + y^2 = 1 + dx^2y^2, \quad a, d \in \mathbb{F}_p, \quad a \neq d, \quad ad(a-d) \neq 0$$
+    <p>
+      其點加法公式具有<strong>完備性</strong>（completeness）：給定 $(x_1, y_1)$ 和 $(x_2, y_2)$，
+    </p>
+    $$(x_1, y_1) + (x_2, y_2) = \left(\frac{x_1 y_2 + y_1 x_2}{1 + d\, x_1 x_2 y_1 y_2},\; \frac{y_1 y_2 - a\, x_1 x_2}{1 - d\, x_1 x_2 y_1 y_2}\right)$$
+    <p>
+      關鍵特性：當 $d$ 不是 $\mathbb{F}_p$ 中的二次剩餘時，上述公式的分母永遠不為零，因此<em>同一個公式適用於所有輸入</em> &mdash; 包括 $P + P$（點倍乘）和 $P + \mathcal{O}$（加單位元）。這消除了條件分支，使電路實作更為簡潔。
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>性質</th>
+          <th>短 Weierstrass 形式</th>
+          <th>扭曲 Edwards 形式</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>方程</td>
+          <td>$y^2 = x^3 + ax + b$</td>
+          <td>$ax^2 + y^2 = 1 + dx^2y^2$</td>
+        </tr>
+        <tr>
+          <td>單位元</td>
+          <td>$\mathcal{O}$（無窮遠點，特殊元素）</td>
+          <td>$(0, 1)$（仿射點，無需特殊處理）</td>
+        </tr>
+        <tr>
+          <td>反元素</td>
+          <td>$-(x, y) = (x, -y)$（沿 $x$ 軸翻轉）</td>
+          <td>$-(x, y) = (-x, y)$（沿 $y$ 軸翻轉）</td>
+        </tr>
+        <tr>
+          <td>加法分支</td>
+          <td>4 個情形</td>
+          <td>1 個統一公式（完備）</td>
+        </tr>
+        <tr>
+          <td>電路約束數</td>
+          <td>較多（條件選擇閘）</td>
+          <td>較少（固定公式，約 6 個乘法約束）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout note">
+      <div class="callout-title">與 Weierstrass 形式的關係</div>
+      <p>
+        並非所有橢圓曲線都能轉為 Edwards 形式 &mdash; 只有具有 4 階點的曲線可以。然而，用於電路內運算的曲線是特別挑選的，因此可以同時提供兩種表示。外部曲線（如 BN254）使用 Weierstrass 形式以獲得成熟的配對運算；內部曲線（如 BabyJubjub）使用 Edwards 形式以獲得高效的電路算術。
+      </p>
+    </div>
+
+    <h3 id="babyjubjub">BabyJubjub 曲線</h3>
+    <p>
+      <strong>BabyJubjub</strong> 是一條定義在 BN254 標量域 $\mathbb{F}_r$ 上的扭曲 Edwards 曲線，專為 BN254 基礎的零知識電路設計。其參數為：
+    </p>
+    $$E_{\text{BJJ}}: -x^2 + y^2 = 1 + d\, x^2 y^2 \quad \text{over } \mathbb{F}_r$$
+    <p>其中 $a = -1$（即 $a$ 為 $\mathbb{F}_r$ 的加法逆元 $r - 1$），$d = \frac{168696}{168700} \pmod{r}$。</p>
+
+    <div class="callout theorem">
+      <div class="callout-title">BabyJubjub 關鍵參數</div>
+      <ul>
+        <li><strong>定義域</strong>：BN254 標量域 $\mathbb{F}_r$，$r = $ <code>21888242871839275222246405745257275088548364400416034343698204186575808495617</code></li>
+        <li><strong>曲線階</strong>：$n = h \cdot \ell$，其中餘因子 $h = 8$</li>
+        <li><strong>子群階</strong>：$\ell$ 為 251 位元的大質數 &mdash; 安全性約 125 位元（在質數階子群中操作）</li>
+        <li><strong>基點</strong>：$B = (x_B, y_B)$，$\ell$ 階生成元（選取標準化，確保在主子群中）</li>
+      </ul>
+    </div>
+
+    <div class="callout warning">
+      <div class="callout-title">為何選擇 BabyJubjub？原生性</div>
+      <p>
+        BabyJubjub 定義在 BN254 的<strong>標量域</strong> $\mathbb{F}_r$ 上。由於 BN254 電路中的所有約束本就在 $\mathbb{F}_r$ 上運算，BabyJubjub 的點加法可以直接用原生域元素表示 &mdash; 無需昂貴的非原生域算術。
+      </p>
+      <p>
+        對比：若在 BN254 電路中驗證 BN254 自身的曲線運算（如遞迴證明），需要在 $\mathbb{F}_r$ 電路中模擬 $\mathbb{F}_p$ 算術 &mdash; 每個域乘法約需數百個約束。而 BabyJubjub 的點加法只需<strong>約 6 個乘法約束</strong>。
+      </p>
+    </div>
+
+    <h3 id="eddsa">EdDSA 數位簽章</h3>
+    <p>
+      <strong>EdDSA</strong>（Edwards-curve Digital Signature Algorithm）是一種建立在扭曲 Edwards 曲線上的 Schnorr 型簽章方案。它具有確定性（無需隨機數生成器）和強安全性。在 ZKMM 協議中，EdDSA 用於交易所對批次交易的<em>不可否認簽章</em>。
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <strong>金鑰生成。</strong>
+        私鑰為標量 $s \in \mathbb{F}_\ell$。公鑰為 $A = [s]B$，其中 $B$ 為 BabyJubjub 的基點。
+      </div>
+      <div class="step">
+        <strong>簽章（訊息 $M$）。</strong>
+        (1) 計算確定性 nonce：$r = H_{\text{Poseidon}}(s \,\|\, M)$。
+        (2) 計算承諾：$R = [r]B$。
+        (3) 計算挑戰：$e = H_{\text{Poseidon}}(R \,\|\, A \,\|\, M)$。
+        (4) 計算回應：$S = r + e \cdot s \pmod{\ell}$。
+        簽章為 $(R, S)$。
+      </div>
+      <div class="step">
+        <strong>驗證。</strong>
+        重新計算 $e = H_{\text{Poseidon}}(R \,\|\, A \,\|\, M)$，然後檢查：
+        $$[S]B \stackrel{?}{=} R + [e]A$$
+        此等式成立當且僅當 $S = r + e \cdot s$，即簽章者確實知道 $s$。
+      </div>
+    </div>
+
+    <div class="callout note">
+      <div class="callout-title">Poseidon 取代 SHA-512</div>
+      <p>
+        標準 EdDSA（如 Ed25519）使用 SHA-512 作為雜湊函數。在 ZKMM 協議中，我們以 <strong>Poseidon</strong> 雜湊取代 SHA-512。原因：SHA-512 在算術電路中需要約 25,000 個約束（大量的位元運算分解），而 Poseidon 只需約 300 個約束。整個 EdDSA 簽章驗證在電路中約需 <strong>~6,300 個約束</strong>（包含兩次標量乘法和兩次 Poseidon 雜湊）。
+      </p>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>面向</th>
+          <th>Ed25519（標準）</th>
+          <th>EdDSA-BabyJubjub-Poseidon（本協議）</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>曲線</td>
+          <td>Curve25519（Montgomery / Edwards）</td>
+          <td>BabyJubjub（扭曲 Edwards, $a = -1$）</td>
+        </tr>
+        <tr>
+          <td>定義域</td>
+          <td>$\mathbb{F}_p$，$p = 2^{255} - 19$</td>
+          <td>BN254 標量域 $\mathbb{F}_r$（原生）</td>
+        </tr>
+        <tr>
+          <td>雜湊函數</td>
+          <td>SHA-512</td>
+          <td>Poseidon</td>
+        </tr>
+        <tr>
+          <td>電路內驗證</td>
+          <td>~30,000 約束（非原生域 + SHA）</td>
+          <td>~6,300 約束（原生域 + Poseidon）</td>
+        </tr>
+        <tr>
+          <td>安全等級</td>
+          <td>~128 位元</td>
+          <td>~125 位元</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout example">
+      <div class="callout-title">在 ZKMM 協議中的應用</div>
+      <p>
+        在 Proof #2（State Transition Proof）中，每筆交易記錄 $\text{tx}_i$ 包含交易所的 EdDSA 簽章 $(R_i, S_i)$。電路驗證：
+      </p>
+      <ol>
+        <li>簽章有效：$[S_i]B = R_i + [e_i]A_{\text{exchange}}$</li>
+        <li>訊息為交易承諾：$M_i = H_{\text{Poseidon}}(\text{op\_type} \,\|\, \text{leaf\_index} \,\|\, \Delta w \,\|\, \ldots)$</li>
+        <li>公鑰 $A_{\text{exchange}}$ 屬於已註冊的交易所</li>
+      </ol>
+      <p>
+        這確保了<strong>不可否認性</strong>：一旦交易被打包進狀態轉移證明，交易所無法否認其簽章行為。
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
     <!-- 1.4 BILINEAR PAIRINGS                                         -->
     <!-- ============================================================ -->
     <h2 id="pairings">1.4 雙線性配對</h2>
@@ -923,6 +1098,151 @@
       </p>
     </div>
 
+    <!-- ============================================================ -->
+    <!-- 1.7 ZK-FRIENDLY HASH: POSEIDON                                -->
+    <!-- ============================================================ -->
+    <h2 id="poseidon">1.7 ZK 友好雜湊函數：Poseidon</h2>
+
+    <p>
+      傳統密碼雜湊函數（SHA-256、Keccak）依賴大量的<em>位元運算</em>（XOR、旋轉、移位），在算術電路中表現極差：每個位元運算需要拆解為多個域元素約束。<strong>Poseidon</strong>（2019, Grassi et al.）是一種專為算術電路設計的雜湊函數，直接在 $\mathbb{F}_p$ 上運算，完全避免位元分解。
+    </p>
+
+    <h3>海綿結構（Sponge Construction）</h3>
+    <p>
+      Poseidon 採用<strong>海綿結構</strong>，狀態寬度為 $t$ 個域元素，分為速率（rate）$r$ 和容量（capacity）$c$，其中 $t = r + c$。典型配置為 $t = 3$, $r = 2$, $c = 1$。
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <strong>吸收（Absorb）。</strong>
+        將輸入分為每 $r$ 個域元素一組。每組加到狀態的速率部分，然後施加置換函數 $\pi$：
+        $$\text{state}[1] \mathrel{+}= m_1, \quad \text{state}[2] \mathrel{+}= m_2, \quad \text{state} \leftarrow \pi(\text{state})$$
+      </div>
+      <div class="step">
+        <strong>擠出（Squeeze）。</strong>
+        從狀態的速率部分讀出輸出。對於 Merkle 雜湊，只需一個域元素輸出（讀取 $\text{state}[1]$）。
+      </div>
+    </div>
+
+    <h3>置換函數 $\pi$：輪函數結構</h3>
+    <p>
+      置換 $\pi$ 由多輪（round）組成，每輪包含三個步驟：
+    </p>
+    <ol>
+      <li><strong>AddRoundConstants (ARC)</strong>：對每個狀態元素加上預計算的常數 $c_i$</li>
+      <li><strong>S-box</strong>：非線性變換 $x \mapsto x^\alpha$（在 BN254 上 $\alpha = 5$，因為 $\gcd(5, r-1) = 1$）</li>
+      <li><strong>MDS 乘法</strong>：狀態向量乘以最大距離可分（Maximum Distance Separable）矩陣，實現全域擴散</li>
+    </ol>
+    <p>
+      為平衡安全性與效率，Poseidon 使用兩種輪次：
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>輪次類型</th>
+          <th>S-box 範圍</th>
+          <th>目的</th>
+          <th>數量（$t=3$, BN254）</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Full Round</strong></td>
+          <td>所有 $t$ 個元素</td>
+          <td>全域非線性擴散</td>
+          <td>$R_F = 8$（前 4 + 後 4）</td>
+        </tr>
+        <tr>
+          <td><strong>Partial Round</strong></td>
+          <td>僅 1 個元素</td>
+          <td>以最小代價維持安全性</td>
+          <td>$R_P = 57$</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>總計 $R_F + R_P = 65$ 輪。每個 partial round 只需 1 個 S-box（即 1 個五次冪），大幅降低約束數。</p>
+
+    <div class="callout theorem">
+      <div class="callout-title">Poseidon 約束效率</div>
+      <p>
+        在 Halo2 電路中，一次 Poseidon 置換（$t = 3$）約需 <strong>~300 個約束列</strong>。作為對比：
+      </p>
+      <ul>
+        <li>SHA-256：~25,000 約束（需將 32 位元字拆解為布林約束）</li>
+        <li>Keccak-256：~150,000 約束</li>
+        <li>Poseidon ($t=3$)：~300 約束</li>
+      </ul>
+      <p>
+        這意味著電路中 Merkle 樹驗證的成本從「不可行」降至「微不足道」。深度為 $d$ 的 Merkle 路徑驗證只需 $d \times 300 \approx 2{,}100$ 個約束（$d = 7$ 時）。
+      </p>
+    </div>
+
+    <h3>在 ZKMM 協議中的使用</h3>
+    <p>Poseidon 雜湊在本協議中承擔五個角色：</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>用途</th>
+          <th>輸入</th>
+          <th>模式</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Position 葉節點雜湊</td>
+          <td>5 個域元素 ($w, k, \text{expiry}, \text{type}, \text{id}$)</td>
+          <td>海綿, $r=2$, 3 次吸收</td>
+        </tr>
+        <tr>
+          <td>Market Data 葉節點雜湊</td>
+          <td>8 個域元素</td>
+          <td>海綿, $r=2$, 4 次吸收</td>
+        </tr>
+        <tr>
+          <td>Merkle 內部節點</td>
+          <td>2 個域元素（左子、右子雜湊）</td>
+          <td>海綿, $r=2$, 1 次吸收</td>
+        </tr>
+        <tr>
+          <td>EdDSA 訊息雜湊</td>
+          <td>交易承諾欄位</td>
+          <td>海綿, 可變長度</td>
+        </tr>
+        <tr>
+          <td>Fiat-Shamir 轉錄</td>
+          <td>證明者訊息序列</td>
+          <td>海綿, 流式吸收</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout warning">
+      <div class="callout-title">安全性考量</div>
+      <p>
+        Poseidon 的安全性分析基於<em>代數攻擊</em>（Gröbner 基底、插值攻擊、差分特徵攻擊等）的困難性，而非傳統雜湊函數的統計分析。對於 $t = 3$ 且安全等級 128 位元，Grassi 等人的分析確定了 $R_F = 8$, $R_P = 57$ 的輪數下界。MDS 矩陣的選擇確保任意兩輪的擴散覆蓋全部狀態，防止「對角線」類型的差分路徑。
+      </p>
+    </div>
+
+    <div class="callout example">
+      <div class="callout-title">Poseidon 海綿雜湊示意（$t=3$, 輸入 $[a, b, c, d, e]$）</div>
+      <p>
+        以 ZKMM 的 5 欄位 Position 葉節點為例（$w, k, \text{expiry}, \text{type}, \text{id}$）：
+      </p>
+      <ol>
+        <li>初始狀態：$[0, 0, 0]$</li>
+        <li>第 1 輪吸收：$[0,\; 0 + w,\; 0 + k] \xrightarrow{\pi} [s_0, s_1, s_2]$</li>
+        <li>第 2 輪吸收：$[s_0,\; s_1 + \text{expiry},\; s_2 + \text{type}] \xrightarrow{\pi} [s_0', s_1', s_2']$</li>
+        <li>第 3 輪吸收：$[s_0',\; s_1' + \text{id},\; s_2' + 0] \xrightarrow{\pi} [s_0'', s_1'', s_2'']$</li>
+        <li>輸出：$s_1''$（從速率部分的第一個位置擠出）</li>
+      </ol>
+      <p>
+        每個 $\pi$ 包含 65 輪的 ARC → S-box → MDS 運算。此流程與實作中 <code>hash_position_leaf()</code> 函數的邏輯完全一致。
+      </p>
+    </div>
+
     <h2>對本研究的意義</h2>
     <div class="callout theorem">
       <div class="callout-title">本章技術如何支撐論文</div>
@@ -932,6 +1252,8 @@
       <ul>
         <li><strong>有限域 $\mathbb{F}_p$</strong>：所有定點運算、多項式求值、電路約束都在 Pallas 曲線的標量域上進行（$p \approx 2^{254}$，確切值為 $2^{254} + 45560315531506369815346746415080538113$）。</li>
         <li><strong>橢圓曲線</strong>：Halo2 使用 Pallas/Vesta 曲線循環。Pallas 曲線 $E(\mathbb{F}_p)$ 的標量域恰好是 Vesta 的基底域，反之亦然——這使得遞迴證明組合成為可能。</li>
+        <li><strong>BabyJubjub / EdDSA</strong>：Proof #2 在 BN254 電路中驗證交易所的 EdDSA 簽章。BabyJubjub 定義在 BN254 標量域上，實現原生的電路內簽章驗證（~6,300 約束/簽章）。</li>
+        <li><strong>Poseidon 雜湊</strong>：所有 Merkle 樹（持倉、市場數據、交易）和 EdDSA 均使用 Poseidon。其算術電路友好的設計使每次雜湊僅需 ~300 約束，是協議效率的關鍵。</li>
         <li><strong>Schwartz-Zippel 引理</strong>：這是 PLONK/Halo2 健全性證明的核心工具。在我們的多項式方法中，錯誤的計算結果只有 $\leq d/|\mathbb{F}_p|$ 的概率通過驗證——對 254 位域來說，這是可忽略的。</li>
         <li><strong>Lagrange 基底</strong>：Halo2 中的閘約束在求值域 $H$ 的 Lagrange 基底上表示。</li>
       </ul>
@@ -947,6 +1269,8 @@
         <tr><td>單位根 $\omega$</td><td>定義求值域 $H$，FFT/iFFT 的基礎</td><td>$\omega^{2^k} = 1$ in $\mathbb{F}_r$</td></tr>
         <tr><td>Lagrange 基底</td><td>多項式插值，閘約束的表示</td><td>$L_i(\omega^j) = \delta_{ij}$</td></tr>
         <tr><td>Schwartz-Zippel</td><td>隨機點檢查保證健全性</td><td>$\Pr[\text{cheat}] \leq d/|\mathbb{F}_r| \approx 2^{-246}$</td></tr>
+        <tr><td>BabyJubjub</td><td>電路內簽章曲線（Proof #2）</td><td>扭曲 Edwards $a=-1$ over BN254 $\mathbb{F}_r$</td></tr>
+        <tr><td>Poseidon</td><td>Merkle 雜湊、EdDSA 雜湊</td><td>海綿 $t=3$, $R_F=8$, $R_P=57$, ~300 約束/次</td></tr>
       </tbody>
     </table>
 

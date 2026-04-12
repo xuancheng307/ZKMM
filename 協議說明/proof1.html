@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proof #1 — Delta Compliance 技術細節</title>
+<style>
+  :root {
+    --primary: #1a365d;
+    --accent: #2b6cb0;
+    --light-bg: #f7fafc;
+    --border: #e2e8f0;
+    --highlight: #ebf8ff;
+    --warn-bg: #fffaf0;
+    --success-bg: #f0fff4;
+    --code-bg: #edf2f7;
+    --purple-bg: #faf5ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Noto Serif TC", "Times New Roman", Georgia, serif;
+    line-height: 1.8;
+    color: #2d3748;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    font-size: 17px;
+  }
+
+  h1 {
+    font-size: 28px;
+    color: var(--primary);
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 12px;
+    margin: 48px 0 24px 0;
+  }
+  h1:first-of-type { margin-top: 0; }
+
+  h2 {
+    font-size: 22px;
+    color: var(--primary);
+    margin: 36px 0 16px 0;
+    padding-left: 12px;
+    border-left: 4px solid var(--accent);
+  }
+
+  h3 { font-size: 18px; color: #4a5568; margin: 24px 0 12px 0; }
+  p { margin: 12px 0; }
+  .subtitle { font-size: 16px; color: #718096; margin-bottom: 32px; }
+
+  .key-insight {
+    background: var(--highlight);
+    border-left: 4px solid var(--accent);
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .key-insight strong { color: var(--accent); }
+
+  .problem-box {
+    background: var(--warn-bg);
+    border-left: 4px solid #ed8936;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  .result-box {
+    background: var(--success-bg);
+    border-left: 4px solid #38a169;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  .purple-box {
+    background: var(--purple-bg);
+    border-left: 4px solid #805ad5;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 15px;
+  }
+  th {
+    background: var(--primary);
+    color: white;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:nth-child(even) { background: var(--light-bg); }
+  td.num { text-align: center; font-family: monospace; }
+  td.em { font-weight: bold; color: var(--accent); }
+
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 15px;
+  }
+
+  .math {
+    font-family: "Times New Roman", serif;
+    font-style: italic;
+  }
+
+  .section-num {
+    color: var(--accent);
+    margin-right: 8px;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 40px 0;
+  }
+
+  .pipeline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 24px 0;
+    flex-wrap: wrap;
+  }
+  .pipeline .step {
+    background: var(--accent);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+    min-width: 100px;
+  }
+  .pipeline .step.ours {
+    background: #2f855a;
+    border: 2px solid #276749;
+  }
+  .pipeline .step.external {
+    background: #a0aec0;
+    color: #2d3748;
+  }
+  .pipeline .step.sigma {
+    background: #805ad5;
+  }
+  .pipeline .arrow {
+    font-size: 24px;
+    color: #a0aec0;
+  }
+
+  .formula-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 24px;
+    margin: 16px 0;
+    font-family: "Times New Roman", serif;
+    font-size: 16px;
+    line-height: 2;
+    overflow-x: auto;
+  }
+
+  .gate-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 12px 0;
+  }
+  .gate-card h4 {
+    font-size: 15px;
+    color: var(--accent);
+    margin: 0 0 8px 0;
+    font-family: monospace;
+  }
+  .gate-card p {
+    font-size: 14px;
+    margin: 4px 0;
+  }
+
+  .site-nav {
+    display: flex; flex-wrap: wrap;
+    background: #1a365d; border-radius: 8px; overflow: hidden;
+    margin-bottom: 32px;
+    font-family: -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 14px;
+  }
+  .site-nav a {
+    color: #cbd5e0; text-decoration: none;
+    padding: 10px 18px; transition: background 0.2s;
+  }
+  .site-nav a:hover { background: #2b6cb0; color: #fff; }
+  .site-nav a.active { background: #2b6cb0; color: #fff; font-weight: 600; }
+
+  @media print {
+    body { font-size: 12pt; padding: 0; }
+    table { break-inside: avoid; }
+    h1 { break-before: page; }
+  }
+  @media (max-width: 700px) {
+    .pipeline { flex-direction: column; }
+    .pipeline .arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="../index.html">ZKMM</a>
+  <a href="index.html">協議總覽</a>
+  <a href="proof1.html" class="active">Proof #1 技術</a>
+  <a href="proof2.html">Proof #2 技術</a>
+</nav>
+
+<!-- ===== Cover ===== -->
+<div style="text-align:center; padding: 40px 0 32px 0;">
+  <h1 style="border:none; font-size:26px; margin:0;">Proof #1: Delta Compliance</h1>
+  <p style="font-size:18px; color:var(--primary); margin:12px 0 8px 0;">
+    投資組合 Delta 風險合規證明 — 技術細節
+  </p>
+  <p class="subtitle">電路架構、自訂閘、約束管線的完整說明</p>
+</div>
+
+<hr>
+
+<!-- ===== 1. ZK Statement ===== -->
+<h1><span class="section-num">1</span>ZK Statement（形式化陳述）</h1>
+
+<div class="formula-block">
+  <strong>Proof #1 proves:</strong><br>
+  &exist; positions {<span class="math">p<sub>1</sub>, ..., p<sub>N</sub></span>} &sub; State(<span class="math">T</span>),
+  &exist; {<span class="math">&sigma;<sub>1</sub>, ..., &sigma;<sub>N</sub></span>} such that:<br><br>
+  (a) &forall;<span class="math">i</span>: MerkleVerify(<span class="math">p<sub>i</sub></span>, path<sub>i</sub>, state_root) = true<br>
+  (b) &forall;<span class="math">i</span>: MerkleVerify(mkt<sub>i</sub>, mkt_path<sub>i</sub>, market_data_root) = true<br>
+  (c) &forall;<span class="math">i</span>: |BS(<span class="math">S, K<sub>i</sub>, T<sub>i</sub>, r, q, &sigma;<sub>i</sub></span>) &minus; settle_price<sub>i</sub>| &le; &epsilon;<sub>&sigma;</sub><br>
+  (d) &forall;<span class="math">i</span>: <span class="math">T<sub>i</sub></span> &times; 365 = expiry_date<sub>i</sub> &minus; today<br>
+  (e) |&Sigma;<sub>i</sub> <span class="math">w<sub>i</sub></span> &middot; &Delta;<sub>BS</sub>(<span class="math">S, K<sub>i</sub>, T<sub>i</sub>, r, q, &sigma;<sub>i</sub></span>)| &le; &tau;
+</div>
+
+<h2>1.1 公開輸入（4 個）</h2>
+
+<table>
+  <thead><tr><th>#</th><th>名稱</th><th>意義</th><th>來源</th></tr></thead>
+  <tbody>
+    <tr><td class="num">0</td><td><code>state_root</code></td><td>Position State Tree 的 Merkle root</td><td>基金計算，由 Proof #2 保證</td></tr>
+    <tr><td class="num">1</td><td><code>market_data_root</code></td><td>Market Data Table 的 Merkle root</td><td>數據提供者公布</td></tr>
+    <tr><td class="num">2</td><td><code>threshold (&tau;)</code></td><td>合規門檻（fixed-point pp=24）</td><td>監管規定</td></tr>
+    <tr><td class="num">3</td><td><code>today</code></td><td>結算日期（days since epoch）</td><td>公開日期</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<!-- ===== 2. Circuit Architecture ===== -->
+<h1><span class="section-num">2</span>電路架構總覽</h1>
+
+<p>Proof #1 的電路由五個主要部分組成，按管線順序執行：</p>
+
+<div class="pipeline">
+  <div class="step">Part A<br><small>State Merkle</small></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step">Part A'<br><small>Market Merkle</small></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step sigma">Part A''<br><small>&sigma; 驗證</small></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step ours">Part B<br><small>Delta 計算</small></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step">Part C<br><small>合規檢查</small></div>
+</div>
+
+<p>每個部分對<strong>每一筆持倉</strong>（N<sub>max</sub> = 128 slots）獨立執行，然後在 Part C 匯總。</p>
+
+<div class="key-insight">
+  <strong>Part B（Delta 管線）是本論文的核心貢獻</strong> — 使用 Minimax 多項式逼近 + Horner 求值法，在 ZK 電路內高效計算 Black-Scholes Delta 所需的三個超越函數（ln, erf, exp）。這一步驟僅佔總電路的約 3%，但是整個協議能夠處理選擇權（而非僅限於現貨）的關鍵。
+</div>
+
+<hr>
+
+<!-- ===== 3. Part A: State Merkle ===== -->
+<h1><span class="section-num">3</span>Part A: State Merkle 驗證</h1>
+
+<p>驗證每筆持倉確實存在於 <code>state_root</code> 承諾的 Merkle tree 中。</p>
+
+<h2>3.1 葉節點 Hash</h2>
+<p>5 個欄位透過 Poseidon sponge 壓縮為單一 hash：</p>
+<div class="formula-block">
+  leaf_hash = PoseidonSponge([w, K, expiry_date, asset_type, underlying_id])<br><br>
+  <small>Sponge 模式：rate=2, capacity=1, 每次吸收 2 個欄位，5 個欄位需要 3 次 permutation。</small>
+</div>
+
+<h2>3.2 Merkle 路徑驗證</h2>
+<p>從葉節點往上走 7 層（depth = 7），每層：</p>
+<ol style="padding-left: 24px;">
+  <li>根據 position_bit 決定 (left, right) 順序</li>
+  <li>計算 parent = Poseidon(left, right)</li>
+  <li>最終 root 必須等於 <code>instance[0]</code>（state_root）</li>
+</ol>
+
+<p>每條 Merkle 路徑約 528 rows/position（7 層 &times; ~64 rows/Poseidon + 葉 hash）。</p>
+
+<hr>
+
+<!-- ===== 4. Part A': Market Data Merkle ===== -->
+<h1><span class="section-num">4</span>Part A': Market Data Merkle 驗證</h1>
+
+<p>驗證每筆持倉使用的市場參數 (S, r, q, settle_price) 確實來自 <code>market_data_root</code> 承諾的公開數據表。</p>
+
+<h2>4.1 Market Data 葉節點</h2>
+<p>8 個欄位的 Poseidon sponge hash（4 次 permutation）：</p>
+<div class="formula-block">
+  mkt_hash = PoseidonSponge([underlying_id, strike, expiry_date, asset_type, spot, r, q, settle_price])
+</div>
+
+<h2>4.2 Cross-Tree 約束</h2>
+<p>Position leaf 和 Market Data leaf 透過 <strong>8 條 copy constraints</strong> 連結，確保 Proof #1 使用的市場數據與持倉的合約條款一致：</p>
+
+<table>
+  <thead><tr><th>Position leaf 欄位</th><th>約束</th><th>Market Data leaf 欄位</th></tr></thead>
+  <tbody>
+    <tr><td><code>underlying_id</code></td><td>=</td><td><code>underlying_id</code></td></tr>
+    <tr><td><code>K</code></td><td>=</td><td><code>strike</code></td></tr>
+    <tr><td><code>expiry_date</code></td><td>=</td><td><code>expiry_date</code></td></tr>
+    <tr><td><code>asset_type</code></td><td>=</td><td><code>asset_type</code></td></tr>
+  </tbody>
+</table>
+
+<p>此外，Market Data 中的 <code>spot</code>（S）、<code>r</code>、<code>q</code>、<code>settle_price</code> 被提取到 Delta 管線和 &sigma; 驗證的輸入中。</p>
+
+<div class="problem-box">
+  <strong>為什麼 Market Data 用 Merkle 而不用 Lookup Table？</strong>Market Data 每日更新 — 如果用 Halo2 fixed column lookup，每次更新都需要重新產生 setup 和 VK。使用 Merkle tree 讓電路結構完全固定，只有 root 值（公開輸入）每日變化。
+</div>
+
+<p>Part A' 是整個電路的<strong>主要成本來源</strong>，約佔 55%（~1,386 rows/position），因為 Market Data 有 8 個欄位（需要 4 次 Poseidon permutation）且 tree depth ~20。</p>
+
+<hr>
+
+<!-- ===== 5. Type Decomposition & Equity MUX ===== -->
+<h1><span class="section-num">5</span>Type Decomposition 與 Equity MUX</h1>
+
+<h2>5.1 類型分解閘 (q_type_decomp)</h2>
+<p>將 <code>asset_type</code>（0/1/2）分解為兩個布林值：</p>
+
+<div class="formula-block">
+  asset_type = is_put + 2 &times; is_equity<br><br>
+  <table style="font-size: 14px; width: auto; margin: 8px 0;">
+    <tr><td>asset_type = 0 (EU Call)</td><td>&rarr;</td><td>is_put = 0, is_equity = 0</td></tr>
+    <tr><td>asset_type = 1 (EU Put)</td><td>&rarr;</td><td>is_put = 1, is_equity = 0</td></tr>
+    <tr><td>asset_type = 2 (Equity)</td><td>&rarr;</td><td>is_put = 0, is_equity = 1</td></tr>
+  </table>
+  <small>閘約束：is_put &times; (1 &minus; is_put) = 0, is_equity &times; (1 &minus; is_equity) = 0（確保布林）</small>
+</div>
+
+<h2>5.2 Equity MUX 閘 (q_equity_mux)</h2>
+<p>Equity 部位不需要 Black-Scholes — Delta 固定為 1.0：</p>
+
+<div class="formula-block">
+  effective_delta = is_equity &times; 1.0 + (1 &minus; is_equity) &times; bs_delta<br><br>
+  <small>Equity: &Delta; = 1.0（持倉量 w 就是 Delta 貢獻）<br>
+  Option: &Delta; = BS Delta（經過完整 ln/erf/exp 管線計算）</small>
+</div>
+
+<hr>
+
+<!-- ===== 6. T_i In-Circuit ===== -->
+<h1><span class="section-num">6</span>T<sub>i</sub> 電路內計算</h1>
+
+<p>到期時間 T<sub>i</sub> 不是由 prover 直接提供的 — 電路在內部計算並驗證。</p>
+
+<h2>6.1 Time Verify 閘 (q_time_verify)</h2>
+
+<div class="formula-block">
+  T<sub>i</sub> &times; 365 = expiry_date<sub>i</sub> &minus; today<br><br>
+  <small>
+  &bull; expiry_date<sub>i</sub> 來自 Merkle-verified Position leaf<br>
+  &bull; today 來自公開輸入 instance[3]<br>
+  &bull; T<sub>i</sub> 是 prover 提供的 witness，電路驗證其正確性<br>
+  &bull; 選擇權部位（type 0/1）額外檢查 T<sub>i</sub> &gt; 0（防止除以零）
+  </small>
+</div>
+
+<div class="key-insight">
+  <strong>為什麼不直接在電路內做除法？</strong>ZK 電路中的除法 = 乘法逆元，成本較高。改為 prover 在電路外算好 T<sub>i</sub> = (expiry &minus; today) / 365，電路只需驗證 T<sub>i</sub> &times; 365 == expiry &minus; today（一個乘法閘）。
+</div>
+
+<hr>
+
+<!-- ===== 7. Part A'': Sigma Verification ===== -->
+<h1><span class="section-num">7</span>Part A'': &sigma; 正向驗證</h1>
+
+<p>隱含波動率 &sigma; 是由 prover 在電路外用 Newton-Raphson 法從結算價反推出來的。電路的任務是<strong>驗證</strong>這個 &sigma; 值是否合理 — 使用它計算一次 BS price，檢查是否接近結算價。</p>
+
+<h2>7.1 BS Price 計算</h2>
+<div class="formula-block">
+  d<sub>1</sub> = [ln(S/K) + (r &minus; q + &sigma;&sup2;/2) &times; T] / (&sigma; &times; &radic;T)<br>
+  d<sub>2</sub> = d<sub>1</sub> &minus; &sigma; &times; &radic;T<br><br>
+  Call price = S &times; e<sup>&minus;qT</sup> &times; N(d<sub>1</sub>) &minus; K &times; e<sup>&minus;rT</sup> &times; N(d<sub>2</sub>)<br>
+  Put price = K &times; e<sup>&minus;rT</sup> &times; N(&minus;d<sub>2</sub>) &minus; S &times; e<sup>&minus;qT</sup> &times; N(&minus;d<sub>1</sub>)
+</div>
+
+<h2>7.2 電路內驗證</h2>
+
+<div class="gate-card">
+  <h4>q_d2_sub gate</h4>
+  <p>計算 d<sub>2</sub> = d<sub>1</sub> &minus; &sigma;&radic;T（帶符號減法處理）</p>
+</div>
+
+<div class="gate-card">
+  <h4>q_bs_price gate</h4>
+  <p>驗證 BS price &asymp; settle_price。使用加法形式避免除法：</p>
+  <p style="font-family: 'Times New Roman', serif; font-style: italic; font-size: 15px;">
+    bs_price + is_put &times; S &times; disc_q + K &times; disc_r &times; N(d<sub>2</sub>) = S &times; disc_q &times; N(d<sub>1</sub>) + is_put &times; K &times; disc_r
+  </p>
+  <p>容許偏差：SIGMA_TOL = 0.02 &times; 2<sup>24</sup>（&asymp; 2% 結算價）</p>
+</div>
+
+<div class="purple-box">
+  <strong>&sigma; 驗證的安全意義：</strong>如果不驗證 &sigma;，基金可以填入讓 Delta 最小的假 &sigma;（例如極高波動率會讓所有 Delta &rarr; 0.5，降低加權效果）。結算價鎖定使 &sigma; 成為<strong>隱函數的唯一解</strong>— 基金無法操縱。
+</div>
+
+<hr>
+
+<!-- ===== 8. Part B: Delta Pipeline ===== -->
+<h1><span class="section-num">8</span>Part B: Delta 計算管線（核心貢獻）</h1>
+
+<p>這是本論文的核心技術 — 使用 Minimax 多項式逼近和 Horner 求值法，在 ZK 電路中高效計算 Black-Scholes Delta。</p>
+
+<h2>8.1 三個超越函數</h2>
+<div class="pipeline">
+  <div class="step ours">ln(S/K)<br><small>自然對數</small></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step ours">erf(d<sub>1</sub>/&radic;2)<br><small>誤差函數</small></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step ours">exp(&minus;qT)<br><small>指數函數</small></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step">Delta<br><small>&Delta; = e<sup>&minus;qT</sup> &times; N(d<sub>1</sub>)</small></div>
+</div>
+
+<h2>8.2 17 步管線</h2>
+
+<table>
+  <thead><tr><th>步驟</th><th>操作</th><th>技術</th></tr></thead>
+  <tbody>
+    <tr><td class="num">1</td><td>計算 S/K（定點除法）</td><td>witness + 乘法驗證</td></tr>
+    <tr><td class="num">2</td><td>Range reduction: r = S/K 映射到 [1, 2)</td><td>ByteTable lookup</td></tr>
+    <tr><td class="num">3-4</td><td>ln(r) by Minimax polynomial (degree 7)</td><td>Horner 求值 + 延遲截斷</td></tr>
+    <tr><td class="num">5</td><td>ln(S/K) = ln(r) + k &times; ln(2)</td><td>加法閘</td></tr>
+    <tr><td class="num">6-7</td><td>計算 d<sub>1</sub> 分子和分母</td><td>乘法 + 加法</td></tr>
+    <tr><td class="num">8</td><td>d<sub>1</sub> = 分子 / 分母</td><td>witness + 驗證</td></tr>
+    <tr><td class="num">9</td><td>Range reduction: |d<sub>1</sub>/&radic;2| 映射到 [0, r<sub>max</sub>]</td><td>ByteTable lookup</td></tr>
+    <tr><td class="num">10-11</td><td>erf(x) by Minimax polynomial (degree 9)</td><td>Horner 求值 + 延遲截斷</td></tr>
+    <tr><td class="num">12</td><td>N(d<sub>1</sub>) = 0.5 + 0.5 &times; erf(d<sub>1</sub>/&radic;2)</td><td>加法閘 + 符號處理</td></tr>
+    <tr><td class="num">13</td><td>qT = q &times; T</td><td>乘法閘</td></tr>
+    <tr><td class="num">14</td><td>Range reduction for exp(&minus;qT)</td><td>ByteTable lookup</td></tr>
+    <tr><td class="num">15-16</td><td>exp(x) by Minimax polynomial (degree 6)</td><td>Horner 求值 + 延遲截斷</td></tr>
+    <tr><td class="num">17</td><td>&Delta; = e<sup>&minus;qT</sup> &times; N(d<sub>1</sub>)</td><td>乘法閘</td></tr>
+  </tbody>
+</table>
+
+<div class="result-box">
+  <strong>效率數據：</strong>Delta 管線僅使用約 58 rows/position（佔總電路 ~3%）。Minimax 多項式比 Taylor 展開精度高 100-1000 倍（相同次數下），且 Horner 求值將截斷成本從 O(d) 降至 O(1)。
+</div>
+
+<h2>8.3 Put Delta 調整</h2>
+<div class="formula-block">
+  Put &Delta; = Call &Delta; &minus; e<sup>&minus;qT</sup>（由 put-call parity 推導）<br><br>
+  <small>電路使用 MUX：is_put = 0 &rarr; Call &Delta;，is_put = 1 &rarr; Call &Delta; &minus; discount</small>
+</div>
+
+<hr>
+
+<!-- ===== 9. Part C: Compliance ===== -->
+<h1><span class="section-num">9</span>Part C: 合規累加與檢查</h1>
+
+<h2>9.1 帶符號累加</h2>
+<p>每筆持倉貢獻 w<sub>i</sub> &times; &Delta;<sub>i</sub>，w 有正負（多/空）：</p>
+<div class="formula-block">
+  w_sign XOR is_put &rarr; 路由到 positive_sum 或 negative_sum<br><br>
+  positive_sum = &Sigma;(正向貢獻的 |w| &times; &Delta;)<br>
+  negative_sum = &Sigma;(負向貢獻的 |w| &times; &Delta;)
+</div>
+
+<h2>9.2 雙向合規檢查</h2>
+<p>Delta 合規不只檢查淨值，而是<strong>雙向</strong>檢查：</p>
+
+<div class="formula-block">
+  &tau; + negative_sum &ge; positive_sum<br>
+  &tau; + positive_sum &ge; negative_sum<br><br>
+  <small>等價於：|positive_sum &minus; negative_sum| &le; &tau;</small><br>
+  <small>使用 range check 而非直接比較，避免有限域中的負數問題。</small>
+</div>
+
+<p>&tau; 來自公開輸入 <code>instance[2]</code>（threshold）。</p>
+
+<hr>
+
+<!-- ===== 10. Constraint Breakdown ===== -->
+<h1><span class="section-num">10</span>電路規模分析</h1>
+
+<table>
+  <thead><tr><th>部分</th><th>每持倉 rows</th><th>佔比</th><th>瓶頸</th></tr></thead>
+  <tbody>
+    <tr><td>Part A: State Merkle</td><td class="num">~528</td><td class="num">26%</td><td>7 層 Poseidon</td></tr>
+    <tr><td>Part A': Market Data Merkle</td><td class="num">~1,386</td><td class="em">55%</td><td>8 欄位 hash + depth ~20</td></tr>
+    <tr><td>Part A'': &sigma; 驗證</td><td class="num">~32</td><td class="num">2%</td><td>BS price 計算</td></tr>
+    <tr><td class="em">Part B: Delta 管線</td><td class="num">~58</td><td class="num">3%</td><td>本論文方法</td></tr>
+    <tr><td>Part C: 累加 + 合規</td><td class="num">~5</td><td class="num">&lt;1%</td><td>加法 + range check</td></tr>
+    <tr><td>其他（type decomp, T verify, MUX）</td><td class="num">~8</td><td class="num">&lt;1%</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<p><strong>總計</strong>：~2,017 rows/position &times; 128 positions &asymp; 258,000 rows（k &asymp; 18）</p>
+
+<div class="key-insight">
+  <strong>瓶頸不在 Delta 計算</strong> — Part B 僅佔 3%。真正的成本在 Merkle 驗證（81%），這是所有 ZK 鏈上狀態驗證的共同挑戰。本論文的貢獻在於讓 Delta 計算成為可能且高效，而不是讓整體電路變小。
+</div>
+
+<hr>
+
+<!-- ===== 11. Self-Contained Gates ===== -->
+<h1><span class="section-num">11</span>自訂閘清單</h1>
+
+<table>
+  <thead><tr><th>閘名稱</th><th>功能</th><th>出現位置</th></tr></thead>
+  <tbody>
+    <tr><td><code>q_poseidon</code></td><td>Poseidon permutation (t=3)</td><td>Part A, A'</td></tr>
+    <tr><td><code>q_merkle_swap</code></td><td>Merkle 路徑 left/right 選擇</td><td>Part A, A'</td></tr>
+    <tr><td><code>q_type_decomp</code></td><td>asset_type &rarr; (is_put, is_equity) 分解</td><td>每持倉一次</td></tr>
+    <tr><td><code>q_time_verify</code></td><td>T<sub>i</sub> &times; 365 == expiry &minus; today</td><td>每持倉一次</td></tr>
+    <tr><td><code>q_equity_mux</code></td><td>Equity/Option Delta 選擇</td><td>每持倉一次</td></tr>
+    <tr><td><code>q_d2_sub</code></td><td>d<sub>2</sub> = d<sub>1</sub> &minus; &sigma;&radic;T 帶符號減法</td><td>Part A''</td></tr>
+    <tr><td><code>q_bs_price</code></td><td>BS price &asymp; settle_price 驗證</td><td>Part A''</td></tr>
+    <tr><td><code>q_kernel_*</code></td><td>ln/erf/exp Horner 求值閘</td><td>Part B</td></tr>
+    <tr><td><code>q_sign_extend</code></td><td>w 的 2's complement 符號擴展</td><td>Part C</td></tr>
+    <tr><td><code>q_compliance</code></td><td>&tau; + neg &ge; pos 雙向 range check</td><td>Part C</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<div style="text-align: center; padding: 32px 0; color: #718096; font-size: 14px;">
+  <p><a href="index.html" style="color: var(--accent); text-decoration: none;">&larr; 協議總覽</a>
+  &ensp;|&ensp;
+  <a href="proof2.html" style="color: var(--accent); text-decoration: none;">Proof #2 技術細節 &rarr;</a></p>
+  <p style="margin-top: 8px;"><a href="../index.html" style="color: var(--accent); text-decoration: none;">ZKMM</a> &mdash; Zero-Knowledge Machine Learning Research</p>
+</div>
+
+</body>
+</html>

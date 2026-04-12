@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proof #2 — State Transition 技術細節</title>
+<style>
+  :root {
+    --primary: #1a365d;
+    --accent: #2b6cb0;
+    --light-bg: #f7fafc;
+    --border: #e2e8f0;
+    --highlight: #ebf8ff;
+    --warn-bg: #fffaf0;
+    --success-bg: #f0fff4;
+    --code-bg: #edf2f7;
+    --purple-bg: #faf5ff;
+    --cyan: #0891b2;
+    --cyan-bg: #e0f2fe;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Noto Serif TC", "Times New Roman", Georgia, serif;
+    line-height: 1.8;
+    color: #2d3748;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    font-size: 17px;
+  }
+
+  h1 {
+    font-size: 28px;
+    color: var(--primary);
+    border-bottom: 3px solid var(--cyan);
+    padding-bottom: 12px;
+    margin: 48px 0 24px 0;
+  }
+  h1:first-of-type { margin-top: 0; }
+
+  h2 {
+    font-size: 22px;
+    color: var(--primary);
+    margin: 36px 0 16px 0;
+    padding-left: 12px;
+    border-left: 4px solid var(--cyan);
+  }
+
+  h3 { font-size: 18px; color: #4a5568; margin: 24px 0 12px 0; }
+  p { margin: 12px 0; }
+  .subtitle { font-size: 16px; color: #718096; margin-bottom: 32px; }
+
+  .key-insight {
+    background: var(--cyan-bg);
+    border-left: 4px solid var(--cyan);
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .key-insight strong { color: var(--cyan); }
+
+  .problem-box {
+    background: var(--warn-bg);
+    border-left: 4px solid #ed8936;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  .result-box {
+    background: var(--success-bg);
+    border-left: 4px solid #38a169;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  .purple-box {
+    background: var(--purple-bg);
+    border-left: 4px solid #805ad5;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 15px;
+  }
+  th {
+    background: var(--primary);
+    color: white;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:nth-child(even) { background: var(--light-bg); }
+  td.num { text-align: center; font-family: monospace; }
+  td.em { font-weight: bold; color: var(--cyan); }
+
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 15px;
+  }
+
+  .math {
+    font-family: "Times New Roman", serif;
+    font-style: italic;
+  }
+
+  .section-num {
+    color: var(--cyan);
+    margin-right: 8px;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 40px 0;
+  }
+
+  .pipeline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 24px 0;
+    flex-wrap: wrap;
+  }
+  .pipeline .step {
+    background: var(--cyan);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+    min-width: 110px;
+  }
+  .pipeline .step.ours {
+    background: #2f855a;
+    border: 2px solid #276749;
+  }
+  .pipeline .step.external {
+    background: #a0aec0;
+    color: #2d3748;
+  }
+  .pipeline .step.crypto {
+    background: #805ad5;
+  }
+  .pipeline .arrow {
+    font-size: 24px;
+    color: #a0aec0;
+  }
+
+  .formula-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 24px;
+    margin: 16px 0;
+    font-family: "Times New Roman", serif;
+    font-size: 16px;
+    line-height: 2;
+    overflow-x: auto;
+  }
+
+  .phase-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 12px 0;
+    border-left: 4px solid var(--cyan);
+  }
+  .phase-card.done { border-left-color: #38a169; }
+  .phase-card.wip { border-left-color: #ed8936; }
+  .phase-card.todo { border-left-color: #a0aec0; }
+  .phase-card h4 {
+    font-size: 15px;
+    margin: 0 0 6px 0;
+  }
+  .phase-card .status {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 8px;
+  }
+  .phase-card .status.done { background: #dcfce7; color: #16a34a; }
+  .phase-card .status.wip { background: #fef3c7; color: #d97706; }
+  .phase-card .status.todo { background: #f1f5f9; color: #64748b; }
+  .phase-card p {
+    font-size: 14px;
+    margin: 4px 0;
+  }
+
+  .site-nav {
+    display: flex; flex-wrap: wrap;
+    background: #1a365d; border-radius: 8px; overflow: hidden;
+    margin-bottom: 32px;
+    font-family: -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 14px;
+  }
+  .site-nav a {
+    color: #cbd5e0; text-decoration: none;
+    padding: 10px 18px; transition: background 0.2s;
+  }
+  .site-nav a:hover { background: #2b6cb0; color: #fff; }
+  .site-nav a.active { background: #2b6cb0; color: #fff; font-weight: 600; }
+
+  @media print {
+    body { font-size: 12pt; padding: 0; }
+    table { break-inside: avoid; }
+    h1 { break-before: page; }
+  }
+  @media (max-width: 700px) {
+    .pipeline { flex-direction: column; }
+    .pipeline .arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="../index.html">ZKMM</a>
+  <a href="index.html">協議總覽</a>
+  <a href="proof1.html">Proof #1 技術</a>
+  <a href="proof2.html" class="active">Proof #2 技術</a>
+</nav>
+
+<!-- ===== Cover ===== -->
+<div style="text-align:center; padding: 40px 0 32px 0;">
+  <h1 style="border:none; font-size:26px; margin:0;">Proof #2: State Transition</h1>
+  <p style="font-size:18px; color:var(--primary); margin:12px 0 8px 0;">
+    持倉狀態轉移證明 — 技術細節
+  </p>
+  <p class="subtitle">BabyJubjub 曲線、EdDSA 簽名驗證、狀態根鏈接</p>
+</div>
+
+<hr>
+
+<!-- ===== 1. ZK Statement ===== -->
+<h1><span class="section-num">1</span>ZK Statement（形式化陳述）</h1>
+
+<div class="formula-block">
+  <strong>Proof #2 proves:</strong><br>
+  &exist; Trades(<span class="math">T</span>) = {<span class="math">tx<sub>1</sub>, ..., tx<sub>M</sub></span>} such that:<br><br>
+  (a) &forall;<span class="math">j</span>: EdDSA.Verify(pk<sub>exchange</sub>, tx<sub>j</sub>, sig<sub>j</sub>) = true<br>
+  (b) Commit(Trades(<span class="math">T</span>)) = batch_root<br>
+  (c) Apply(State(<span class="math">T</span>&minus;1), Trades(<span class="math">T</span>)) = State(<span class="math">T</span>)
+</div>
+
+<h2>1.1 公開輸入（3 個）</h2>
+
+<table>
+  <thead><tr><th>#</th><th>名稱</th><th>意義</th><th>來源</th></tr></thead>
+  <tbody>
+    <tr><td class="num">0</td><td><code>state_root_prev</code></td><td>State(T&minus;1) 的 Merkle root</td><td>前一期的 state_root</td></tr>
+    <tr><td class="num">1</td><td><code>state_root</code></td><td>State(T) 的 Merkle root</td><td>基金計算，與 Proof #1 共享</td></tr>
+    <tr><td class="num">2</td><td><code>batch_root</code></td><td>交易批次承諾 root</td><td>交易所批次公布</td></tr>
+  </tbody>
+</table>
+
+<div class="key-insight">
+  <strong>與 Proof #1 的銜接：</strong>Proof #2 的 <code>state_root</code>（instance[1]）必須與 Proof #1 的 <code>state_root</code>（instance[0]）一致。驗證者只需比較這兩個值 — 不需要遞歸證明。
+</div>
+
+<hr>
+
+<!-- ===== 2. State Transition Model ===== -->
+<h1><span class="section-num">2</span>狀態轉移模型</h1>
+
+<p>Proof #2 證明從 State(T&minus;1) 到 State(T) 的轉換完全由合法交易驅動，沒有未經授權的狀態變更。</p>
+
+<div class="pipeline">
+  <div class="step external">State(T&minus;1)<br><small>上期持倉</small></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step crypto">EdDSA 驗證<br><small>每筆交易</small></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step">逐筆套用<br><small>op_type dispatch</small></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step">Root 鏈接<br><small>增量式更新</small></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step ours">State(T)<br><small>本期持倉</small></div>
+</div>
+
+<h2>2.1 操作類型 (op_type)</h2>
+
+<table>
+  <thead><tr><th>代碼</th><th>名稱</th><th>操作</th><th>葉子變化</th></tr></thead>
+  <tbody>
+    <tr><td class="num">0</td><td><strong>TRADE</strong></td><td>新開倉：插入新葉子到空 slot</td><td>dummy &rarr; 新部位</td></tr>
+    <tr><td class="num">1</td><td><strong>CLOSE</strong></td><td>完全平倉：清除葉子</td><td>舊部位 &rarr; dummy</td></tr>
+    <tr><td class="num">2</td><td><strong>EXERCISE</strong></td><td>選擇權行權：關閉選擇權 + 開啟現貨（原子操作）</td><td>option leaf &rarr; equity leaf</td></tr>
+    <tr><td class="num">3</td><td><strong>EXPIRY</strong></td><td>到期：驗證 today &ge; expiry_date，清除葉子</td><td>expired leaf &rarr; dummy</td></tr>
+    <tr><td class="num">4</td><td><strong>CORPORATE_ACTION</strong></td><td>公司行動（分拆、配息）：調整 K/w 比例</td><td>舊條款 &rarr; 新條款</td></tr>
+    <tr><td class="num">5</td><td><strong>NOP</strong></td><td>空操作：填充用，不改變任何狀態</td><td>不變</td></tr>
+  </tbody>
+</table>
+
+<div class="purple-box">
+  <strong>靜態葉節點原則的實現：</strong>每片葉子一旦建立就不可修改。「部分平倉」在 Proof #2 中實現為 CLOSE 舊葉子 + TRADE 新葉子（reduced w）的兩步操作。這確保了 Merkle root 的唯一性。
+</div>
+
+<h2>2.2 Root 鏈接</h2>
+
+<p>交易按順序逐筆套用。每筆交易修改一片 Merkle 葉子，產生新的 root：</p>
+
+<div class="formula-block">
+  root<sub>0</sub> = state_root_prev<br>
+  root<sub>1</sub> = MerkleUpdate(root<sub>0</sub>, idx<sub>1</sub>, old_leaf<sub>1</sub> &rarr; new_leaf<sub>1</sub>)<br>
+  root<sub>2</sub> = MerkleUpdate(root<sub>1</sub>, idx<sub>2</sub>, old_leaf<sub>2</sub> &rarr; new_leaf<sub>2</sub>)<br>
+  &vellip;<br>
+  root<sub>M</sub> = state_root<br><br>
+  <small>電路約束：root<sub>M</sub> == instance[1]（state_root 公開輸入）</small>
+</div>
+
+<hr>
+
+<!-- ===== 3. BabyJubjub Curve ===== -->
+<h1><span class="section-num">3</span>BabyJubjub 曲線</h1>
+
+<p>EdDSA 簽名需要橢圓曲線運算。本協議使用 <strong>BabyJubjub</strong> — 一條定義在 BN254 scalar field 上的 twisted Edwards 曲線。</p>
+
+<h2>3.1 為什麼選 BabyJubjub</h2>
+
+<div class="key-insight">
+  <strong>Native 運算：</strong>BabyJubjub 的基域 = BN254 的 scalar field (F<sub>r</sub>)。這意味著所有曲線運算都是有限域的原生運算 — <strong>不需要非原生域模擬</strong>（non-native field arithmetic），省去大量約束。
+</div>
+
+<h2>3.2 曲線定義</h2>
+
+<div class="formula-block">
+  <strong>Twisted Edwards 形式：</strong><br>
+  <span class="math">a</span> &times; x&sup2; + y&sup2; = 1 + <span class="math">d</span> &times; x&sup2; &times; y&sup2;<br><br>
+  <span class="math">a</span> = &minus;1<br>
+  <span class="math">d</span> = 12181644023421730124874158521699555681764249180949974110617291017600649128846<br><br>
+  <strong>Base field:</strong> F<sub>r</sub>(BN254) = 21888242871839275222246405745257275088548364400416034343698204186575808495617<br>
+  <strong>Subgroup order:</strong> 2736030358979909402780800718157159386076813972158567259200215660948447373041
+</div>
+
+<h2>3.3 Point Operations</h2>
+
+<p>在 affine twisted Edwards 座標下：</p>
+
+<table>
+  <thead><tr><th>操作</th><th>公式</th><th>約束數</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Point Add</strong></td>
+      <td>
+        x<sub>3</sub> = (x<sub>1</sub>y<sub>2</sub> + y<sub>1</sub>x<sub>2</sub>) / (1 + d &times; x<sub>1</sub>x<sub>2</sub>y<sub>1</sub>y<sub>2</sub>)<br>
+        y<sub>3</sub> = (y<sub>1</sub>y<sub>2</sub> &minus; a &times; x<sub>1</sub>x<sub>2</sub>) / (1 &minus; d &times; x<sub>1</sub>x<sub>2</sub>y<sub>1</sub>y<sub>2</sub>)
+      </td>
+      <td class="num">~6</td>
+    </tr>
+    <tr>
+      <td><strong>Point Double</strong></td>
+      <td>特殊化的 add (P + P)</td>
+      <td class="num">~6</td>
+    </tr>
+    <tr>
+      <td><strong>Scalar Mul</strong></td>
+      <td>Double-and-add（253 bits）</td>
+      <td class="num">~3,000</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="result-box">
+  <strong>實作驗證：</strong>20 個 unit tests 通過，包含 curve constants 正確性、identity/inverse 性質、交換律/結合律、以及與 arnaucube/babyjubjub-rs 參考實作的交叉驗證。
+</div>
+
+<hr>
+
+<!-- ===== 4. EdDSA Signature ===== -->
+<h1><span class="section-num">4</span>EdDSA 簽名驗證</h1>
+
+<p>每筆交易都需要交易所的 EdDSA 簽名。電路在內部驗證簽名，確保交易不可偽造。</p>
+
+<h2>4.1 EdDSA with Poseidon</h2>
+
+<p>標準 EdDSA 使用 SHA-512 作為 hash — 這在 ZK 電路中極度昂貴。本協議使用 <strong>Poseidon hash</strong> 替代，利用其 ZK-friendly 特性大幅降低約束數。</p>
+
+<div class="formula-block">
+  <strong>簽名生成</strong>（off-circuit）：<br>
+  R = r &times; B（nonce point）<br>
+  h = Poseidon(R.x, R.y, A.x, A.y, M)（hash of commitment）<br>
+  S = r + h &times; sk (mod subgroup_order)<br><br>
+  <strong>簽名</strong> = (R, S)<br>
+  <strong>公鑰</strong> = A = sk &times; B
+</div>
+
+<div class="formula-block">
+  <strong>簽名驗證</strong>（in-circuit）：<br>
+  h = Poseidon(R.x, R.y, A.x, A.y, M)<br>
+  S &times; B ?= R + h &times; A<br><br>
+  <small>電路計算左邊 S &times; B 和右邊 R + h &times; A，比較兩個點的座標。<br>
+  兩次 scalar multiplication（~3,000 constraints each）+ 一次 point addition。</small>
+</div>
+
+<h2>4.2 Message = Trade Commitment</h2>
+<p>被簽名的訊息 M 是交易參數的 Poseidon hash：</p>
+<div class="formula-block">
+  M = Poseidon(asset_id, qty, price, direction, K, expiry_date, opt_type, exchange_id)
+</div>
+
+<h2>4.3 約束分析</h2>
+
+<table>
+  <thead><tr><th>組件</th><th>約束數</th><th>備註</th></tr></thead>
+  <tbody>
+    <tr><td>Scalar Mul: S &times; B</td><td class="num">~3,000</td><td>253 doublings + conditional adds</td></tr>
+    <tr><td>Scalar Mul: h &times; A</td><td class="num">~3,000</td><td>同上</td></tr>
+    <tr><td>Point Add: R + hA</td><td class="num">~6</td><td>twisted Edwards 加法</td></tr>
+    <tr><td>Equality check</td><td class="num">2</td><td>比較 x, y 座標</td></tr>
+    <tr><td>Poseidon hash (h)</td><td class="num">~320</td><td>5 個輸入的 sponge</td></tr>
+    <tr><td><strong>每筆簽名總計</strong></td><td class="em">~6,300</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<div class="result-box">
+  <strong>實作驗證：</strong>EdDSA off-circuit 8 tests 通過（sign/verify、tamper detection、多 key/多 message）。EdDSA circuit 6 tests 通過（ec_add, scalar_mul MockProver 驗證）。
+</div>
+
+<hr>
+
+<!-- ===== 5. Batch Attestation ===== -->
+<h1><span class="section-num">5</span>Per-Exchange 批次認證</h1>
+
+<p>交易所不只簽署個別交易 — 每家交易所還對自己的交易批次進行集體認證（batch attestation）。</p>
+
+<h2>5.1 機制</h2>
+
+<div class="formula-block">
+  交易按交易所分組：<br>
+  Exchange A: {tx<sub>1</sub>, tx<sub>3</sub>, tx<sub>5</sub>} &rarr; sub_root<sub>A</sub><br>
+  Exchange B: {tx<sub>2</sub>, tx<sub>4</sub>} &rarr; sub_root<sub>B</sub><br><br>
+  batch_root = Poseidon(sub_root<sub>A</sub>, sub_root<sub>B</sub>, ...)<br><br>
+  <small>每家交易所簽署自己的 sub_root，公開發布。<br>
+  驗證者可獨立向每家交易所確認 batch 內容。</small>
+</div>
+
+<h2>5.2 安全意義</h2>
+
+<div class="key-insight">
+  <strong>防止基金偽造交易：</strong>即使基金控制了自己的系統，它無法偽造交易所的 EdDSA 簽名。batch_root 作為公開輸入，任何人都可以向交易所詢問「你確認了這個 batch 嗎？」形成<strong>不可否認的審計軌跡</strong>。
+</div>
+
+<hr>
+
+<!-- ===== 6. Implementation Status ===== -->
+<h1><span class="section-num">6</span>實作進度</h1>
+
+<p>Proof #2 的實作分為 7 個階段。以下是目前的進度（108 tests green）：</p>
+
+<div class="phase-card done">
+  <h4>Phase 0: BabyJubjub 曲線算術 <span class="status done">DONE</span></h4>
+  <p>Curve constants (a, d, B, subgroup order)、point add/double/negate（affine twisted Edwards）。20 unit tests cross-verified against arnaucube/babyjubjub-rs。</p>
+</div>
+
+<div class="phase-card done">
+  <h4>Phase 1: Scalar Multiplication 電路 <span class="status done">DONE</span></h4>
+  <p>Halo2 double-and-add scalar mul gadget。MockProver 驗證通過，matches off-circuit scalar mul。</p>
+</div>
+
+<div class="phase-card done">
+  <h4>Phase 2: EdDSA Verify 電路 <span class="status done">DONE</span></h4>
+  <p>Off-circuit EdDSA (sign + verify) + in-circuit ec_add 和 scalar_mul。8 + 6 tests 通過，包含 tamper detection（篡改 R、S、pubkey、message 都會被偵測）。</p>
+</div>
+
+<div class="phase-card wip">
+  <h4>Phase 3: 整合到 transition.rs <span class="status wip">IN PROGRESS</span></h4>
+  <p>將 EdDSA verify gadget 接入 transition circuit。Trade struct 增加 signature fields (R, S)。每筆交易驗證 EdDSA 簽名。</p>
+</div>
+
+<div class="phase-card todo">
+  <h4>Phase 4: 擴展 op_types <span class="status todo">PLANNED</span></h4>
+  <p>加入 EXERCISE、EXPIRY、CORPORATE_ACTION 操作。移除或重新定義 PARAM_UPDATE（與靜態葉節點原則矛盾）。</p>
+</div>
+
+<div class="phase-card todo">
+  <h4>Phase 5: Per-Exchange 批次認證 <span class="status todo">PLANNED</span></h4>
+  <p>交易按交易所分組，sub-tree root per exchange，交易所簽署 batch attestation。</p>
+</div>
+
+<div class="phase-card todo">
+  <h4>Phase 6: 整合測試 + KZG 基準 <span class="status todo">PLANNED</span></h4>
+  <p>End-to-end：generate signatures &rarr; prove &rarr; verify。KZG proof 生成時間和大小基準測量。</p>
+</div>
+
+<hr>
+
+<!-- ===== 7. Architecture Decisions ===== -->
+<h1><span class="section-num">7</span>架構決策</h1>
+
+<table>
+  <thead><tr><th>決策</th><th>選擇</th><th>原因</th><th>替代方案</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>簽名曲線</td>
+      <td><strong>BabyJubjub</strong></td>
+      <td>Base field = BN254 F<sub>r</sub>，native arithmetic</td>
+      <td>secp256k1（non-native，10x 成本）</td>
+    </tr>
+    <tr>
+      <td>Hash for EdDSA</td>
+      <td><strong>Poseidon</strong></td>
+      <td>~64 constraints/permutation vs SHA-256 ~25,000</td>
+      <td>SHA-256, Blake2（ZK-unfriendly）</td>
+    </tr>
+    <tr>
+      <td>Scalar Mul 方法</td>
+      <td><strong>Double-and-add</strong></td>
+      <td>簡單、可靠、~3,000 constraints</td>
+      <td>Windowed（更快但更複雜）</td>
+    </tr>
+    <tr>
+      <td>State 更新模型</td>
+      <td><strong>增量式 Merkle</strong></td>
+      <td>逐筆更新，root 鏈接自然形成</td>
+      <td>Full tree rebuild（不可行）</td>
+    </tr>
+    <tr>
+      <td>Proof 組合</td>
+      <td><strong>獨立驗證</strong></td>
+      <td>簡單、無遞歸開銷</td>
+      <td>Recursive composition（複雜）</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="problem-box">
+  <strong>已知問題 (ISSUE-003)：</strong>原型中的 PARAM_UPDATE op_type 允許修改葉子參數，與靜態葉節點設計矛盾。Phase 4 將解決 — 選項：(1) 完全移除；(2) 重新定義為需要管理員簽名的行政修正。
+</div>
+
+<hr>
+
+<!-- ===== 8. Security Properties ===== -->
+<h1><span class="section-num">8</span>安全性質</h1>
+
+<table>
+  <thead><tr><th>性質</th><th>保證機制</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>交易不可偽造</strong></td>
+      <td>EdDSA 簽名在電路內驗證。偽造簽名需要破解離散對數問題。</td>
+    </tr>
+    <tr>
+      <td><strong>狀態不可篡改</strong></td>
+      <td>Root 鏈接：每筆交易的 old root 必須等於前一筆的 new root。最終 root 必須等於公開輸入。</td>
+    </tr>
+    <tr>
+      <td><strong>交易不可遺漏</strong></td>
+      <td>batch_root 承諾所有交易。跳過任何一筆都會導致 root 不匹配。</td>
+    </tr>
+    <tr>
+      <td><strong>交易不可重排</strong></td>
+      <td>Root 鏈接強制交易的執行順序。改變順序 = 改變中間 roots。</td>
+    </tr>
+    <tr>
+      <td><strong>狀態連續性</strong></td>
+      <td>state_root_prev 連接到上一期。Genesis 由監管機構簽名錨定。完整歷史可追溯。</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr>
+
+<div style="text-align: center; padding: 32px 0; color: #718096; font-size: 14px;">
+  <p><a href="proof1.html" style="color: var(--accent); text-decoration: none;">&larr; Proof #1 技術細節</a>
+  &ensp;|&ensp;
+  <a href="index.html" style="color: var(--accent); text-decoration: none;">協議總覽</a></p>
+  <p style="margin-top: 8px;"><a href="../index.html" style="color: var(--accent); text-decoration: none;">ZKMM</a> &mdash; Zero-Knowledge Machine Learning Research</p>
+</div>
+
+</body>
+</html>

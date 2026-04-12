@@ -598,7 +598,7 @@
   <h1>逐步截斷 Minimax Horner 求值<br>在零知識證明中的應用</h1>
   <p class="subtitle">實驗結果與研究貢獻總覽</p>
   <p class="brief">
-    一套在 ZK 電路中求值超越函數（<strong>exp</strong>、<strong>ln</strong>、<strong>erf</strong>、<strong>sin</strong>、...）的完整方法論。
+    一套在 ZK 電路中求值超越函數（<strong>exp</strong>、<strong>ln</strong>、<strong>erf</strong>、<strong>sin</strong>、...）的完整證明架構。
     在金融級應用場景中實現最高 <strong>44 個有效位元</strong>的精度，
     證明大小僅 <strong>7–15 KB</strong>，驗證時間為毫秒級。
   </p>
@@ -634,7 +634,7 @@
       </div>
       <div class="is-box">
         <div class="box-label">是我們的貢獻</div>
-        <p>一套<strong>完整的方法論</strong>：在零知識電路中實現高精度超越函數求值 &mdash; 涵蓋電路設計、數值分析、以及端到端的金融模型證明。</p>
+        <p>一套<strong>完整的證明架構</strong>：在零知識電路中實現高精度超越函數求值 &mdash; 涵蓋電路設計、數值分析、以及端到端的金融合規證明。</p>
       </div>
     </div>
 
@@ -671,7 +671,7 @@
         <div class="contrib-num">5</div>
         <div class="contrib-body">
           <strong>端到端金融模型 ZK 證明</strong>
-          <span>從抽象方法論到可運行的 KZG 證明：Black-Scholes 選擇權定價（場景 A）與 Merton 結構模型違約機率（場景 C）。</span>
+          <span>從證明架構到可運行的 KZG 證明：Black-Scholes 選擇權定價（場景 A）與 Merton 結構模型違約機率（場景 C）。</span>
         </div>
       </div>
     </div>
@@ -700,9 +700,9 @@
       <table>
         <thead><tr><th>角色</th><th>身份</th><th>職責</th></tr></thead>
         <tbody>
-          <tr><td><strong>證明者</strong></td><td>對沖基金</td><td>持有選擇權部位，想保護交易策略。生成 ZK 證明</td></tr>
-          <tr><td><strong>驗證者</strong></td><td>監管機構</td><td>確認 |Delta_total| &le; 0.05，毫秒級驗證，不需知道持倉</td></tr>
-          <tr><td><strong>可信第三方</strong></td><td>清算所</td><td>記錄所有交易，每日公布持倉的 Merkle root（一個 hash），保證輸入真實性</td></tr>
+          <tr><td><strong>證明者</strong></td><td>對沖基金</td><td>持有選擇權部位，想保護交易策略。生成兩個 ZK 證明（Delta 合規 + 狀態轉移）</td></tr>
+          <tr><td><strong>驗證者</strong></td><td>監管機構</td><td>驗證兩個 proof（毫秒級）+ 簽署初始狀態（Genesis）+ 隨機抽查</td></tr>
+          <tr><td><strong>簽名者</strong></td><td>多家交易所</td><td>各自執行的交易簽名（EdDSA），提供批次承諾。沒有任何一方看到完整組合</td></tr>
         </tbody>
       </table>
     </div>
@@ -718,7 +718,7 @@
 
     <h4>電路架構</h4>
     <div class="circuit-diagram"><span class="dim">┌────────────────────────────────────────────────────┐</span>
-<span class="dim">│</span>  公開輸入: Merkle_root, threshold                    <span class="dim">│</span>
+<span class="dim">│</span>  公開輸入: State(T) root, threshold                  <span class="dim">│</span>
 <span class="dim">│</span>  私密見證: S, r, sigma_i, n, 所有部位資料             <span class="dim">│</span>
 <span class="dim">└───────────────────┬────────────────────────────────┘</span>
                     <span class="dim">│</span>
