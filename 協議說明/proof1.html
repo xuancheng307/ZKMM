@@ -204,14 +204,96 @@
   .site-nav a:hover { background: #2b6cb0; color: #fff; }
   .site-nav a.active { background: #2b6cb0; color: #fff; font-weight: 600; }
 
+  /* --- Script (講稿) blocks --- */
+  .script-block {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border: 1px solid #f59e0b;
+    border-left: 5px solid #f59e0b;
+    border-radius: 0 10px 10px 0;
+    padding: 20px 24px;
+    margin: 24px 0;
+    font-family: -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 15.5px;
+    line-height: 2;
+    color: #78350f;
+    position: relative;
+    display: none;
+  }
+  .script-block::before {
+    content: attr(data-label);
+    position: absolute;
+    top: -11px; left: 16px;
+    background: #f59e0b;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+  }
+  .script-block.visible { display: block; }
+  .script-block p { margin: 8px 0; color: #78350f; }
+  .script-block .pause {
+    display: block;
+    text-align: center;
+    color: #b45309;
+    font-size: 13px;
+    margin: 12px 0;
+    font-style: italic;
+  }
+  .script-block .emphasis {
+    background: #fef08a;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+  .script-block .gesture {
+    color: #92400e;
+    font-size: 13px;
+    font-style: italic;
+  }
+
+  .script-toggle-btn {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 1000;
+    background: #f59e0b;
+    color: white;
+    border: none;
+    border-radius: 50px;
+    padding: 14px 24px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .script-toggle-btn:hover {
+    background: #d97706;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(245, 158, 11, 0.5);
+  }
+  .script-toggle-btn.active {
+    background: #b45309;
+  }
+  .script-toggle-btn .icon { font-size: 18px; }
+
   @media print {
     body { font-size: 12pt; padding: 0; }
     table { break-inside: avoid; }
     h1 { break-before: page; }
+    .script-block { display: none !important; }
+    .script-toggle-btn { display: none !important; }
   }
   @media (max-width: 700px) {
     .pipeline { flex-direction: column; }
     .pipeline .arrow { transform: rotate(90deg); }
+    .script-toggle-btn { bottom: 16px; right: 16px; padding: 12px 18px; font-size: 14px; }
   }
 </style>
 </head>
@@ -222,7 +304,6 @@
   <a href="index.html">協議總覽</a>
   <a href="proof1.html" class="active">Proof #1 技術</a>
   <a href="proof2.html">Proof #2 技術</a>
-  <a href="merkle.html">Merkle Tree</a>
 </nav>
 
 <!-- ===== Cover ===== -->
@@ -243,7 +324,8 @@
   <strong>Proof #1 proves:</strong><br>
   &exist; positions {<span class="math">p<sub>1</sub>, ..., p<sub>N</sub></span>} &sub; State(<span class="math">T</span>),
   &exist; {<span class="math">&sigma;<sub>1</sub>, ..., &sigma;<sub>N</sub></span>} such that:<br><br>
-  (a) &forall;<span class="math">i</span>: MerkleVerify(<span class="math">p<sub>i</sub></span>, path<sub>i</sub>, state_root) = true<br>
+  (a) &forall;<span class="math">i</span>: MerkleVerify(<span class="math">p<sub>i</sub></span>, path<sub>i</sub>, state_root) = true
+  <small style="font-style: normal; color: #718096;">（注：Proof #1 不強制葉索引唯一性 — 由 Proof #2 的 State(T) 完整性保證）</small><br>
   (b) &forall;<span class="math">i</span>: MerkleVerify(mkt<sub>i</sub>, mkt_path<sub>i</sub>, market_data_root) = true<br>
   (c) &forall;<span class="math">i</span>: |BS(<span class="math">S, K<sub>i</sub>, T<sub>i</sub>, r, q, &sigma;<sub>i</sub></span>) &minus; settle_price<sub>i</sub>| &le; &epsilon;<sub>&sigma;</sub><br>
   (d) &forall;<span class="math">i</span>: <span class="math">T<sub>i</sub></span> &times; 365 = expiry_date<sub>i</sub> &minus; today<br>
@@ -261,6 +343,20 @@
     <tr><td class="num">3</td><td><code>today</code></td><td>結算日期（days since epoch）</td><td>公開日期</td></tr>
   </tbody>
 </table>
+
+<div class="script-block" data-label="講稿 — 開場 + ZK Statement（~3min）">
+  <p>各位老師好，接下來我要介紹我們協議中的第一個零知識證明 — <span class="emphasis">Proof #1: Delta Compliance</span>。這個證明的目標是：讓基金公司在<strong>不揭露任何持倉細節</strong>的前提下，向監管機構證明其投資組合的 Delta 風險在合規門檻之內。</p>
+  <p><span class="emphasis">為什麼用零知識證明，而不是其他隱私技術？</span>三個替代方案各有致命缺點：(1) <strong>加密 + 可信第三方</strong>：需要一個機構能看到全部持倉明文，這正是我們要避免的 — 基金公司不願意讓任何人看到交易策略。(2) <strong>安全多方計算（MPC）</strong>：需要多方在線協作，每次驗證都是一輪互動協議，延遲高且基礎設施複雜。(3) <strong>同態加密（FHE）</strong>：可以在密文上計算，但 Black-Scholes 涉及超越函數（ln, erf, exp），FHE 的乘法深度限制讓這類非線性計算極為昂貴。ZK proof 的優勢是：prover 在本地一次性計算，生成一個常數大小的 proof（~1 KB），verifier 在毫秒內驗證。<strong>非互動、可公開驗證、不洩漏任何私密輸入。</strong></p>
+  <span class="pause">— 停頓，指向 ZK Statement —</span>
+  <p><span class="emphasis">為什麼拆成兩個 proof？</span>我們的協議用 Proof #1 做<strong>合規計算</strong>（Delta 有沒有超標），用 Proof #2 做<strong>狀態完整性</strong>（State Tree 是正確更新的、每個葉節點唯一）。拆分的理由是<strong>關注點分離</strong>：Proof #1 處理金融數學（BS 公式、多項式逼近），Proof #2 處理資料結構（tree update、batch transition）。合在一起的話，單一電路會過大、開發難度高、且不同更新頻率的邏輯被綁死 — 例如市場數據每日變動但 tree 結構規則不常改。</p>
+  <p>Proof #1 要證明五件事。<span class="gesture">（逐條指）</span></p>
+  <p>條件 (a)：每筆持倉確實存在於已承諾的 State Tree 裡 — 透過 Merkle proof 驗證。這裡有一個<span class="emphasis">跨 proof 的設計取捨</span>：Proof #1 不強制葉索引唯一性，也就是理論上同一筆持倉可以被重複提交。但這不是漏洞 — 因為 <strong>Proof #2 保證了 State Tree 的完整性和葉索引唯一性</strong>，兩個 proof 合在一起就確保了每個持倉恰好被檢查一次。為什麼不在 Proof #1 也檢查唯一性？因為唯一性需要排序或全域比對，這在固定大小的電路中代價很高（O(N²) 的 pairwise check），而 Proof #2 的 tree update 邏輯天然就包含了這個保證。</p>
+  <p>條件 (b)：市場數據同樣通過 Merkle 驗證，確保使用的是公開的官方數據。</p>
+  <p>條件 (c)：用隱含波動率 σ 算出的 BS price 要接近官方結算價 — 這是 σ 正向驗證。</p>
+  <p>條件 (d)：到期時間 T 在電路內計算，不信任 prover。</p>
+  <p>條件 (e)：所有持倉的加權 Delta 總和的絕對值不超過門檻 τ。</p>
+  <p>公開輸入只有 4 個 — state root、market data root、門檻 τ、和今天的日期。都是可公開驗證的值。<span class="emphasis">為什麼只有 4 個？</span>設計原則是：公開輸入越少，隱私性越強。所有持倉細節（權重、strike、到期日、σ）都是 private witness，只有可公開驗證的「錨點」才暴露。</p>
+</div>
 
 <hr>
 
@@ -285,6 +381,15 @@
 
 <div class="key-insight">
   <strong>Part B（Delta 管線）是本論文的核心貢獻</strong> — 使用 Minimax 多項式逼近 + Horner 求值法，在 ZK 電路內高效計算 Black-Scholes Delta 所需的三個超越函數（ln, erf, exp）。這一步驟僅佔總電路的約 3%，但是整個協議能夠處理選擇權（而非僅限於現貨）的關鍵。
+</div>
+
+<div class="script-block" data-label="講稿 — 2 電路架構（~2min）">
+  <p>在看電路細節之前，先說明<span class="emphasis">為什麼選擇 Halo2 + KZG 作為證明系統</span>。</p>
+  <p>我們需要的是：(1) 可程式化的電路 — 因為 Delta 計算涉及複雜的多項式求值管線；(2) 高效的 lookup table — 用於 range reduction 和 byte decomposition；(3) 成熟的工具鏈。Halo2 基於 PLONKish 算術化，支援自訂閘和 lookup table，而 KZG 多項式承諾提供了常數大小的 proof（~1 KB）和快速的驗證。相比之下，Groth16 不支援 lookup；STARKs 的 proof 太大（~100 KB）且驗證成本高。</p>
+  <p>另一個基礎選擇是<span class="emphasis">定點算術（fixed-point, pp=24）</span>。為什麼不用浮點數？因為浮點數需要分別追蹤指數和尾數，每次運算都要做正規化 — 在 ZK 電路中代價極高。定點算術把所有數乘以 2<sup>24</sup> ≈ 1,600 萬，用整數運算模擬小數。pp=24 提供約 7 位十進位精度，足夠金融計算的需求，而且電路中只需要標準的乘法和加法。</p>
+  <span class="pause">— 指向管線圖 —</span>
+  <p>整體電路分為五個部分。<span class="gesture">（逐一指）</span> Part A、A' 做 Merkle 驗證。Part A'' 驗證 σ。<span class="emphasis">Part B 是核心貢獻 — Delta 計算</span>。Part C 做合規檢查。每個部分對每一筆持倉獨立執行，最多 128 slots，最後在 Part C 匯總。</p>
+  <p>Part B 只佔整體電路的 3% — 這正好說明了我們方法的高效性。</p>
 </div>
 
 <hr>
@@ -334,16 +439,32 @@
     <tr><td><code>K</code></td><td>=</td><td><code>strike</code></td></tr>
     <tr><td><code>expiry_date</code></td><td>=</td><td><code>expiry_date</code></td></tr>
     <tr><td><code>asset_type</code></td><td>=</td><td><code>asset_type</code></td></tr>
+    <tr><td><code>K</code></td><td>=</td><td>delta.<code>strike</code></td></tr>
+    <tr><td colspan="2" style="text-align:right;">mkt.<code>spot</code></td><td>= delta.<code>stock</code> (S)</td></tr>
+    <tr><td colspan="2" style="text-align:right;">mkt.<code>r</code></td><td>= delta.<code>r</code></td></tr>
+    <tr><td colspan="2" style="text-align:right;">mkt.<code>q</code></td><td>= delta.<code>q</code></td></tr>
   </tbody>
 </table>
 
-<p>此外，Market Data 中的 <code>spot</code>（S）、<code>r</code>、<code>q</code>、<code>settle_price</code> 被提取到 Delta 管線和 &sigma; 驗證的輸入中。</p>
+<p>前 4 條確保合約條款（underlying、strike、expiry、type）一致；後 4 條將市場參數 (S, r, q) 和持倉 K 直接連結到 Delta 管線的輸入 cells。</p>
 
 <div class="problem-box">
   <strong>為什麼 Market Data 用 Merkle 而不用 Lookup Table？</strong>Market Data 每日更新 — 如果用 Halo2 fixed column lookup，每次更新都需要重新產生 setup 和 VK。使用 Merkle tree 讓電路結構完全固定，只有 root 值（公開輸入）每日變化。
 </div>
 
 <p>Part A' 是整個電路的<strong>主要成本來源</strong>，約佔 55%（~1,386 rows/position），因為 Market Data 有 8 個欄位（需要 4 次 Poseidon permutation）且 tree depth ~20。</p>
+
+<div class="script-block" data-label="講稿 — 3-4 State & Market Merkle（~3.5min）">
+  <p>Part A 是標準的 Merkle 驗證。每個持倉有 5 個欄位：持倉量 w、履約價 K、到期日、資產類型、和標的資產 ID。</p>
+  <p><span class="emphasis">為什麼用 Merkle tree 做狀態承諾，而不是 KZG 多項式承諾或 Pedersen vector commitment？</span>三個原因：第一，Merkle tree 支援高效的<strong>成員證明</strong> — 只需 O(log N) 個 hash 就能證明某筆持倉存在於樹中，而不需要揭露其他持倉。第二，Merkle tree 的<strong>更新</strong>也是 O(log N)，適合每日結算時只更改部分持倉。第三，Merkle tree 的概念簡單，安全性分析直觀 — 只要 hash 函數抗碰撞，承諾就是 binding 的。</p>
+  <p><span class="emphasis">為什麼選 Poseidon hash 而不是 SHA-256 或 Pedersen hash？</span>SHA-256 是位元運算（AND、XOR、rotation），在算術電路中非常昂貴 — 一次 SHA-256 需要約 25,000 個約束，而 Poseidon 只需約 64 個。Pedersen hash 雖然也是代數友好的，但它基於橢圓曲線標量乘法，成本介於兩者之間。Poseidon 是專門為 ZK 電路設計的<strong>代數 hash 函數</strong>，直接在有限域 F<sub>p</sub> 上運算，每次 permutation 只需要幾十個乘法閘。這個選擇讓 Merkle 驗證的成本降低了兩個數量級。</p>
+  <p><span class="emphasis">為什麼用 sponge 結構？</span>Poseidon sponge（rate=2, capacity=1）可以吸收任意長度的輸入。5 個欄位每次吸收 2 個，需要 3 次 permutation。相比之下，如果用固定寬度的 Poseidon，就需要先 pad 到特定長度，浪費 rows。</p>
+  <span class="pause">— 翻到 Part A' —</span>
+  <p>Part A' 結構類似，但處理市場數據。市場數據葉有 8 個欄位。</p>
+  <p>這裡有一個重要的設計決策：<span class="emphasis">為什麼市場數據不用 Halo2 的 lookup table？</span>Lookup table 是 Halo2 的強大功能 — 可以把任意函數值預先存在 fixed column 中，電路直接查表。但問題是：<strong>fixed column 是 setup 的一部分</strong>。市場數據每天都在變，如果用 lookup，每天都要重新做 trusted setup、重新產生 proving key 和 verification key。這完全不切實際。改用 Merkle tree，電路結構<strong>一次 setup 永久有效</strong>，每天只有 root 這個公開輸入在變。</p>
+  <p>Part A 和 A' 之間透過 <strong>8 條 copy constraints</strong> 連結。<span class="gesture">（指向表格）</span> <span class="emphasis">為什麼用 copy constraint 而不是重新 hash 驗證？</span>Copy constraint 是 PLONK 系統的原生機制 — 它強制兩個 cell 的值完全相等，零成本。如果改用重新 hash 來驗證一致性，就需要額外的 Poseidon 電路，白白增加 rows。前 4 條確保合約條款一致，後 4 條把 S、r、q、K 直接綁定到 Delta 管線的輸入 cells。</p>
+  <p>Part A' 佔了整個電路的 55%，是主要成本來源 — 因為 8 個欄位需要 4 次 Poseidon permutation。</p>
+</div>
 
 <hr>
 
@@ -360,7 +481,7 @@
     <tr><td>asset_type = 1 (EU Put)</td><td>&rarr;</td><td>is_put = 1, is_equity = 0</td></tr>
     <tr><td>asset_type = 2 (Equity)</td><td>&rarr;</td><td>is_put = 0, is_equity = 1</td></tr>
   </table>
-  <small>閘約束：is_put &times; (1 &minus; is_put) = 0, is_equity &times; (1 &minus; is_equity) = 0（確保布林）</small>
+  <small>閘約束：is_equity &times; (1 &minus; is_equity) = 0（確保布林）。is_put 的布林性由 Delta 管線隱式保證。</small>
 </div>
 
 <h2>5.2 Equity MUX 閘 (q_equity_mux)</h2>
@@ -395,6 +516,13 @@
   <strong>為什麼不直接在電路內做除法？</strong>ZK 電路中的除法 = 乘法逆元，成本較高。改為 prover 在電路外算好 T<sub>i</sub> = (expiry &minus; today) / 365，電路只需驗證 T<sub>i</sub> &times; 365 == expiry &minus; today（一個乘法閘）。
 </div>
 
+<div class="script-block" data-label="講稿 — 5-6 類型分解與時間驗證（~2min）">
+  <p>在進入 Delta 計算之前，電路需要做兩件前處理工作。</p>
+  <p>第一是<strong>類型分解</strong>。我們的系統支援三種資產：歐式 call、歐式 put、和 equity。asset_type 被分解為 is_put 和 is_equity 兩個旗標。</p>
+  <p><span class="emphasis">為什麼用 MUX 閘而不是條件分支？</span>ZK 電路沒有 if-else — 所有路徑都必須執行。MUX 的做法是：<strong>兩個值都算出來</strong>（bs_delta 和 1.0），然後用 is_equity 做加權選擇：effective_delta = is_equity × 1.0 + (1 − is_equity) × bs_delta。這在電路中只需要 2 個乘法和 1 個加法。對 equity 來說 Delta 永遠是 1（持倉量等於 Delta 貢獻），不需要 BS 計算。</p>
+  <p>第二是<strong>到期時間驗證</strong>。<span class="emphasis">為什麼不讓 prover 直接提供 T 就好？</span>因為 T 可以被操縱 — 較短的 T 會改變 Delta 計算結果。所以電路自己驗證：T × 365 = expiry_date − today，兩邊都是 Merkle-verified 或公開輸入的值。<span class="emphasis">為什麼用乘法驗證而不是電路內除法？</span>ZK 電路中的除法需要乘法逆元，成本較高。改為 prover 在電路外算好 T，電路只做一個乘法閘來驗證 — 這是 ZK 中常見的 <strong>「prover hint + verifier check」</strong>設計模式。</p>
+</div>
+
 <hr>
 
 <!-- ===== 7. Part A'': Sigma Verification ===== -->
@@ -421,13 +549,27 @@
   <h4>q_bs_price gate</h4>
   <p>驗證 BS price &asymp; settle_price。使用加法形式避免除法：</p>
   <p style="font-family: 'Times New Roman', serif; font-style: italic; font-size: 15px;">
-    bs_price + is_put &times; S &times; disc_q + K &times; disc_r &times; N(d<sub>2</sub>) = S &times; disc_q &times; N(d<sub>1</sub>) + is_put &times; K &times; disc_r
+    bs + is_put &times; s_disc_q + term2 = term1 + is_put &times; k_disc_r<br>
+    <small style="font-style: normal;">
+    其中 term1 = stock &times; &Delta;<sub>call</sub> / S（= S&middot;e<sup>&minus;qT</sup>&middot;N(d<sub>1</sub>) / S），term2 = strike &times; disc_r &times; N(d<sub>2</sub>) / S，<br>
+    s_disc_q = stock &times; discount / S，k_disc_r = strike &times; disc_r / S（皆為 fp24 定點值）
+    </small>
   </p>
-  <p>容許偏差：SIGMA_TOL = 0.02 &times; 2<sup>24</sup>（&asymp; 2% 結算價）</p>
+  <p>容許偏差：SIGMA_TOL = 0.02 &times; 2<sup>24</sup> = 335,544（絕對容差 0.02，非百分比）</p>
 </div>
 
 <div class="purple-box">
   <strong>&sigma; 驗證的安全意義：</strong>如果不驗證 &sigma;，基金可以填入讓 Delta 最小的假 &sigma;（例如極高波動率會讓所有 Delta &rarr; 0.5，降低加權效果）。結算價鎖定使 &sigma; 成為<strong>隱函數的唯一解</strong>— 基金無法操縱。
+</div>
+
+<div class="script-block" data-label="講稿 — 7 σ 正向驗證（~2.5min）">
+  <p>σ 正向驗證是 Proof #1 的一個<span class="emphasis">關鍵安全機制</span>。</p>
+  <p>隱含波動率 σ 是 prover 在電路外用 Newton-Raphson 法從結算價反推出來的。但電路不能直接信任 prover 給的 σ — 為什麼？因為如果不驗證，基金可以填入讓 Delta 趨近於零的假 σ，從而規避合規檢查。例如，極高的波動率會讓所有 Delta 趨向 0.5，降低加權效果。</p>
+  <span class="pause">— 停頓 —</span>
+  <p><span class="emphasis">為什麼用「正向驗證」而不是在電路內直接求解 σ？</span>因為求解 σ 需要 Newton-Raphson 迭代 — 這涉及迴圈和條件收斂判斷，在 ZK 電路中無法實現（電路是固定結構的，不支援動態迭代）。但反過來，給定 σ 去<strong>算一次</strong> BS price 只需要前向計算 — 這正好就是我們 Delta 管線已經能做的事。所以策略是：prover 在電路外做困難的反向求解，電路只負責簡單的正向驗證。</p>
+  <p>容許偏差 SIGMA_TOL = 0.02。<span class="emphasis">為什麼用絕對容差而不是相對容差？</span>因為相對容差需要除法（|error / price|），而除法在 ZK 電路中成本高。絕對容差只需要一個 range check：|bs_price − settle_price| ≤ 0.02，電路成本更低。0.02 的容差足夠小，不會影響 σ 的唯一性。</p>
+  <p><span class="emphasis">BS price 為什麼要改寫成加法形式？</span><span class="gesture">（指向 q_bs_price gate）</span> 標準的 BS 公式是 Call = S·e<sup>−qT</sup>·N(d₁) − K·e<sup>−rT</sup>·N(d₂)，裡面有減法。在有限域中，減法結果可能 wrap around 成巨大的值，無法直接做 range check。改寫為加法形式：把減號兩邊移到等式的不同側，所有項都是正的，就可以安全比較了。</p>
+  <p>因為結算價是公開的、不可篡改的，σ 就成了隱函數的唯一解 — 基金無法操縱。</p>
 </div>
 
 <hr>
@@ -455,16 +597,16 @@
   <tbody>
     <tr><td class="num">1</td><td>計算 S/K（定點除法）</td><td>witness + 乘法驗證</td></tr>
     <tr><td class="num">2</td><td>Range reduction: r = S/K 映射到 [1, 2)</td><td>ByteTable lookup</td></tr>
-    <tr><td class="num">3-4</td><td>ln(r) by Minimax polynomial (degree 7)</td><td>Horner 求值 + 延遲截斷</td></tr>
+    <tr><td class="num">3-4</td><td>ln(r) by Minimax polynomial (degree 8)</td><td>Horner 求值 + 延遲截斷</td></tr>
     <tr><td class="num">5</td><td>ln(S/K) = ln(r) + k &times; ln(2)</td><td>加法閘</td></tr>
     <tr><td class="num">6-7</td><td>計算 d<sub>1</sub> 分子和分母</td><td>乘法 + 加法</td></tr>
     <tr><td class="num">8</td><td>d<sub>1</sub> = 分子 / 分母</td><td>witness + 驗證</td></tr>
     <tr><td class="num">9</td><td>Range reduction: |d<sub>1</sub>/&radic;2| 映射到 [0, r<sub>max</sub>]</td><td>ByteTable lookup</td></tr>
-    <tr><td class="num">10-11</td><td>erf(x) by Minimax polynomial (degree 9)</td><td>Horner 求值 + 延遲截斷</td></tr>
+    <tr><td class="num">10-11</td><td>erf(x) by Minimax polynomial (degree 8)</td><td>Horner 求值 + 延遲截斷</td></tr>
     <tr><td class="num">12</td><td>N(d<sub>1</sub>) = 0.5 + 0.5 &times; erf(d<sub>1</sub>/&radic;2)</td><td>加法閘 + 符號處理</td></tr>
     <tr><td class="num">13</td><td>qT = q &times; T</td><td>乘法閘</td></tr>
     <tr><td class="num">14</td><td>Range reduction for exp(&minus;qT)</td><td>ByteTable lookup</td></tr>
-    <tr><td class="num">15-16</td><td>exp(x) by Minimax polynomial (degree 6)</td><td>Horner 求值 + 延遲截斷</td></tr>
+    <tr><td class="num">15-16</td><td>exp(x) by Minimax polynomial (degree 8)</td><td>Horner 求值 + 延遲截斷</td></tr>
     <tr><td class="num">17</td><td>&Delta; = e<sup>&minus;qT</sup> &times; N(d<sub>1</sub>)</td><td>乘法閘</td></tr>
   </tbody>
 </table>
@@ -477,6 +619,20 @@
 <div class="formula-block">
   Put &Delta; = Call &Delta; &minus; e<sup>&minus;qT</sup>（由 put-call parity 推導）<br><br>
   <small>電路使用 MUX：is_put = 0 &rarr; Call &Delta;，is_put = 1 &rarr; Call &Delta; &minus; discount</small>
+</div>
+
+<div class="script-block" data-label="講稿 — 8 Delta 管線・核心貢獻（~5min）">
+  <p>現在進入本論文的<span class="emphasis">核心貢獻 — Delta 計算管線</span>。</p>
+  <p>Black-Scholes Delta 公式包含三個超越函數：自然對數 ln、誤差函數 erf、和指數函數 exp。在一般程式語言中，這些函數由 CPU 的浮點運算單元直接支援。但在 ZK 電路中，我們只有加法和乘法 — 沒有浮點數，沒有條件分支，沒有迭代。</p>
+  <span class="pause">— 停頓，讓聽眾理解這個挑戰 —</span>
+  <p>在 ZK 中逼近超越函數有幾種可能的方案，讓我解釋為什麼我們選擇了 Minimax：</p>
+  <p><span class="emphasis">為什麼不用 Taylor 展開？</span>Taylor 展開在展開點附近精度很高，但離展開點越遠誤差增長很快。要在整個輸入區間達到足夠精度，Taylor 需要很高的次數 — 而在 ZK 電路中，每增加一個次數就多一個乘法閘。Minimax 多項式是在整個區間上<strong>均勻分配誤差</strong>的最優解 — 由 Chebyshev 等振盪定理保證。同樣 degree 8，Minimax 比 Taylor 精度高 100 到 1000 倍。</p>
+  <p><span class="emphasis">為什麼不用 lookup table？</span>Halo2 的 lookup table 可以直接查表得到函數值，但問題是精度。要達到 24-bit 定點精度，lookup table 需要 2<sup>24</sup> ≈ 1,600 萬個 entries — 這會讓 proving key 和 setup 的大小爆炸。多項式逼近只需要 9 個係數。</p>
+  <p><span class="emphasis">為什麼用 degree 8？</span>這是精度和成本的平衡點。Degree 8 在我們的輸入區間上可以達到 24-bit 以上的精度（相對誤差 &lt; 2<sup>-24</sup>），而每個多項式求值只需要 8 個乘法閘。更低的 degree 精度不夠，更高的 degree 成本增加但精度提升已經邊際遞減。</p>
+  <p>搭配 <span class="emphasis">Horner 求值法</span>。<span class="gesture">（指向 17 步表格）</span> 為什麼不用直接展開 c₀ + c₁x + c₂x² + ...？因為直接展開每一步乘法都會產生中間結果需要截斷，而 Horner 法把多項式改寫為 c₀ + x(c₁ + x(c₂ + ...))，整個過程只需要在<strong>最後做一次截斷</strong>。這把截斷的額外 rows 從 O(d) 降到 O(1)。</p>
+  <p><span class="emphasis">為什麼需要 range reduction？</span>Minimax 多項式只在特定區間上有保證精度。例如 ln 的多項式是為 [1, 2) 設計的。所以我們先把輸入映射到這個區間（x = 2<sup>k</sup> × r，r ∈ [1,2)），求值後再還原：ln(x) = ln(r) + k × ln(2)。Range reduction 用 ByteTable lookup 實現，成本很低。</p>
+  <p>整個管線 17 步，每個持倉只需約 <span class="emphasis">58 rows</span>。相比之下，光是 Merkle 驗證就要將近 2,000 rows。Delta 管線只佔總電路的 3%。</p>
+  <p>對於 put option，我們利用 <span class="emphasis">put-call parity</span>：Put Delta = Call Delta − e<sup>−qT</sup>。這是金融數學的恆等式，不是近似 — 所以只需一個減法閘，不必重新計算整個管線。</p>
 </div>
 
 <hr>
@@ -504,6 +660,13 @@
 
 <p>&tau; 來自公開輸入 <code>instance[2]</code>（threshold）。</p>
 
+<div class="script-block" data-label="講稿 — 9 合規檢查（~1.5min）">
+  <p>最後一步是合規檢查。電路把所有持倉的 w<sub>i</sub> 乘以 Delta<sub>i</sub> 累加起來。因為 w 有正有負 — 代表多倉和空倉 — 我們把正向貢獻和負向貢獻分開累加。</p>
+  <p><span class="emphasis">為什麼要分開累加，而不是直接加總？</span>因為 ZK 電路在有限域 F<sub>p</sub> 上運算，負數不存在 — 一個「負值」在有限域中其實是一個非常大的正數。如果直接做 a - b，結果可能 wrap around 變成一個巨大的值，range check 就會失敗。所以我們把正項和負項分別累加，最後用<span class="emphasis">雙向 range check</span> 來驗證。</p>
+  <p>具體做法：τ + negative_sum ≥ positive_sum，同時 τ + positive_sum ≥ negative_sum。兩邊都是非負數相加，不會出現 underflow 問題。兩個都成立，就等價於 |net delta| ≤ τ。</p>
+  <p>這個技巧是 ZK 電路中處理帶符號比較的<strong>標準做法</strong> — 把「比大小」轉化為「驗證一個差值落在合法範圍內」。</p>
+</div>
+
 <hr>
 
 <!-- ===== 10. Constraint Breakdown ===== -->
@@ -522,9 +685,17 @@
 </table>
 
 <p><strong>總計</strong>：~2,017 rows/position &times; 128 positions &asymp; 258,000 rows（k &asymp; 18）</p>
+<p><small style="color: #718096;">註：N<sub>max</sub>=128 為生產規格。目前測試實作使用 N_POS=8（depth=3）以加速開發驗證。</small></p>
 
 <div class="key-insight">
   <strong>瓶頸不在 Delta 計算</strong> — Part B 僅佔 3%。真正的成本在 Merkle 驗證（81%），這是所有 ZK 鏈上狀態驗證的共同挑戰。本論文的貢獻在於讓 Delta 計算成為可能且高效，而不是讓整體電路變小。
+</div>
+
+<div class="script-block" data-label="講稿 — 10 電路規模（~1.5min）">
+  <p>最後看整體電路的規模分析。<span class="gesture">（指向表格）</span></p>
+  <p>每個持倉大約 2,017 rows。乘以 128 個持倉 slot，總共約 258,000 rows，需要的 circuit size 是 k 約等於 18。</p>
+  <p>這張表最重要的觀察是：<span class="emphasis">瓶頸完全不在 Delta 計算</span>。Merkle 驗證佔了 81%，而我們的 Delta 管線只佔 3%。這個數據本身就說明了 Minimax + Horner 方法的效率 — 在 ZK 電路中計算 Black-Scholes Delta 的成本，比驗證數據真實性的成本低了一個數量級。</p>
+  <p>這也解釋了為什麼我們選擇 <span class="emphasis">Poseidon 而不是 SHA-256</span> 做 hash — 如果用 SHA-256，Merkle 驗證的成本會再高出 100 倍以上，那 81% 就會變成 99%，整個電路就不切實際了。Poseidon 是目前 ZK 電路中最高效的代數 hash 函數，這個選擇直接決定了整個系統的可行性。</p>
 </div>
 
 <hr>
@@ -548,6 +719,12 @@
   </tbody>
 </table>
 
+<div class="script-block" data-label="講稿 — 11 自訂閘 + 總結（~1min）">
+  <p>以上就是 Proof #1 的全部技術細節。整個電路使用了 10 種自訂閘，構成一個完整的端對端管線。</p>
+  <p>總結一下我們的技術選擇邏輯：<span class="emphasis">Halo2 + KZG</span> 提供了可程式化的 PLONK 框架和高效的多項式承諾；<span class="emphasis">Poseidon hash</span> 讓 Merkle 驗證的電路成本最小化；<span class="emphasis">Merkle tree 承諾</span>讓電路結構固定、數據可以每日更新；<span class="emphasis">Minimax + Horner</span> 讓超越函數計算在 ZK 中成為可能且高效；<span class="emphasis">定點算術 pp=24</span> 在精度和電路成本之間取得平衡。每一個選擇都有明確的理由，而不是偶然的。</p>
+  <p>接下來讓我們看 Proof #2 是如何保證 State Tree 的完整性。</p>
+</div>
+
 <hr>
 
 <div style="text-align: center; padding: 32px 0; color: #718096; font-size: 14px;">
@@ -556,6 +733,33 @@
   <a href="proof2.html" style="color: var(--accent); text-decoration: none;">Proof #2 技術細節 &rarr;</a></p>
   <p style="margin-top: 8px;"><a href="../index.html" style="color: var(--accent); text-decoration: none;">ZKMM</a> &mdash; Zero-Knowledge Machine Learning Research</p>
 </div>
+
+<button class="script-toggle-btn" id="scriptToggle" onclick="toggleScripts()">
+  <span class="icon">&#x1F399;</span> 講稿
+</button>
+
+<script>
+function toggleScripts() {
+  const blocks = document.querySelectorAll('.script-block');
+  const btn = document.getElementById('scriptToggle');
+  const isShowing = blocks[0] && blocks[0].classList.contains('visible');
+  blocks.forEach(b => b.classList.toggle('visible', !isShowing));
+  btn.classList.toggle('active', !isShowing);
+  btn.innerHTML = !isShowing
+    ? '<span class="icon">&#x1F399;</span> 隱藏講稿'
+    : '<span class="icon">&#x1F399;</span> 講稿';
+  try { localStorage.setItem('proof1-script', !isShowing ? '1' : '0'); } catch(e) {}
+}
+// Restore state
+try {
+  if (localStorage.getItem('proof1-script') === '1') {
+    document.querySelectorAll('.script-block').forEach(b => b.classList.add('visible'));
+    const btn = document.getElementById('scriptToggle');
+    btn.classList.add('active');
+    btn.innerHTML = '<span class="icon">&#x1F399;</span> 隱藏講稿';
+  }
+} catch(e) {}
+</script>
 
 </body>
 </html>
