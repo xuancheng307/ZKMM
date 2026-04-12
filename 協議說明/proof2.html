@@ -180,11 +180,8 @@
     border-radius: 8px;
     padding: 16px 20px;
     margin: 12px 0;
-    border-left: 4px solid var(--cyan);
+    border-left: 4px solid #38a169;
   }
-  .phase-card.done { border-left-color: #38a169; }
-  .phase-card.wip { border-left-color: #ed8936; }
-  .phase-card.todo { border-left-color: #a0aec0; }
   .phase-card h4 {
     font-size: 15px;
     margin: 0 0 6px 0;
@@ -196,10 +193,9 @@
     padding: 2px 8px;
     border-radius: 4px;
     margin-left: 8px;
+    background: #dcfce7;
+    color: #16a34a;
   }
-  .phase-card .status.done { background: #dcfce7; color: #16a34a; }
-  .phase-card .status.wip { background: #fef3c7; color: #d97706; }
-  .phase-card .status.todo { background: #f1f5f9; color: #64748b; }
   .phase-card p {
     font-size: 14px;
     margin: 4px 0;
@@ -219,10 +215,72 @@
   .site-nav a:hover { background: #2b6cb0; color: #fff; }
   .site-nav a.active { background: #2b6cb0; color: #fff; font-weight: 600; }
 
+  /* ===== Speaker Notes ===== */
+  .speaker-notes {
+    display: none;
+    background: #fffbeb;
+    border: 2px dashed #f59e0b;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 15px;
+    line-height: 1.9;
+    color: #92400e;
+    font-family: -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  }
+  .speaker-notes::before {
+    content: "\1F399 \8B1B\7A3F";
+    display: block;
+    font-weight: 700;
+    font-size: 13px;
+    color: #d97706;
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+  }
+  body.show-notes .speaker-notes { display: block; }
+
+  #notes-toggle {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 999;
+    background: #f59e0b;
+    color: #fff;
+    border: none;
+    border-radius: 50px;
+    padding: 12px 22px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,.2);
+    transition: background .2s, transform .1s;
+    font-family: -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  }
+  #notes-toggle:hover { background: #d97706; transform: scale(1.05); }
+  #notes-toggle.active { background: #92400e; }
+
+  /* ===== 3-bit encoding diagram ===== */
+  .bit-grid {
+    display: grid;
+    grid-template-columns: auto repeat(3,60px) auto auto;
+    gap: 4px 8px;
+    margin: 16px 0;
+    font-size: 14px;
+    font-family: monospace;
+    align-items: center;
+  }
+  .bit-grid .hdr { font-weight: 700; text-align: center; color: var(--primary); }
+  .bit-grid .bit { text-align: center; background: var(--code-bg); padding: 4px; border-radius: 4px; }
+  .bit-grid .bit.on { background: var(--cyan); color: #fff; }
+  .bit-grid .name { font-weight: 600; }
+  .bit-grid .invalid { color: #e53e3e; font-weight: 700; }
+
   @media print {
     body { font-size: 12pt; padding: 0; }
     table { break-inside: avoid; }
     h1 { break-before: page; }
+    #notes-toggle { display: none; }
+    .speaker-notes { display: none !important; }
   }
   @media (max-width: 700px) {
     .pipeline { flex-direction: column; }
@@ -246,7 +304,73 @@
   <p style="font-size:18px; color:var(--primary); margin:12px 0 8px 0;">
     持倉狀態轉移證明 — 技術細節
   </p>
-  <p class="subtitle">BabyJubjub 曲線、EdDSA 簽名驗證、狀態根鏈接</p>
+  <p class="subtitle">BabyJubjub 曲線 &middot; EdDSA-Poseidon 簽名 &middot; 3-bit Op_Type &middot; 批次認證</p>
+</div>
+
+<div class="speaker-notes">
+各位好，接下來我要介紹的是 Proof #2 — 狀態轉移證明。<br><br>
+如果說 Proof #1 回答的是「基金現在的風險合不合規」，那 Proof #2 回答的就是「基金的持倉是怎麼從上一期變成這一期的」。<br><br>
+這個證明的核心目標是：確保每一筆持倉變動都經過交易所的合法授權 — 基金不能自己憑空修改帳上的部位。我們在零知識電路裡面驗證 EdDSA 數位簽名，來達成這個目標。
+</div>
+
+<hr>
+
+<!-- ===== 0. Technology Selection ===== -->
+<h1><span class="section-num">0</span>技術選型動機</h1>
+
+<p>Proof #2 的每一項技術選擇都受到同一個核心約束驅動：<strong>所有密碼學運算必須在 ZK 電路內完成</strong>。這意味著每個元件的成本不是「CPU 上跑多快」，而是「轉換成算術約束需要多少列」。以下是主要設計決策的全景：</p>
+
+<table>
+  <thead><tr><th>層級</th><th>選擇</th><th>核心理由</th><th>被淘汰的替代方案</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>證明系統</strong></td>
+      <td>halo2 (PSE fork) + KZG</td>
+      <td>PLONKish 自訂 gate 讓橢圓曲線加法只需 1 列；KZG 提供 O(1) 驗證和小 proof size，適合鏈上部署</td>
+      <td>Groth16（需 trusted setup per-circuit）、Plonky2（FRI proof 太大 ~100KB）、Nova（不適合非遞歸場景）</td>
+    </tr>
+    <tr>
+      <td><strong>簽名方案</strong></td>
+      <td>EdDSA（Schnorr 變體）</td>
+      <td>確定性 nonce 消除隨機數失敗的風險；驗證方程 S·B = R + h·A 只需 2 次 scalar mul + 1 次 point add</td>
+      <td>ECDSA（需要 modular inverse，在電路中極昂貴 ~3x）、BLS（需要 pairing，在電路中不可行）</td>
+    </tr>
+    <tr>
+      <td><strong>簽名曲線</strong></td>
+      <td>BabyJubjub (twisted Edwards)</td>
+      <td>基域 = BN254 F<sub>r</sub>（原生域），complete addition law 免分支</td>
+      <td>secp256k1（non-native，~10x）、JubJub（為 BLS12-381 設計，域不匹配）</td>
+    </tr>
+    <tr>
+      <td><strong>Hash 函數</strong></td>
+      <td>Poseidon (t=3 sponge)</td>
+      <td>代數結構直接映射到 PLONKish gate，~66 rows/perm；安全性有嚴格密碼分析支持（GMIMC 家族）</td>
+      <td>SHA-256（~25,000 rows/hash，bit 操作在算術電路中極昂貴）、MiMC（R1CS 優化，PLONKish 下不如 Poseidon）、Pedersen（需要額外的橢圓曲線 scalar mul）</td>
+    </tr>
+    <tr>
+      <td><strong>承諾方案</strong></td>
+      <td>Poseidon sponge 吸收 8 域元素</td>
+      <td>綁定交易完整語義（op_type + leaf + nonce），含 nonce 防止重放攻擊</td>
+      <td>直接拼接 hash（不是 sponge，多 round 的 capacity 更安全）、Pedersen commitment（可加性不需要，反而引入額外 DLP 假設）</td>
+    </tr>
+    <tr>
+      <td><strong>狀態結構</strong></td>
+      <td>Poseidon Merkle tree (depth 7)</td>
+      <td>對數級 proof size (7 siblings)；支持增量式單葉更新（不需重算全樹）</td>
+      <td>RSA accumulator（需 non-native bigint ~2048-bit）、Vector commitment（不支持高效更新證明）</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="key-insight">
+  <strong>統一的成本度量：</strong>所有選擇都以「halo2 PLONKish rows」為單位衡量。一個看似更安全或更通用的方案，如果約束數膨脹 10 倍，就會導致 k 增加 3-4 級（prove time 增長 8-16 倍）。Proof #2 的設計原則是：<strong>在保證 128-bit 安全性的前提下，最小化約束數</strong>。
+</div>
+
+<div class="speaker-notes">
+在開始技術細節之前，我想先解釋一下整體的設計哲學。<br><br>
+Proof #2 的每一個技術選擇，都圍繞著一個核心問題：「在 ZK 電路裡面，這個操作需要多少約束？」我們不是在選「最好」的密碼學方案，而是在選「在算術電路裡面最便宜、同時安全性足夠」的方案。<br><br>
+舉個例子：SHA-256 在 CPU 上很快、非常成熟，但轉換成算術約束大約需要 25,000 列 — 因為它大量使用 bit rotation 和 XOR，這些操作在有限域的算術電路中非常昂貴。相反，Poseidon 是為有限域設計的，它的 S-box 就是一個簡單的 x<sup>5</sup> 運算，自然映射到多項式約束，一次 permutation 只需要 66 列。<br><br>
+同樣的邏輯適用於簽名曲線（BabyJubjub 的域恰好是 BN254 的原生域）、簽名方案（EdDSA 不需要 modular inverse）、甚至批次結構（用 copy constraint 而非額外的 EdDSA 驗證）。每一個選擇都是約束成本的最優化。
 </div>
 
 <hr>
@@ -256,10 +380,19 @@
 
 <div class="formula-block">
   <strong>Proof #2 proves:</strong><br>
-  &exist; Trades(<span class="math">T</span>) = {<span class="math">tx<sub>1</sub>, ..., tx<sub>M</sub></span>} such that:<br><br>
-  (a) &forall;<span class="math">j</span>: EdDSA.Verify(pk<sub>exchange</sub>, tx<sub>j</sub>, sig<sub>j</sub>) = true<br>
+  &exist; Trades(<span class="math">T</span>) = {<span class="math">tx<sub>1</sub>, ..., tx<sub>4</sub></span>} such that:<br><br>
+  (a) &forall;<span class="math">j</span>: EdDSA.Verify(pk<sub>exchange</sub>, Commit(tx<sub>j</sub>), sig<sub>j</sub>) = true<br>
   (b) Commit(Trades(<span class="math">T</span>)) = batch_root<br>
-  (c) Apply(State(<span class="math">T</span>&minus;1), Trades(<span class="math">T</span>)) = State(<span class="math">T</span>)
+  (c) Apply(State(<span class="math">T</span>&minus;1), Trades(<span class="math">T</span>)) = State(<span class="math">T</span>)<br>
+  (d) &forall;<span class="math">j</span>: op_type<sub>j</sub> &notin; {5, 6}（保留代碼被拒絕）
+</div>
+
+<div class="speaker-notes">
+這是 Proof #2 的形式化陳述。它要證明四件事：<br><br>
+第一，每筆交易都有交易所的 EdDSA 簽名，而且簽名是簽在交易的 commitment 上 — 也就是 Poseidon hash 過後的承諾值。<br><br>
+第二，所有交易的承諾值組成的 batch root 等於公開輸入。<br><br>
+第三，把這些交易依序套用到前一期的狀態上，會得到本期的狀態。<br><br>
+第四，所有 op_type 都是合法的 — 3-bit 編碼中的保留代碼 5 和 6 會被電路拒絕。
 </div>
 
 <h2>1.1 公開輸入（3 個）</h2>
@@ -269,7 +402,7 @@
   <tbody>
     <tr><td class="num">0</td><td><code>state_root_prev</code></td><td>State(T&minus;1) 的 Merkle root</td><td>前一期的 state_root</td></tr>
     <tr><td class="num">1</td><td><code>state_root</code></td><td>State(T) 的 Merkle root</td><td>基金計算，與 Proof #1 共享</td></tr>
-    <tr><td class="num">2</td><td><code>batch_root</code></td><td>交易批次承諾 root</td><td>交易所批次公布</td></tr>
+    <tr><td class="num">2</td><td><code>batch_root</code></td><td>交易批次承諾 Merkle root</td><td>由交易承諾的二叉 hash tree 算出</td></tr>
   </tbody>
 </table>
 
@@ -277,54 +410,111 @@
   <strong>與 Proof #1 的銜接：</strong>Proof #2 的 <code>state_root</code>（instance[1]）必須與 Proof #1 的 <code>state_root</code>（instance[0]）一致。驗證者只需比較這兩個值 — 不需要遞歸證明。
 </div>
 
+<div class="speaker-notes">
+公開輸入只有三個值 — 舊的狀態根、新的狀態根、和批次根。<br><br>
+這裡最重要的設計是 state_root 的共享：Proof #1 和 Proof #2 各自獨立生成，但它們都把 state_root 作為公開輸入。驗證者只需要檢查這兩個值相等就好，不需要任何遞歸證明的複雜性。這是整個協議架構最優雅的地方之一。
+</div>
+
 <hr>
 
 <!-- ===== 2. State Transition Model ===== -->
 <h1><span class="section-num">2</span>狀態轉移模型</h1>
 
-<p>Proof #2 證明從 State(T&minus;1) 到 State(T) 的轉換完全由合法交易驅動，沒有未經授權的狀態變更。</p>
+<p>Proof #2 證明從 State(T&minus;1) 到 State(T) 的轉換完全由合法交易驅動，沒有未經授權的狀態變更。每個批次處理 T_MAX = 4 筆交易。</p>
+
+<div class="purple-box">
+  <strong>為什麼 T_MAX = 4？</strong>每筆交易需要 ~3,838 列（EdDSA 驗證 + Poseidon hash），4 筆 &times; 3,838 + 198（批次 hash）&approx; 15,550 列，恰好落在 k = 14（16,384 列）的範圍內，利用率約 95%。增加到 8 筆需要 k = 15（prove time 約翻倍）；減少到 2 筆則浪費近半電路空間。4 筆在效能和實用性之間取得平衡 — 不足 4 筆時用 NOP（空操作）填充，NOP 的 EdDSA 仍然會被驗證（使用 dummy 簽名），確保電路結構固定、不洩漏實際交易筆數。
+</div>
 
 <div class="pipeline">
   <div class="step external">State(T&minus;1)<br><small>上期持倉</small></div>
   <span class="arrow">&rarr;</span>
   <div class="step crypto">EdDSA 驗證<br><small>每筆交易</small></div>
   <span class="arrow">&rarr;</span>
-  <div class="step">逐筆套用<br><small>op_type dispatch</small></div>
+  <div class="step">op_type 判斷<br><small>3-bit dispatch</small></div>
   <span class="arrow">&rarr;</span>
   <div class="step">Root 鏈接<br><small>增量式更新</small></div>
   <span class="arrow">&rarr;</span>
   <div class="step ours">State(T)<br><small>本期持倉</small></div>
 </div>
 
-<h2>2.1 操作類型 (op_type)</h2>
+<div class="speaker-notes">
+這是整個處理流程。從左到右：上期的持倉狀態進來，每一筆交易先驗證 EdDSA 簽名，然後根據 3-bit 的操作類型碼來決定葉子怎麼變，最後更新 Merkle root。四筆交易依序處理，root 像鏈子一樣串起來。<br><br>
+為什麼是 4 筆？因為每筆交易需要約 3,838 列（EdDSA 驗證 + Poseidon hash），4 筆加上批次 hash 共約 15,550 列，恰好放在 k=14 的電路裡（16,384 列），利用率約 95%。如果增加到 8 筆就需要 k=15，prove time 大約翻倍。4 是成本和實用性的甜蜜點。<br><br>
+為什麼必須逐筆依序處理而不是平行？因為 root chaining — 後一筆交易的 old root 必須等於前一筆的 new root。這個序列性是設計上刻意的：它保證了交易執行順序的不可篡改性。
+</div>
+
+<h2>2.1 操作類型 — 3-bit 編碼</h2>
+
+<p>操作類型使用 3-bit 編碼：<code>op = b<sub>0</sub> + 2 &times; b<sub>1</sub> + 4 &times; b<sub>2</sub></code>。電路以布林約束強制每一位為 0 或 1，並以多項式約束拒絕保留代碼。</p>
+
+<div class="purple-box">
+  <strong>為什麼用 3-bit 布林分解而不用 Lookup Table？</strong>Lookup table 雖然更靈活（可以任意映射輸入到輸出），但需要專門的 lookup column 和額外的 table 初始化列數。3-bit 方案只用 3 個布林約束（每個 b<sub>i</sub>(1&minus;b<sub>i</sub>) = 0）加上 5 個 selector gate，總共 8 列。更關鍵的是：每個 bit 可以直接復用作 selector — 例如 b<sub>1</sub> 同時扮演「是否為 CLOSE 或 EXPIRY」的指示器（因為 b<sub>1</sub> = 1 時包含代碼 2, 3, 6, 7），省去額外的條件分支。這種 bit 復用技巧讓約束矩陣既緊湊又可讀。
+</div>
+
+<div class="bit-grid">
+  <span class="hdr">代碼</span><span class="hdr">b<sub>2</sub></span><span class="hdr">b<sub>1</sub></span><span class="hdr">b<sub>0</sub></span><span class="hdr">名稱</span><span class="hdr">語義</span>
+  <span>0</span><span class="bit">0</span><span class="bit">0</span><span class="bit">0</span><span class="name">TRADE</span><span>全欄位替換（新開倉）</span>
+  <span>1</span><span class="bit">0</span><span class="bit">0</span><span class="bit on">1</span><span class="name">EXERCISE</span><span>行權：到期日歸零，w 可調</span>
+  <span>2</span><span class="bit">0</span><span class="bit on">1</span><span class="bit">0</span><span class="name">CLOSE</span><span>平倉：w 歸零</span>
+  <span>3</span><span class="bit">0</span><span class="bit on">1</span><span class="bit on">1</span><span class="name">EXPIRY</span><span>到期：w 歸零</span>
+  <span>4</span><span class="bit on">1</span><span class="bit">0</span><span class="bit">0</span><span class="name">CORPORATE_ACTION</span><span>公司行動：K/w 比例調整</span>
+  <span class="invalid">5</span><span class="bit on">1</span><span class="bit">0</span><span class="bit on">1</span><span class="invalid">RESERVED</span><span class="invalid">電路拒絕</span>
+  <span class="invalid">6</span><span class="bit on">1</span><span class="bit on">1</span><span class="bit">0</span><span class="invalid">RESERVED</span><span class="invalid">電路拒絕</span>
+  <span>7</span><span class="bit on">1</span><span class="bit on">1</span><span class="bit on">1</span><span class="name">NOP</span><span>空操作：所有欄位不變</span>
+</div>
+
+<div class="speaker-notes">
+這裡是 3-bit 操作類型的完整編碼表。用三個 bit 可以表達 8 種代碼，我們定義了 6 種合法操作，保留了 2 種（代碼 5 和 6）作為未來擴展。<br><br>
+電路用一個巧妙的多項式來拒絕保留代碼：b<sub>2</sub> &times; (b<sub>0</sub> + b<sub>1</sub> &minus; 2 &times; b<sub>0</sub> &times; b<sub>1</sub>) = 0。這個表達式只在代碼 5 和 6 時不為零。<br><br>
+比較有趣的設計是：CLOSE 和 EXPIRY 的差別只在語義層面 — 電路約束是一樣的，都是 w 歸零。但區分它們可以在鏈下的審計記錄中提供更豐富的資訊。
+</div>
+
+<h2>2.2 欄位約束矩陣</h2>
+
+<p>每種操作類型對 5 個葉子欄位施加不同的約束。「自由」表示新值不受限，「不變」表示必須等於舊值，「=0」表示必須為零：</p>
 
 <table>
-  <thead><tr><th>代碼</th><th>名稱</th><th>操作</th><th>葉子變化</th></tr></thead>
+  <thead><tr><th>欄位</th><th>TRADE</th><th>EXERCISE</th><th>CLOSE</th><th>EXPIRY</th><th>CORP_ACT</th><th>NOP</th></tr></thead>
   <tbody>
-    <tr><td class="num">0</td><td><strong>TRADE</strong></td><td>新開倉：插入新葉子到空 slot</td><td>dummy &rarr; 新部位</td></tr>
-    <tr><td class="num">1</td><td><strong>CLOSE</strong></td><td>完全平倉：清除葉子</td><td>舊部位 &rarr; dummy</td></tr>
-    <tr><td class="num">2</td><td><strong>EXERCISE</strong></td><td>選擇權行權：關閉選擇權 + 開啟現貨（原子操作）</td><td>option leaf &rarr; equity leaf</td></tr>
-    <tr><td class="num">3</td><td><strong>EXPIRY</strong></td><td>到期：驗證 today &ge; expiry_date，清除葉子</td><td>expired leaf &rarr; dummy</td></tr>
-    <tr><td class="num">4</td><td><strong>CORPORATE_ACTION</strong></td><td>公司行動（分拆、配息）：調整 K/w 比例</td><td>舊條款 &rarr; 新條款</td></tr>
-    <tr><td class="num">5</td><td><strong>NOP</strong></td><td>空操作：填充用，不改變任何狀態</td><td>不變</td></tr>
+    <tr><td><strong>w</strong>（數量）</td><td>自由</td><td>自由</td><td class="em">=0</td><td class="em">=0</td><td>自由</td><td>不變</td></tr>
+    <tr><td><strong>K</strong>（履約價）</td><td>自由</td><td>不變</td><td>不變</td><td>不變</td><td>自由</td><td>不變</td></tr>
+    <tr><td><strong>expiry</strong>（到期日）</td><td>自由</td><td class="em">=0</td><td>不變</td><td>不變</td><td>不變</td><td>不變</td></tr>
+    <tr><td><strong>asset_type</strong></td><td>自由</td><td>不變</td><td>不變</td><td>不變</td><td>不變</td><td>不變</td></tr>
+    <tr><td><strong>underlying_id</strong></td><td>自由</td><td>不變</td><td>不變</td><td>不變</td><td>不變</td><td>不變</td></tr>
   </tbody>
 </table>
 
-<div class="purple-box">
-  <strong>靜態葉節點原則的實現：</strong>每片葉子一旦建立就不可修改。「部分平倉」在 Proof #2 中實現為 CLOSE 舊葉子 + TRADE 新葉子（reduced w）的兩步操作。這確保了 Merkle root 的唯一性。
+<div class="speaker-notes">
+這張表是整個 op_type 約束系統的核心。我來解讀幾個重點：<br><br>
+TRADE 是唯一可以自由修改所有五個欄位的操作 — 因為它代表全新的開倉。<br><br>
+EXERCISE 讓 w 自由改變、到期日必須歸零 — 因為行權就是消滅選擇權，改成結算後的部位。注意 K 不能變，因為行權是按原始履約價結算的。<br><br>
+CLOSE 和 EXPIRY 都強制 w 歸零 — 代表這個部位被清空了。<br><br>
+CORPORATE_ACTION 可以改 w 和 K — 典型例子是股票分拆，一股變兩股的同時履約價減半。但到期日和資產類型不能動。<br><br>
+NOP 什麼都不能改 — 它只是用來填充批次的。<br><br>
+這些約束用了 8 列、5 個 selector gate，靠巧妙地復用 bit 組合來實現不同的「OR」邏輯。
 </div>
 
-<h2>2.2 Root 鏈接</h2>
+<div class="purple-box">
+  <strong>靜態葉節點原則：</strong>每片葉子一旦建立就不可隨意修改。「部分平倉」實現為 CLOSE 舊葉子 + TRADE 新葉子（reduced w）的兩步操作，確保 Merkle root 的唯一性和可追溯性。
+</div>
 
-<p>交易按順序逐筆套用。每筆交易修改一片 Merkle 葉子，產生新的 root：</p>
+<h2>2.3 Root 鏈接</h2>
+
+<p>交易按順序逐筆套用。每筆交易同時提供 old Merkle path 和 new Merkle path，電路驗證兩條路徑的 siblings 和 position bits 完全相同：</p>
 
 <div class="formula-block">
-  root<sub>0</sub> = state_root_prev<br>
+  root<sub>0</sub> = state_root_prev &ensp; <small>（公開輸入 instance[0]）</small><br>
   root<sub>1</sub> = MerkleUpdate(root<sub>0</sub>, idx<sub>1</sub>, old_leaf<sub>1</sub> &rarr; new_leaf<sub>1</sub>)<br>
   root<sub>2</sub> = MerkleUpdate(root<sub>1</sub>, idx<sub>2</sub>, old_leaf<sub>2</sub> &rarr; new_leaf<sub>2</sub>)<br>
-  &vellip;<br>
-  root<sub>M</sub> = state_root<br><br>
-  <small>電路約束：root<sub>M</sub> == instance[1]（state_root 公開輸入）</small>
+  root<sub>3</sub> = MerkleUpdate(root<sub>2</sub>, idx<sub>3</sub>, old_leaf<sub>3</sub> &rarr; new_leaf<sub>3</sub>)<br>
+  root<sub>4</sub> = state_root &ensp; <small>（公開輸入 instance[1]）</small><br><br>
+  <small>電路約束：每筆交易的 old_root = 前一筆的 new_root（copy constraint）</small>
+</div>
+
+<div class="speaker-notes">
+Root 鏈接是 Proof #2 的骨幹。4 筆交易依序處理，每一筆產生一個新的 Merkle root。電路用 copy constraint 強制連續性 — 第二筆的 old root 必須等於第一筆的 new root。<br><br>
+最後一個 root 必須等於公開輸入的 state_root。這就形成了一條不可篡改的「root chain」。任何人跳過一筆交易、重新排序、或修改中間狀態，都會導致 root 不匹配。
 </div>
 
 <hr>
@@ -337,102 +527,271 @@
 <h2>3.1 為什麼選 BabyJubjub</h2>
 
 <div class="key-insight">
-  <strong>Native 運算：</strong>BabyJubjub 的基域 = BN254 的 scalar field (F<sub>r</sub>)。這意味著所有曲線運算都是有限域的原生運算 — <strong>不需要非原生域模擬</strong>（non-native field arithmetic），省去大量約束。
+  <strong>Native 運算：</strong>BabyJubjub 的基域 = BN254 的 scalar field (F<sub>r</sub>)。這意味著所有曲線運算都是有限域的原生運算 — <strong>不需要非原生域模擬</strong>（non-native field arithmetic），省去大量約束。相比之下，在 halo2 內驗證 secp256k1 需要模擬 256-bit 非原生域，成本高約 10 倍。
 </div>
 
-<h2>3.2 曲線定義</h2>
-
-<div class="formula-block">
-  <strong>Twisted Edwards 形式：</strong><br>
-  <span class="math">a</span> &times; x&sup2; + y&sup2; = 1 + <span class="math">d</span> &times; x&sup2; &times; y&sup2;<br><br>
-  <span class="math">a</span> = &minus;1<br>
-  <span class="math">d</span> = 12181644023421730124874158521699555681764249180949974110617291017600649128846<br><br>
-  <strong>Base field:</strong> F<sub>r</sub>(BN254) = 21888242871839275222246405745257275088548364400416034343698204186575808495617<br>
-  <strong>Subgroup order:</strong> 2736030358979909402780800718157159386076813972158567259200215660948447373041
+<div class="speaker-notes">
+為什麼選 BabyJubjub？核心原因就一個字：效率。<br><br>
+我們的 ZK 電路運行在 BN254 的 scalar field 上，也就是 halo2 的原生域。BabyJubjub 恰好就定義在這個域上 — 所以每一次曲線上的加法、乘法，都直接對應到電路原生的有限域運算，不需要任何額外的 overhead。<br><br>
+如果我們用 secp256k1（就是以太坊用的那條曲線），每個域元素的運算都需要用多個原生域元素來模擬 — 這會讓約束數膨脹 10 倍以上。
 </div>
 
-<h2>3.3 Point Operations</h2>
+<h2>3.2 為什麼用 Twisted Edwards 形式</h2>
 
-<p>在 affine twisted Edwards 座標下：</p>
+<p>橢圓曲線有多種表示方式。Twisted Edwards 形式的核心優勢是 <strong>complete addition law</strong>（完備加法公式）：</p>
+
+<div class="key-insight">
+  <strong>Complete Addition Law：</strong>同一組公式可以處理所有情況 — 包括 P + Q、P + P（doubling）、P + O（identity）。這在電路中至關重要：我們不需要「if P == Q then double else add」的分支邏輯。分支在 ZK 電路中非常昂貴（需要 conditional gate），而 complete 公式讓每一步都只走一條路，消除所有邊界情況的約束成本。
+</div>
 
 <table>
-  <thead><tr><th>操作</th><th>公式</th><th>約束數</th></tr></thead>
+  <thead><tr><th>曲線形式</th><th>加法公式</th><th>Complete?</th><th>電路成本</th></tr></thead>
   <tbody>
     <tr>
-      <td><strong>Point Add</strong></td>
-      <td>
-        x<sub>3</sub> = (x<sub>1</sub>y<sub>2</sub> + y<sub>1</sub>x<sub>2</sub>) / (1 + d &times; x<sub>1</sub>x<sub>2</sub>y<sub>1</sub>y<sub>2</sub>)<br>
-        y<sub>3</sub> = (y<sub>1</sub>y<sub>2</sub> &minus; a &times; x<sub>1</sub>x<sub>2</sub>) / (1 &minus; d &times; x<sub>1</sub>x<sub>2</sub>y<sub>1</sub>y<sub>2</sub>)
-      </td>
-      <td class="num">~6</td>
+      <td>Short Weierstrass<br><small>y&sup2; = x&sup3; + ax + b</small></td>
+      <td>需要分支處理 P = Q 和 P = -Q</td>
+      <td class="em">否</td>
+      <td>需額外 conditional gate</td>
     </tr>
     <tr>
-      <td><strong>Point Double</strong></td>
-      <td>特殊化的 add (P + P)</td>
-      <td class="num">~6</td>
+      <td>Montgomery<br><small>By&sup2; = x&sup3; + Ax&sup2; + x</small></td>
+      <td>高效 x-only ladder</td>
+      <td class="em">否</td>
+      <td>不支持 y 座標，無法做 point add</td>
     </tr>
     <tr>
-      <td><strong>Scalar Mul</strong></td>
-      <td>Double-and-add（253 bits）</td>
-      <td class="num">~3,000</td>
+      <td><strong>Twisted Edwards</strong><br><small>ax&sup2; + y&sup2; = 1 + dx&sup2;y&sup2;</small></td>
+      <td>統一公式（a 為二次剩餘時 complete）</td>
+      <td style="color:#38a169; font-weight:bold;">是</td>
+      <td><strong>1 row / add</strong></td>
     </tr>
   </tbody>
 </table>
 
+<div class="speaker-notes">
+為什麼用 twisted Edwards 而不是更常見的 Weierstrass 形式？<br><br>
+關鍵在於 complete addition law。Weierstrass 曲線的加法公式在 P = Q（需要用 doubling 公式）和 P = -Q（結果是無窮遠點）時需要特殊處理。在 CPU 上用 if-else 就解決了，但在 ZK 電路裡，分支意味著你要同時計算兩條路徑再用 conditional select 挑一條 — 成本翻倍。<br><br>
+Twisted Edwards 的加法公式在所有情況下都一樣。BabyJubjub 的 a = 168700 是 BN254 F<sub>r</sub> 中的二次剩餘，所以加法公式是 complete 的。我們可以用完全相同的 gate 處理 double、add、甚至加上 identity point，不需要任何分支。
+</div>
+
+<h2>3.3 曲線參數</h2>
+
+<div class="formula-block">
+  <strong>Twisted Edwards 形式：</strong><br>
+  <span class="math">a</span> &times; x&sup2; + y&sup2; = 1 + <span class="math">d</span> &times; x&sup2; &times; y&sup2;<br><br>
+  <span class="math">a</span> = 168700<br>
+  <span class="math">d</span> = 168696<br><br>
+  <strong>Base field:</strong> F<sub>r</sub>(BN254)<br>
+  <strong>Subgroup order <span class="math">l</span>:</strong> 2736030358979909402780800718157159386076813972158567259200215660948447373041<br>
+  <strong>Cofactor:</strong> h = 8（full curve order = 8<span class="math">l</span>）
+</div>
+
+<h2>3.4 電路中的點運算</h2>
+
+<p>使用 degree-5 的 PLONKish gate，每次點加法只需 1 列、6 個 advice column：</p>
+
+<table>
+  <thead><tr><th>操作</th><th>電路實現</th><th>列數</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Point Add</strong></td>
+      <td>
+        x<sub>3</sub>(1 + d &times; x<sub>1</sub>x<sub>2</sub>y<sub>1</sub>y<sub>2</sub>) = x<sub>1</sub>y<sub>2</sub> + y<sub>1</sub>x<sub>2</sub><br>
+        y<sub>3</sub>(1 &minus; d &times; x<sub>1</sub>x<sub>2</sub>y<sub>1</sub>y<sub>2</sub>) = y<sub>1</sub>y<sub>2</sub> &minus; a &times; x<sub>1</sub>x<sub>2</sub>
+      </td>
+      <td class="num">1 row</td>
+    </tr>
+    <tr>
+      <td><strong>Conditional Select</strong></td>
+      <td>out = false_pt + bit &times; (true_pt &minus; false_pt)</td>
+      <td class="num">1 row</td>
+    </tr>
+    <tr>
+      <td><strong>Scalar Mul (254 bits)</strong></td>
+      <td>Double-and-add：每 bit = 1 double + 1 add + 1 cond_sel = 3 rows</td>
+      <td class="num">763 rows</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="speaker-notes">
+在 halo2 的 PLONKish 架構下，一次 twisted Edwards 加法只需要 1 列 — 我們用 6 個 advice column 放入 P1、P2、P3 的座標，用 degree-5 的自訂 gate 來約束加法公式。<br><br>
+Scalar multiplication 就是反覆做 double-and-add。254 個 bit，每個 bit 需要 3 列（double、add、conditional select），加上 1 列初始化 identity point，所以一次 scalar mul 需要 763 列。<br><br>
+值得注意的是，我們的加法公式是 implicit form — 把分母移到左邊，避免了在電路中做除法（求逆）。
+</div>
+
 <div class="result-box">
-  <strong>實作驗證：</strong>20 個 unit tests 通過，包含 curve constants 正確性、identity/inverse 性質、交換律/結合律、以及與 arnaucube/babyjubjub-rs 參考實作的交叉驗證。
+  <strong>實作驗證：</strong>40 個 unit tests 通過，包含 curve constants 正確性、identity/inverse 性質、交換律/結合律、subgroup order 驗證 (l &times; B = identity)、以及與 Python 參考實作的交叉驗證（2B、8B 精確比對）。
 </div>
 
 <hr>
 
 <!-- ===== 4. EdDSA Signature ===== -->
-<h1><span class="section-num">4</span>EdDSA 簽名驗證</h1>
+<h1><span class="section-num">4</span>EdDSA-Poseidon 簽名驗證</h1>
 
 <p>每筆交易都需要交易所的 EdDSA 簽名。電路在內部驗證簽名，確保交易不可偽造。</p>
 
-<h2>4.1 EdDSA with Poseidon</h2>
+<h2>4.1 為什麼選 EdDSA（而非 ECDSA 或 BLS）</h2>
 
-<p>標準 EdDSA 使用 SHA-512 作為 hash — 這在 ZK 電路中極度昂貴。本協議使用 <strong>Poseidon hash</strong> 替代，利用其 ZK-friendly 特性大幅降低約束數。</p>
+<p>數位簽名方案的選擇直接影響電路成本。以下比較三種主流方案在 ZK 電路內驗證的差異：</p>
+
+<table>
+  <thead><tr><th>方案</th><th>驗證方程</th><th>電路瓶頸</th><th>估計列數</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>EdDSA</strong><br><small>(Schnorr 變體)</small></td>
+      <td>S&times;B = R + h&times;A</td>
+      <td>2 次 scalar mul + 1 次 point add</td>
+      <td class="em">~2,238</td>
+    </tr>
+    <tr>
+      <td>ECDSA</td>
+      <td>R = (h&times;s<sup>&minus;1</sup>)&times;G + (r&times;s<sup>&minus;1</sup>)&times;A</td>
+      <td>需要 <strong>modular inverse</strong> s<sup>&minus;1</sup> mod <span class="math">l</span>（在電路中需 ~1,000+ 列的擴展歐幾里德算法）</td>
+      <td class="num">~5,000+</td>
+    </tr>
+    <tr>
+      <td>BLS</td>
+      <td>e(S, G<sub>2</sub>) = e(H(m), pk)</td>
+      <td>需要 <strong>pairing 運算</strong>（Miller loop + final exponentiation，在電路中不可行）</td>
+      <td class="num">&gt;100,000</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="key-insight">
+  <strong>EdDSA 的兩個關鍵優勢：</strong><br>
+  (1) <strong>無 modular inverse：</strong>驗證方程 S&times;B = R + h&times;A 只需加法和乘法，不需要在電路中計算模逆元（ECDSA 需要）。模逆元在算術電路中極昂貴，因為需要用擴展歐幾里德算法或 Fermat 小定理（約 254 次模乘）。<br>
+  (2) <strong>確定性 nonce：</strong>EdDSA 的 nonce r = Hash(sk, M) 是確定性的，不依賴隨機數產生器。這消除了 nonce 重用攻擊的風險 — Sony PS3 破解（2010 年）和多起比特幣盜竊事件都源於 ECDSA 的 nonce 重用。
+</div>
+
+<div class="speaker-notes">
+為什麼選 EdDSA 而不是更常見的 ECDSA？有兩個核心原因。<br><br>
+第一是電路成本。ECDSA 的驗證方程需要計算 s 的模逆元 — 也就是在 BabyJubjub 的 subgroup order 下求 s<sup>&minus;1</sup>。這在 CPU 上很快，但在 ZK 電路裡，你需要用擴展歐幾里德算法或 Fermat 小定理來實現，大約需要 1,000 多列。EdDSA 的方程 S·B = R + h·A 完全沒有除法，只有乘法和加法，直接省了這些成本。<br><br>
+第二是安全性。ECDSA 需要一個隨機的 nonce k，如果兩次簽名使用了相同的 k，私鑰就會洩漏 — 這不是理論上的風險，Sony PS3 的 ECDSA 私鑰就是這樣被破解的。EdDSA 的 nonce 是確定性計算的：r = Hash(sk, M)，同樣的訊息永遠產生同樣的簽名，不需要隨機數產生器，從根本上消除了這類攻擊。<br><br>
+至於 BLS 簽名 — 它支持聚合簽名，理論上更優雅，但驗證需要 pairing 運算。pairing 在電路裡面的成本是天文數字，超過 10 萬列，完全不可行。
+</div>
+
+<h2>4.2 Hash 函數：為什麼選 Poseidon</h2>
+
+<p>EdDSA 需要一個 hash 函數來計算 challenge h 和 commitment M。標準 EdDSA 使用 SHA-512 — 這在 ZK 電路中極度昂貴。本協議使用 <strong>Poseidon hash</strong> 替代：</p>
+
+<table>
+  <thead><tr><th>Hash 函數</th><th>設計目標</th><th>電路成本</th><th>不選的原因</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Poseidon</strong></td>
+      <td>為算術電路設計（S-box = x<sup>5</sup>）</td>
+      <td class="em">~66 rows/perm</td>
+      <td>—（選用）</td>
+    </tr>
+    <tr>
+      <td>SHA-256</td>
+      <td>為 CPU 設計（bit rotation, XOR, AND）</td>
+      <td class="num">~25,000 rows</td>
+      <td>bit 操作在算術電路中需要拆解為布林約束，成本極高</td>
+    </tr>
+    <tr>
+      <td>MiMC</td>
+      <td>為 R1CS 設計（S-box = x<sup>3</sup>）</td>
+      <td class="num">~15 rows/perm</td>
+      <td>R1CS 下很省，但 PLONKish 支持 degree-5 gate，Poseidon 的 x<sup>5</sup> S-box 可以用更少 round</td>
+    </tr>
+    <tr>
+      <td>Rescue</td>
+      <td>為算術電路設計</td>
+      <td class="num">~12 rows/perm</td>
+      <td>需要 S-box 和 inverse S-box 交替，密碼分析文獻較少</td>
+    </tr>
+    <tr>
+      <td>Pedersen Hash</td>
+      <td>基於橢圓曲線 DLP</td>
+      <td class="num">~750 rows/hash</td>
+      <td>每次 hash 需要一次 scalar mul，而且安全性依賴額外的 DLP 假設（與 EdDSA 曲線安全性疊加）</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="speaker-notes">
+Hash 函數的選擇同樣受電路成本驅動。<br><br>
+SHA-256 每次 hash 需要約 25,000 列 — 因為它的內部操作（bit rotation、XOR、32-bit modular addition）在有限域的算術電路中需要拆解成大量的布林約束。一個 32-bit XOR 就需要把兩個操作數拆成 32 個 bit、逐 bit 做 XOR、再組合回來 — 每個 XOR 需要 1 列。<br><br>
+Poseidon 完全不同。它的核心操作是 x<sup>5</sup>（在有限域裡就是一次乘法鏈），加上矩陣向量乘法（也是有限域原生操作）。一次完整的 Poseidon permutation 在我們的 t=3 配置下只需要 66 列。這是近 380 倍的差距。<br><br>
+MiMC 也是 ZK-friendly 的，但它用 x<sup>3</sup> S-box — 在 R1CS 系統下很好，但我們用的 halo2 支持 degree-5 的自訂 gate，所以 Poseidon 的 x<sup>5</sup> 可以用更少的 round 達到同等安全性。
+</div>
+
+<h2>4.3 簽名方程與電路步驟</h2>
 
 <div class="formula-block">
   <strong>簽名生成</strong>（off-circuit）：<br>
-  R = r &times; B（nonce point）<br>
-  h = Poseidon(R.x, R.y, A.x, A.y, M)（hash of commitment）<br>
-  S = r + h &times; sk (mod subgroup_order)<br><br>
-  <strong>簽名</strong> = (R, S)<br>
-  <strong>公鑰</strong> = A = sk &times; B
+  r = Poseidon(sk, M) mod <span class="math">l</span> &ensp; <small>（確定性 nonce — 消除隨機數重用風險）</small><br>
+  R = r &times; B<br>
+  h = Poseidon(R.x, R.y, A.x, A.y, M, 0) &ensp; <small>（sponge 3 perms，吸收 6 個域元素）</small><br>
+  S = (r + h &times; sk) mod <span class="math">l</span><br><br>
+  <strong>簽名</strong> = (R, S) &ensp; <strong>公鑰</strong> A = sk &times; B
 </div>
 
 <div class="formula-block">
   <strong>簽名驗證</strong>（in-circuit）：<br>
-  h = Poseidon(R.x, R.y, A.x, A.y, M)<br>
-  S &times; B ?= R + h &times; A<br><br>
-  <small>電路計算左邊 S &times; B 和右邊 R + h &times; A，比較兩個點的座標。<br>
-  兩次 scalar multiplication（~3,000 constraints each）+ 一次 point addition。</small>
+  h = Poseidon(R.x, R.y, A.x, A.y, M, 0) &ensp; <small>（3 次 Poseidon permutation）</small><br>
+  S &times; B &ensp; ?= &ensp; R + h &times; A<br><br>
+  <small>電路步驟：<br>
+  &ensp; 1. Poseidon sponge 算 h（3 perms &times; 66 rows = 198 rows）<br>
+  &ensp; 2. Decompose S into 254 bits（running sum, 255 rows）<br>
+  &ensp; 3. Compute S &times; B（scalar mul, 763 rows）<br>
+  &ensp; 4. Decompose h into 254 bits + constrain 回 sponge output（255 rows）<br>
+  &ensp; 5. Compute h &times; A（scalar mul, 763 rows）<br>
+  &ensp; 6. Compute R + h &times; A（point add, 1 row）<br>
+  &ensp; 7. Constrain S &times; B == R + h &times; A（2 copy constraints）</small>
 </div>
 
-<h2>4.2 Message = Trade Commitment</h2>
-<p>被簽名的訊息 M 是交易參數的 Poseidon hash：</p>
+<div class="speaker-notes">
+EdDSA-Poseidon 的驗證方程式是 S &times; B = R + h &times; A。<br><br>
+在電路內部，我們先用 Poseidon sponge 計算 challenge hash h，然後做兩次 scalar multiplication — 一次算 S 乘以 generator B，一次算 h 乘以公鑰 A。最後把 R 加上 h &times; A，檢查是否等於 S &times; B。<br><br>
+整個過程最花約束的就是兩次 scalar multiplication，各需要 763 列。加上 bit decomposition 和 Poseidon sponge，每筆簽名驗證總共大約 2,238 列。<br><br>
+有一個技術細節值得提：我們在做 bit decomposition 的時候，使用了 running sum 技巧 — 從 MSB 開始累加，每一步乘以 2 再加上當前的 bit，最後結果必須等於原始的 scalar 值。這保證了 bit 分解的正確性。
+</div>
+
+<h2>4.4 被簽名的訊息 = Trade Commitment</h2>
+
+<p>被簽名的訊息 M 是交易參數的 Poseidon sponge hash（4 次 permutation）：</p>
+
 <div class="formula-block">
-  M = Poseidon(asset_id, qty, price, direction, K, expiry_date, opt_type, exchange_id)
+  M = PoseidonSponge(<br>
+  &ensp; (op_type, leaf_index),<br>
+  &ensp; (w, K),<br>
+  &ensp; (expiry_date, asset_type),<br>
+  &ensp; (underlying_id, exchange_nonce)<br>
+  )<br><br>
+  <small>共 8 個域元素，分 4 對吸收。Commitment 綁定了完整的交易語義。</small>
 </div>
 
-<h2>4.3 約束分析</h2>
+<div class="purple-box">
+  <strong>為什麼使用 Sponge 而非直接 Hash？</strong>Poseidon sponge（rate=2, capacity=1）提供了比直接拼接更強的安全性。直接把 8 個域元素拼成一個向量再 hash，需要 t &ge; 9 的 Poseidon 配置（更多 column、更大的 MDS 矩陣）。Sponge 模式用 t=3 的小配置分 4 輪吸收，capacity 位在整個過程中累積內部狀態，防止長度擴展攻擊和碰撞。
+</div>
+
+<div class="key-insight">
+  <strong>為什麼綁定所有 8 個欄位（含 nonce）？</strong><br>
+  &bull; <strong>完整綁定：</strong>Commitment 包含 op_type 和 leaf_index — 即使兩筆交易的新葉子值相同，如果它們的操作類型或目標位置不同，commitment 也不同。這防止「替換攻擊」（把 TRADE 操作偽裝成 NOP）。<br>
+  &bull; <strong>exchange_nonce 防重放：</strong>每筆交易附帶交易所產生的唯一 nonce。即使基金重新提交一筆已簽名的舊交易，nonce 不同會導致 commitment 不同，簽名驗證失敗。這是防止<strong>重放攻擊</strong>的關鍵機制。
+</div>
+
+<h2>4.5 每筆簽名驗證的列數分析</h2>
 
 <table>
-  <thead><tr><th>組件</th><th>約束數</th><th>備註</th></tr></thead>
+  <thead><tr><th>組件</th><th>列數</th><th>備註</th></tr></thead>
   <tbody>
-    <tr><td>Scalar Mul: S &times; B</td><td class="num">~3,000</td><td>253 doublings + conditional adds</td></tr>
-    <tr><td>Scalar Mul: h &times; A</td><td class="num">~3,000</td><td>同上</td></tr>
-    <tr><td>Point Add: R + hA</td><td class="num">~6</td><td>twisted Edwards 加法</td></tr>
-    <tr><td>Equality check</td><td class="num">2</td><td>比較 x, y 座標</td></tr>
-    <tr><td>Poseidon hash (h)</td><td class="num">~320</td><td>5 個輸入的 sponge</td></tr>
-    <tr><td><strong>每筆簽名總計</strong></td><td class="em">~6,300</td><td>—</td></tr>
+    <tr><td>Poseidon sponge（h）</td><td class="num">198</td><td>3 perms &times; 66 rows/perm</td></tr>
+    <tr><td>S bit decomposition</td><td class="num">255</td><td>254 gates + 1 final accumulator</td></tr>
+    <tr><td>Assign B + S &times; B</td><td class="num">764</td><td>1 init + 254 &times; 3</td></tr>
+    <tr><td>h bit decomposition</td><td class="num">255</td><td>同上 + constrain == sponge output</td></tr>
+    <tr><td>Assign A + h &times; A</td><td class="num">764</td><td>1 init + 254 &times; 3</td></tr>
+    <tr><td>Assign R + point add</td><td class="num">2</td><td>1 assign + 1 ec_add</td></tr>
+    <tr><td><strong>每筆簽名小計</strong></td><td class="em">2,238</td><td>外加 2 個 equality constraints</td></tr>
   </tbody>
 </table>
 
 <div class="result-box">
-  <strong>實作驗證：</strong>EdDSA off-circuit 8 tests 通過（sign/verify、tamper detection、多 key/多 message）。EdDSA circuit 6 tests 通過（ec_add, scalar_mul MockProver 驗證）。
+  <strong>實作驗證：</strong>EdDSA off-circuit 10 tests 通過（sign/verify、tamper detection for R/S/pubkey/message、determinism、multiple keys/messages）。EdDSA in-circuit 6 tests 通過（ec_add identity/double、scalar_mul small/one/wrong、full EdDSA verify valid/wrong_msg/tampered_s）。
 </div>
 
 <hr>
@@ -440,17 +799,30 @@
 <!-- ===== 5. Batch Attestation ===== -->
 <h1><span class="section-num">5</span>Per-Exchange 批次認證</h1>
 
-<p>交易所不只簽署個別交易 — 每家交易所還對自己的交易批次進行集體認證（batch attestation）。</p>
+<p>電路不僅驗證每筆交易的 EdDSA 簽名，還強制同一子批次內的交易必須來自同一家交易所。</p>
 
-<h2>5.1 機制</h2>
+<h2>5.1 Sub-Batch 結構</h2>
 
 <div class="formula-block">
-  交易按交易所分組：<br>
-  Exchange A: {tx<sub>1</sub>, tx<sub>3</sub>, tx<sub>5</sub>} &rarr; sub_root<sub>A</sub><br>
-  Exchange B: {tx<sub>2</sub>, tx<sub>4</sub>} &rarr; sub_root<sub>B</sub><br><br>
-  batch_root = Poseidon(sub_root<sub>A</sub>, sub_root<sub>B</sub>, ...)<br><br>
-  <small>每家交易所簽署自己的 sub_root，公開發布。<br>
-  驗證者可獨立向每家交易所確認 batch 內容。</small>
+  4 筆交易固定分成 2 個 sub-batch：<br><br>
+  <strong>Sub-batch 0：</strong>trades[0], trades[1] &ensp;&larr;&ensp; Exchange A 簽署<br>
+  <strong>Sub-batch 1：</strong>trades[2], trades[3] &ensp;&larr;&ensp; Exchange B 簽署<br><br>
+  電路約束（copy constraints，零額外列數）：<br>
+  &ensp; pk<sub>0</sub>.x == pk<sub>1</sub>.x &ensp; pk<sub>0</sub>.y == pk<sub>1</sub>.y<br>
+  &ensp; pk<sub>2</sub>.x == pk<sub>3</sub>.x &ensp; pk<sub>2</sub>.y == pk<sub>3</sub>.y<br><br>
+  batch_root = Poseidon(Poseidon(C<sub>0</sub>, C<sub>1</sub>), Poseidon(C<sub>2</sub>, C<sub>3</sub>))<br>
+  <small>其中 C<sub>j</sub> = Commit(tx<sub>j</sub>)，形成二叉 Merkle tree</small>
+</div>
+
+<div class="speaker-notes">
+批次認證是 Proof #2 的第五階段加入的功能。<br><br>
+4 筆交易固定分成兩個 sub-batch — 前兩筆必須用同一把公鑰簽名，後兩筆必須用同一把公鑰簽名。但前後兩組可以用不同的公鑰 — 這就實現了多交易所的支持。<br><br>
+最優雅的地方是：這個約束只需要 4 個 copy constraint，完全不增加電路列數。我們直接複用 EdDSA 驗證時已經 assign 在 advice column 裡的公鑰座標，讓 halo2 的 permutation argument 來強制相等。<br><br>
+batch root 則是把 4 個交易 commitment 組成一棵二叉 Poseidon hash tree。這個值作為公開輸入，讓任何人都可以向交易所確認「你確實授權了這些交易嗎？」。
+</div>
+
+<div class="purple-box">
+  <strong>為什麼用二叉 Merkle Tree 作為 Batch Commitment？</strong>替代方案是 sequential hash chain：C<sub>final</sub> = H(H(H(C<sub>0</sub>, C<sub>1</sub>), C<sub>2</sub>), C<sub>3</sub>)。兩者的 hash 次數相同（3 次），但二叉樹結構使得未來若需要個別交易的 inclusion proof，只需 log<sub>2</sub>(4) = 2 個 sibling（而 chain 結構需要最多 3 個）。此外，二叉結構的對稱性天然對應 sub-batch 分組：左子樹 = sub-batch 0，右子樹 = sub-batch 1。
 </div>
 
 <h2>5.2 安全意義</h2>
@@ -459,116 +831,138 @@
   <strong>防止基金偽造交易：</strong>即使基金控制了自己的系統，它無法偽造交易所的 EdDSA 簽名。batch_root 作為公開輸入，任何人都可以向交易所詢問「你確認了這個 batch 嗎？」形成<strong>不可否認的審計軌跡</strong>。
 </div>
 
-<hr>
-
-<!-- ===== 6. Implementation Status ===== -->
-<h1><span class="section-num">6</span>實作進度</h1>
-
-<p>Proof #2 的實作分為 7 個階段。以下是目前的進度（108 tests green）：</p>
-
-<div class="phase-card done">
-  <h4>Phase 0: BabyJubjub 曲線算術 <span class="status done">DONE</span></h4>
-  <p>Curve constants (a, d, B, subgroup order)、point add/double/negate（affine twisted Edwards）。20 unit tests cross-verified against arnaucube/babyjubjub-rs。</p>
-</div>
-
-<div class="phase-card done">
-  <h4>Phase 1: Scalar Multiplication 電路 <span class="status done">DONE</span></h4>
-  <p>Halo2 double-and-add scalar mul gadget。MockProver 驗證通過，matches off-circuit scalar mul。</p>
-</div>
-
-<div class="phase-card done">
-  <h4>Phase 2: EdDSA Verify 電路 <span class="status done">DONE</span></h4>
-  <p>Off-circuit EdDSA (sign + verify) + in-circuit ec_add 和 scalar_mul。8 + 6 tests 通過，包含 tamper detection（篡改 R、S、pubkey、message 都會被偵測）。</p>
-</div>
-
-<div class="phase-card wip">
-  <h4>Phase 3: 整合到 transition.rs <span class="status wip">IN PROGRESS</span></h4>
-  <p>將 EdDSA verify gadget 接入 transition circuit。Trade struct 增加 signature fields (R, S)。每筆交易驗證 EdDSA 簽名。</p>
-</div>
-
-<div class="phase-card todo">
-  <h4>Phase 4: 擴展 op_types <span class="status todo">PLANNED</span></h4>
-  <p>加入 EXERCISE、EXPIRY、CORPORATE_ACTION 操作。移除或重新定義 PARAM_UPDATE（與靜態葉節點原則矛盾）。</p>
-</div>
-
-<div class="phase-card todo">
-  <h4>Phase 5: Per-Exchange 批次認證 <span class="status todo">PLANNED</span></h4>
-  <p>交易按交易所分組，sub-tree root per exchange，交易所簽署 batch attestation。</p>
-</div>
-
-<div class="phase-card todo">
-  <h4>Phase 6: 整合測試 + KZG 基準 <span class="status todo">PLANNED</span></h4>
-  <p>End-to-end：generate signatures &rarr; prove &rarr; verify。KZG proof 生成時間和大小基準測量。</p>
+<div class="key-insight">
+  <strong>Sub-batch 公鑰約束的作用：</strong>防止基金混入未經授權的交易。如果 trade[0] 由 exchange A 簽署，trade[1] 就不可能由 exchange B 簽署 — 公鑰不匹配會被電路拒絕。
 </div>
 
 <hr>
 
-<!-- ===== 7. Architecture Decisions ===== -->
-<h1><span class="section-num">7</span>架構決策</h1>
+<!-- ===== 6. Circuit Architecture ===== -->
+<h1><span class="section-num">6</span>電路架構 — 列數預算</h1>
+
+<h2>6.1 為什麼選 halo2 (PSE fork) + KZG</h2>
+
+<p>證明系統的選擇決定了電路的表達能力和效能上限：</p>
 
 <table>
-  <thead><tr><th>決策</th><th>選擇</th><th>原因</th><th>替代方案</th></tr></thead>
+  <thead><tr><th>證明系統</th><th>電路模型</th><th>Proof Size</th><th>Verify Time</th><th>不選的原因</th></tr></thead>
   <tbody>
     <tr>
-      <td>簽名曲線</td>
-      <td><strong>BabyJubjub</strong></td>
-      <td>Base field = BN254 F<sub>r</sub>，native arithmetic</td>
-      <td>secp256k1（non-native，10x 成本）</td>
+      <td><strong>halo2 + KZG</strong></td>
+      <td>PLONKish（自訂 gate）</td>
+      <td class="em">~3.2 KB</td>
+      <td class="em">~16 ms</td>
+      <td>—（選用）</td>
     </tr>
     <tr>
-      <td>Hash for EdDSA</td>
-      <td><strong>Poseidon</strong></td>
-      <td>~64 constraints/permutation vs SHA-256 ~25,000</td>
-      <td>SHA-256, Blake2（ZK-unfriendly）</td>
+      <td>Groth16</td>
+      <td>R1CS</td>
+      <td class="num">128 B</td>
+      <td class="num">~5 ms</td>
+      <td>需要 <strong>per-circuit trusted setup</strong>（每次改電路都要重新 ceremony）；R1CS 不支持自訂 gate</td>
     </tr>
     <tr>
-      <td>Scalar Mul 方法</td>
-      <td><strong>Double-and-add</strong></td>
-      <td>簡單、可靠、~3,000 constraints</td>
-      <td>Windowed（更快但更複雜）</td>
+      <td>Plonky2 + FRI</td>
+      <td>PLONKish</td>
+      <td class="num">~100 KB</td>
+      <td class="num">~2 ms</td>
+      <td>Proof size 太大不適合鏈上；使用 Goldilocks 域（64-bit），與 BN254 生態不相容</td>
     </tr>
     <tr>
-      <td>State 更新模型</td>
-      <td><strong>增量式 Merkle</strong></td>
-      <td>逐筆更新，root 鏈接自然形成</td>
-      <td>Full tree rebuild（不可行）</td>
-    </tr>
-    <tr>
-      <td>Proof 組合</td>
-      <td><strong>獨立驗證</strong></td>
-      <td>簡單、無遞歸開銷</td>
-      <td>Recursive composition（複雜）</td>
+      <td>Nova / HyperNova</td>
+      <td>IVC (folding)</td>
+      <td class="num">可變</td>
+      <td class="num">可變</td>
+      <td>為<strong>遞歸組合</strong>設計，Proof #2 是單次證明（非遞歸），不需要 folding 的額外開銷</td>
     </tr>
   </tbody>
 </table>
 
-<div class="problem-box">
-  <strong>已知問題 (ISSUE-003)：</strong>原型中的 PARAM_UPDATE op_type 允許修改葉子參數，與靜態葉節點設計矛盾。Phase 4 將解決 — 選項：(1) 完全移除；(2) 重新定義為需要管理員簽名的行政修正。
+<div class="key-insight">
+  <strong>PLONKish 自訂 Gate 的威力：</strong>halo2 允許定義 degree-5 的自訂多項式 gate。這意味著 twisted Edwards 加法的兩條約束（degree-5 多項式）可以放在同一列用同一個 gate 檢查 — 在 R1CS 系統中，同樣的運算需要拆成多個 degree-2 約束，列數增加 3-5 倍。
+</div>
+
+<div class="key-insight">
+  <strong>KZG 承諾的優勢：</strong>KZG (Kate-Zaverucha-Goldberg) polynomial commitment 提供 O(1) 驗證時間和恆定的 proof size (~3.2 KB)。雖然需要 structured reference string (SRS)（一次性生成的公開參數），但 <strong>universal SRS</strong> 可以被所有 k &le; N 的電路共用 — 不像 Groth16 需要 per-circuit setup。Ethereum 的 KZG ceremony (2023) 已為 BN254 生態提供了廣泛信任的 SRS。
+</div>
+
+<div class="speaker-notes">
+為什麼選 halo2？兩個關鍵理由。<br><br>
+第一，PLONKish 的自訂 gate。我們的 twisted Edwards 加法公式是 degree-5 的多項式 — 在 R1CS 系統（像 Groth16 用的）裡，每個約束只能是 degree-2（a &times; b = c），所以一個 degree-5 的約束需要拆成多個中間變數和多列。halo2 允許我們直接定義 degree-5 的 gate，一列搞定。<br><br>
+第二，KZG commitment。它給了我們恆定的 proof size（3.2 KB）和毫秒級的驗證時間。Groth16 的 proof 更小（128 bytes），但每次改電路就要重做 trusted setup ceremony — 對一個還在迭代的研究原型來說，這是不可接受的。<br><br>
+至於 Plonky2 — 它用 FRI 作為 polynomial commitment，不需要 trusted setup，但 proof size 大約 100 KB，放到鏈上的 gas 成本太高。而且它用 64-bit 的 Goldilocks 域，和 BN254 生態不相容 — 我們的 BabyJubjub 曲線是定義在 BN254 F<sub>r</sub> 上的。
+</div>
+
+<p>整個 Proof #2 電路的列數分配如下（k = 14，2<sup>14</sup> = 16,384 列可用）：</p>
+
+<h2>6.2 Per-Trade 組件</h2>
+
+<table>
+  <thead><tr><th>組件</th><th>Perms / 操作</th><th>列數</th></tr></thead>
+  <tbody>
+    <tr><td>Hash old leaf（Poseidon sponge）</td><td>3 perms</td><td class="num">198</td></tr>
+    <tr><td>Old Merkle path（depth 7）</td><td>7 perms</td><td class="num">462</td></tr>
+    <tr><td>Hash new leaf</td><td>3 perms</td><td class="num">198</td></tr>
+    <tr><td>New Merkle path</td><td>7 perms</td><td class="num">462</td></tr>
+    <tr><td>Commitment sponge</td><td>4 perms</td><td class="num">264</td></tr>
+    <tr><td>Index accumulator</td><td>&mdash;</td><td class="num">8</td></tr>
+    <tr><td>Op_type constraints</td><td>&mdash;</td><td class="num">8</td></tr>
+    <tr><td>EdDSA verify</td><td>&mdash;</td><td class="num">~2,238</td></tr>
+    <tr><td><strong>每筆交易小計</strong></td><td>&mdash;</td><td class="em">~3,838</td></tr>
+  </tbody>
+</table>
+
+<h2>6.3 全電路總計</h2>
+
+<table>
+  <thead><tr><th>組件</th><th>算式</th><th>列數</th></tr></thead>
+  <tbody>
+    <tr><td>4 trades</td><td>4 &times; ~3,838</td><td class="num">~15,352</td></tr>
+    <tr><td>Batch root hash</td><td>3 &times; 66 (Poseidon)</td><td class="num">198</td></tr>
+    <tr><td>Sub-batch pubkey constraints</td><td>copy only</td><td class="num">0</td></tr>
+    <tr><td><strong>TRANSITION_ROWS 總計</strong></td><td>&mdash;</td><td class="em">~15,550</td></tr>
+  </tbody>
+</table>
+
+<p style="font-size:15px; color:#718096;">使用 k = 14（2<sup>14</sup> = 16,384 列），利用率約 95%。</p>
+
+<div class="speaker-notes">
+這一節是電路的「成本分析」。整個 Proof #2 需要大約 15,550 列，放在 k=14 的電路裡利用率約 95%。<br><br>
+從表格可以看出，EdDSA 簽名驗證佔了每筆交易的最大成本 — 每筆交易約 3,838 列中有 2,238 列是 EdDSA 相關的（約 58%）。Poseidon hash（Merkle path、leaf hash、commitment sponge）合計 1,584 列（24 次 permutation &times; 66 列），也是重要的成本來源。<br><br>
+這也解釋了為什麼我們選 BabyJubjub + Poseidon 而不是 secp256k1 + SHA-256 — 即使是最省的實現，EdDSA 仍然是最大的約束來源。如果用 non-native 曲線，每筆交易可能需要 20,000+ 列，4 筆就超過 80,000 列，需要 k=17 或更大。
 </div>
 
 <hr>
 
-<!-- ===== 8. Security Properties ===== -->
-<h1><span class="section-num">8</span>安全性質</h1>
+<!-- ===== 7. Security Properties ===== -->
+<h1><span class="section-num">7</span>安全性質</h1>
 
 <table>
   <thead><tr><th>性質</th><th>保證機制</th></tr></thead>
   <tbody>
     <tr>
       <td><strong>交易不可偽造</strong></td>
-      <td>EdDSA 簽名在電路內驗證。偽造簽名需要破解離散對數問題。</td>
+      <td>EdDSA 簽名在電路內驗證。偽造簽名需要破解 BabyJubjub 上的離散對數問題。</td>
     </tr>
     <tr>
       <td><strong>狀態不可篡改</strong></td>
-      <td>Root 鏈接：每筆交易的 old root 必須等於前一筆的 new root。最終 root 必須等於公開輸入。</td>
+      <td>Root 鏈接：每筆交易的 old root 必須等於前一筆的 new root（copy constraint）。最終 root 必須等於公開輸入。</td>
     </tr>
     <tr>
       <td><strong>交易不可遺漏</strong></td>
-      <td>batch_root 承諾所有交易。跳過任何一筆都會導致 root 不匹配。</td>
+      <td>batch_root 承諾所有 4 筆交易。跳過任何一筆都會導致 batch root 不匹配。</td>
     </tr>
     <tr>
       <td><strong>交易不可重排</strong></td>
-      <td>Root 鏈接強制交易的執行順序。改變順序 = 改變中間 roots。</td>
+      <td>Root 鏈接強制交易的執行順序。改變順序 = 改變中間 roots = 驗證失敗。</td>
+    </tr>
+    <tr>
+      <td><strong>操作語義正確</strong></td>
+      <td>3-bit op_type 約束矩陣強制每種操作只能修改允許的欄位。保留代碼被多項式約束拒絕。</td>
+    </tr>
+    <tr>
+      <td><strong>交易所不可否認</strong></td>
+      <td>Sub-batch 公鑰約束 + batch_root 公開輸入 = 交易所簽署了什麼是公開可查的。</td>
     </tr>
     <tr>
       <td><strong>狀態連續性</strong></td>
@@ -577,14 +971,183 @@
   </tbody>
 </table>
 
+<div class="speaker-notes">
+安全性質的設計遵循「多層防禦」的思路。<br><br>
+即使攻擊者控制了基金的全部系統，他仍然無法偽造交易所的簽名 — 除非他同時也破解了 BabyJubjub 的離散對數。<br><br>
+即使攻擊者知道了前後兩個 state root，他也無法自由構造中間的交易 — root chain 強制了唯一的交易序列。<br><br>
+最後，3-bit 的操作類型約束確保了語義正確性。比如一個 CLOSE 操作不可能偷偷把 K 也改了 — 電路不允許。
+</div>
+
+<hr>
+
+<!-- ===== 8. Architecture Decisions ===== -->
+<h1><span class="section-num">8</span>架構決策</h1>
+
+<table>
+  <thead><tr><th>決策</th><th>選擇</th><th>核心理由</th><th>被淘汰的替代方案</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>證明系統</td>
+      <td><strong>halo2 + KZG</strong></td>
+      <td>PLONKish 自訂 gate 讓 EC add = 1 列；KZG 給 O(1) 驗證 + ~3.2 KB proof；universal SRS 不需 per-circuit setup</td>
+      <td>Groth16（per-circuit setup）、Plonky2（proof 100KB+、Goldilocks 域不相容）、Nova（為遞歸設計，此處非遞歸）</td>
+    </tr>
+    <tr>
+      <td>簽名方案</td>
+      <td><strong>EdDSA</strong></td>
+      <td>驗證無 modular inverse（ECDSA 需要 ~1,000 列的 s<sup>&minus;1</sup>）；確定性 nonce 消除隨機數重用風險</td>
+      <td>ECDSA（需模逆，~5,000 列）、BLS（需 pairing，&gt;100,000 列）</td>
+    </tr>
+    <tr>
+      <td>簽名曲線</td>
+      <td><strong>BabyJubjub</strong></td>
+      <td>Base field = BN254 F<sub>r</sub>（native）；twisted Edwards 提供 complete addition law，免分支</td>
+      <td>secp256k1（non-native ~10x）、JubJub（為 BLS12-381 設計，域不匹配）</td>
+    </tr>
+    <tr>
+      <td>Hash 函數</td>
+      <td><strong>Poseidon (t=3)</strong></td>
+      <td>S-box = x<sup>5</sup> 直接映射 degree-5 gate；~66 rows/perm；GMIMC 家族密碼分析充分</td>
+      <td>SHA-256（~25,000 rows，bit ops 昂貴）、MiMC（x<sup>3</sup> S-box 在 PLONKish 下不如 x<sup>5</sup>）、Pedersen（需額外 scalar mul ~750 rows）</td>
+    </tr>
+    <tr>
+      <td>承諾方案</td>
+      <td><strong>Poseidon sponge (rate=2)</strong></td>
+      <td>t=3 小配置分 4 輪吸收 8 欄位；capacity 位防長度擴展攻擊；含 nonce 防重放</td>
+      <td>直接拼接 hash（需 t&ge;9 配置）、Pedersen commitment（可加性不需要，額外 DLP 假設）</td>
+    </tr>
+    <tr>
+      <td>Scalar Mul</td>
+      <td><strong>Double-and-add</strong></td>
+      <td>254 bits &times; 3 rows = 763 rows/mul，實作簡單可靠，constant time</td>
+      <td>Windowed method（更快但查表邏輯複雜，需預計算點）</td>
+    </tr>
+    <tr>
+      <td>Op_type 編碼</td>
+      <td><strong>3-bit 布林分解</strong></td>
+      <td>每個 bit 復用作 selector（bit OR 邏輯），8 rows 實現 6 種操作的完整約束矩陣</td>
+      <td>Lookup table（更靈活但需專門 column + table 初始化列）</td>
+    </tr>
+    <tr>
+      <td>Batch 結構</td>
+      <td><strong>固定 2 sub-batches</strong></td>
+      <td>Copy constraint only = 零額外列數；左右子樹 = 2 個 sub-batch，結構對稱</td>
+      <td>Full in-circuit batch EdDSA（+4,476 rows，推到 k=15）</td>
+    </tr>
+    <tr>
+      <td>狀態樹</td>
+      <td><strong>Poseidon Merkle (depth 7)</strong></td>
+      <td>log 級 proof（7 siblings）；支持增量式單葉更新；與 hash 函數統一</td>
+      <td>RSA accumulator（需 2048-bit non-native bigint）、Vector commitment（不支持高效更新）</td>
+    </tr>
+    <tr>
+      <td>Proof 組合</td>
+      <td><strong>獨立驗證</strong></td>
+      <td>Proof #1 和 #2 共享 state_root 即可銜接 — 比較兩個域元素的 gas 成本幾乎為零</td>
+      <td>Recursive composition（需要 verifier circuit 在內部驗證另一個 proof，增加 ~100K 約束）</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="speaker-notes">
+這張表是整個 Proof #2 的技術選型總結。我想強調幾個最重要的決策。<br><br>
+第一，為什麼用 halo2 而不是 Groth16？Groth16 的 proof 更小（128 bytes），驗證更快，但它需要 per-circuit trusted setup — 每次我們修改電路，就得重做一次 ceremony。對一個還在開發中的系統，這是不可接受的。halo2 + KZG 用的是 universal SRS，一次生成就可以被所有電路共用。<br><br>
+第二，為什麼用 EdDSA 而不是 ECDSA？核心原因是 modular inverse。ECDSA 的驗證需要算 s<sup>&minus;1</sup> mod l，這在電路裡大約需要 1,000 多列。EdDSA 的方程 S&times;B = R + h&times;A 完全沒有除法，少了將近一半的成本。<br><br>
+第三，Proof #1 和 #2 的組合方式。我們沒有用 recursive proof composition（在一個電路裡面驗證另一個 proof），因為那需要在電路內實作一個完整的 verifier — 大約 10 萬列。我們的做法簡單得多：兩個 proof 各自獨立生成，但都把 state_root 作為公開輸入，驗證者只需檢查兩個 state_root 相等就好。
+</div>
+
+<hr>
+
+<!-- ===== 9. Implementation & Benchmarks ===== -->
+<h1><span class="section-num">9</span>實作狀態與效能</h1>
+
+<p>Proof #2 的實作分 7 個階段，全部完成。127 個 tests（含 21 個 proof2 專屬 tests）全部通過。</p>
+
+<h3>實作階段</h3>
+
+<div class="phase-card">
+  <h4>Phase 0: BabyJubjub 曲線算術 <span class="status">DONE</span></h4>
+  <p>Curve constants、point add/double/negate（affine twisted Edwards）。40 unit tests，含與 Python 參考的交叉驗證。</p>
+</div>
+
+<div class="phase-card">
+  <h4>Phase 1: Scalar Multiplication 電路 <span class="status">DONE</span></h4>
+  <p>Halo2 double-and-add scalar mul gadget + conditional select。4 integration tests（MockProver 驗證 1B、3B、5B）。</p>
+</div>
+
+<div class="phase-card">
+  <h4>Phase 2: EdDSA Verify 電路 <span class="status">DONE</span></h4>
+  <p>Full in-circuit Poseidon sponge + bit decomposition + 2&times; scalar mul + point add。6 unit tests（valid、wrong_msg、tampered_s）。</p>
+</div>
+
+<div class="phase-card">
+  <h4>Phase 3: 整合到 Transition Circuit <span class="status">DONE</span></h4>
+  <p>EdDSA verify gadget 接入 transition circuit。Trade struct 增加 sig fields。每筆交易驗證 EdDSA 簽名。8 integration tests。</p>
+</div>
+
+<div class="phase-card">
+  <h4>Phase 4: 3-bit Op_Types <span class="status">DONE</span></h4>
+  <p>6 種合法操作 + 2 種保留代碼拒絕。8 列約束矩陣（5 selectors）。10 新 tests（close、exercise、expiry、corporate_action、nop、reserved_code）。</p>
+</div>
+
+<div class="phase-card">
+  <h4>Phase 5: Per-Exchange 批次認證 <span class="status">DONE</span></h4>
+  <p>Sub-batch 公鑰 copy constraints。零額外列數。2 新 tests（multi_exchange_basic、mixed_exchange_fails）。</p>
+</div>
+
+<div class="phase-card">
+  <h4>Phase 6: KZG End-to-End <span class="status">DONE</span></h4>
+  <p>完整的 KZG proof + verify cycle。Multi-exchange scenario（TRADE + CLOSE + 2&times; NOP）。1 新 test。</p>
+</div>
+
+<h3>KZG 效能基準</h3>
+
+<table>
+  <thead><tr><th>指標</th><th>數值</th></tr></thead>
+  <tbody>
+    <tr><td>Circuit size (k)</td><td class="em">14</td></tr>
+    <tr><td>Total rows</td><td class="num">~15,550</td></tr>
+    <tr><td>Prove time</td><td class="em">~5.1 s</td></tr>
+    <tr><td>Verify time</td><td class="em">~16 ms</td></tr>
+    <tr><td>Proof size</td><td class="num">3,200 bytes</td></tr>
+    <tr><td>Tests passing</td><td class="num">127 / 127</td></tr>
+  </tbody>
+</table>
+
+<div class="result-box">
+  <strong>KZG 驗證通過：</strong>multi-exchange 場景（exchange A: TRADE + CLOSE, exchange B: NOP &times; 2）完成 SRS 生成、keygen、prove、verify 全流程。proof size 3,200 bytes 適合鏈上驗證。
+</div>
+
+<div class="speaker-notes">
+最後是效能數據。整個電路 k=14，prove time 大約 5 秒，verify 只要 16 毫秒 — 這個驗證速度足夠放到 L1 的智能合約上。<br><br>
+Proof size 3,200 bytes 也很合理 — 對比 Groth16 的 128 bytes 確實大了一些，但 PLONK 不需要 trusted setup，這是值得的 trade-off。<br><br>
+整個 Proof #2 從 Phase 0 到 Phase 6，總共有 127 個 test 全部通過 — 包含正向驗證和各種攻擊場景的負向測試。<br><br>
+以上就是 Proof #2 的完整技術介紹。它和 Proof #1 搭配起來，構成了一個完整的雙重保障：Proof #1 證明「持倉合規」，Proof #2 證明「狀態變動合法」。兩者通過共享 state_root 這一個公開輸入來銜接。謝謝。
+</div>
+
 <hr>
 
 <div style="text-align: center; padding: 32px 0; color: #718096; font-size: 14px;">
   <p><a href="proof1.html" style="color: var(--accent); text-decoration: none;">&larr; Proof #1 技術細節</a>
   &ensp;|&ensp;
-  <a href="index.html" style="color: var(--accent); text-decoration: none;">協議總覽</a></p>
+  <a href="index.html" style="color: var(--accent); text-decoration: none;">協議總覽</a>
+  &ensp;|&ensp;
+  <a href="merkle.html" style="color: var(--accent); text-decoration: none;">Merkle Tree &rarr;</a></p>
   <p style="margin-top: 8px;"><a href="../index.html" style="color: var(--accent); text-decoration: none;">ZKMM</a> &mdash; Zero-Knowledge Machine Learning Research</p>
 </div>
+
+<!-- ===== Floating Toggle Button ===== -->
+<button id="notes-toggle" onclick="toggleNotes()">&#x1F399; 講稿</button>
+
+<script>
+function toggleNotes() {
+  document.body.classList.toggle('show-notes');
+  const btn = document.getElementById('notes-toggle');
+  btn.classList.toggle('active');
+  btn.textContent = document.body.classList.contains('show-notes')
+    ? '\u2716 \u96B1\u85CF\u8B1B\u7A3F' : '\uD83C\uDF99 \u8B1B\u7A3F';
+}
+</script>
 
 </body>
 </html>
