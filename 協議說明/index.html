@@ -602,8 +602,8 @@
   </div>
   <div class="guarantee-card">
     <span class="g-icon">&#x1F50F;</span>
-    <div class="g-title">持倉真實性</div>
-    <div class="g-desc">每筆持倉來自交易所簽名的合法交易</div>
+    <div class="g-title">交易真實性</div>
+    <div class="g-desc">每筆狀態更新來自交易所 EdDSA 簽名的合法交易</div>
   </div>
   <div class="guarantee-card">
     <span class="g-icon">&#x1F4C8;</span>
@@ -722,7 +722,7 @@
 
   <!-- Verify result -->
   <div class="verify-result">
-    &#x2705; 監管機構驗證 &mdash; 兩個 proof 通過 + state_root 一致 = 合規確認 (&lt; 30ms)
+    &#x2705; 監管機構驗證 &mdash; 兩個 proof 通過 + state_root 一致 = 合規確認（毫秒級）
   </div>
 </div>
 <p class="fig-caption">圖 1：ZKMM 協議全景架構。三方角色、三棵 Merkle 樹、兩個 ZK 證明及其公開輸入的完整關係。</p>
@@ -747,7 +747,7 @@
     <p><strong>角色</strong>：驗證者（Verifier）</p>
     <p><strong>職責</strong>：驗證 proof、執行隨機抽查</p>
     <p><strong>所見</strong>：僅 Merkle roots + 門檻值</p>
-    <p><strong>計算量</strong>：&lt; 30 毫秒驗證</p>
+    <p><strong>計算量</strong>：毫秒級驗證</p>
   </div>
   <div class="role-card exchange">
     <span class="role-icon">&#x1F4B1;</span>
@@ -760,7 +760,7 @@
 </div>
 
 <div class="key-insight">
-  <strong>隱私分離原則：</strong>沒有任何一方能看到基金的完整持倉。基金知道自己的全貌，但只提交加密承諾。交易所各自只看到自己執行的部分交易。監管機構只看到 Merkle root（幾個 hash 值）和一個 proof。
+  <strong>隱私分離原則：</strong>沒有任何一方能看到基金的完整持倉。基金知道自己的全貌，但只提交加密承諾。交易所各自只看到自己執行的部分交易。監管機構只看到 Merkle roots（幾個 hash 值）和兩個 proof。
 </div>
 
 <hr>
@@ -928,7 +928,7 @@
   <span class="arrow">&rarr;</span>
   <div class="step proof1">Proof #1<br><small>|&Delta;| &le; &tau;</small></div>
   <span class="arrow">&rarr;</span>
-  <div class="step ours">&#x2705; 合規確認<br><small>&lt; 30ms</small></div>
+  <div class="step ours">&#x2705; 合規確認<br><small>毫秒級</small></div>
 </div>
 
 <div class="key-insight">
@@ -1055,7 +1055,7 @@
     <div class="swim-cell"></div>
     <div class="swim-cell">
       <div class="swim-action reg-a">
-        <strong>驗證 (&lt;30ms)</strong>
+        <strong>驗證（毫秒級）</strong>
         <small>Proof #1 &#x2713;<br>Proof #2 &#x2713;<br>state_root 一致 &#x2713;</small>
       </div>
     </div>
@@ -1075,7 +1075,7 @@
   <tbody>
     <tr>
       <td><strong>監管機構</strong></td>
-      <td>state_root, market_data_root, &tau;, today, proof 結果</td>
+      <td>state_root, state_root_prev, market_data_root, batch_root, &tau;, today, proof 結果</td>
       <td>持倉明細、交易歷史、標的、數量、Delta 值</td>
     </tr>
     <tr>
