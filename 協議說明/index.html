@@ -768,43 +768,48 @@
 <!-- ===== 4. 四層信任模型 ===== -->
 <h1><span class="section-num">4</span>四層信任模型</h1>
 
-<p>安全性由四層機制堆疊而成。最底層是最強的密碼學保證，最頂層是法律嚇阻。即使某層被突破，其他層仍提供保護。</p>
+<p>ZK proof 保證「給定輸入，計算正確」，但無法保證「輸入本身是真的」。
+  協議的 <strong>input authenticity</strong>（輸入真實性）由四層機制共同保障，每層針對不同的攻擊面：</p>
 
 <div class="trust-stack">
   <div class="trust-block l4">
     <div class="trust-num">L4</div>
     <div class="trust-body">
-      <h4>Deterrence 嚇阻層</h4>
-      <p>監管機構可隨時要求基金開示特定持倉進行抽查。若抽查與 proof 承諾不一致 &rarr; 法律後果。</p>
-      <span class="trust-tech">唯一需要人類信任的層 &mdash; 有法律約束力</span>
+      <h4>Random Audit 隨機抽查</h4>
+      <p>針對密碼學無法防禦的場景：交易所用合法私鑰簽署虛假交易時，EdDSA 驗證仍會通過。
+        監管機構可要求基金開示特定持倉，與交易所交叉比對。</p>
+      <span class="trust-tech">防禦目標：簽名者本身串通作弊（密碼學無法區分合法簽名+假內容 vs 合法簽名+真內容）</span>
     </div>
   </div>
   <div class="trust-block l3">
     <div class="trust-num">L3</div>
     <div class="trust-body">
-      <h4>Computational Correctness 計算正確性</h4>
-      <p>兩個 ZK 證明保證所有邏輯正確。Proof 通過 &hArr; 陳述為真（數學保證）。</p>
-      <span class="trust-tech">Proof #1 (Delta) + Proof #2 (State Transition)</span>
+      <h4>ZK Computation 零知識計算</h4>
+      <p>兩個 ZK 證明保證所有邏輯正確：Delta 加權合規（Proof #1）、狀態轉移合法（Proof #2）。
+        Proof 通過 &hArr; 陳述為真（基於 DLOG 與 Poseidon collision resistance 的數學保證）。</p>
+      <span class="trust-tech">Proof #1 (Delta Compliance) + Proof #2 (State Transition)</span>
     </div>
   </div>
   <div class="trust-block l2">
     <div class="trust-num">L2</div>
     <div class="trust-body">
-      <h4>Cryptographic Integrity 密碼學完整性</h4>
-      <p>EdDSA 簽名保證交易真實性。Poseidon Merkle 樹保證數據完整性。偽造在計算上不可行。</p>
-      <span class="trust-tech">BabyJubjub EdDSA + Poseidon Merkle Tree</span>
+      <h4>Cryptographic Authentication 密碼學認證</h4>
+      <p><strong>L2a 交易認證：</strong>每筆交易由執行交易所以 EdDSA 簽名，電路內驗證。偽造簽名在計算上不可行。<br>
+        <strong>L2b 市場數據承諾：</strong>S, r, q, &sigma; 經 Poseidon Merkle 樹承諾為 market_data_root，公開可驗證。</p>
+      <span class="trust-tech">L2a: BabyJubjub EdDSA（交易所私鑰）&ensp;|&ensp;L2b: Poseidon Merkle Tree（數據源）</span>
     </div>
   </div>
   <div class="trust-block l1">
     <div class="trust-num">L1</div>
     <div class="trust-body">
-      <h4>Trust Anchor 信任錨點</h4>
-      <p>監管機構簽署 Genesis 承諾：State(0) = 空樹 root。所有後續狀態由此起始推導。</p>
-      <span class="trust-tech">Genesis commitment &mdash; 監管機構 EdDSA 簽名</span>
+      <h4>Genesis Anchor 起點錨定</h4>
+      <p>監管機構簽署初始狀態：State(0) = 空樹 root。Proof #2 的 state_root_prev 鏈從此起始，
+        確保狀態鏈有不可偽造的起點。這是協議中唯一的一次性信任假設。</p>
+      <span class="trust-tech">Genesis commitment &mdash; 監管機構簽署的一次性信任假設</span>
     </div>
   </div>
 </div>
-<p class="fig-caption">圖 2：信任層堆疊。L1（底部）為密碼學信任錨點，L4（頂部）為法律嚇阻。</p>
+<p class="fig-caption">圖 2：Input authenticity 四層保障。L1 錨定狀態鏈起點，L2 認證每筆輸入，L3 證明計算正確，L4 補足密碼學盲區。</p>
 
 <hr>
 
@@ -1145,7 +1150,7 @@
       <td><strong>交易所串通</strong></td>
       <td>簽署虛假交易</td>
       <td>L4 隨機抽查 + 多交易所分散風險</td>
-      <td><span style="background:#fef3c7; padding:2px 8px; border-radius:4px; font-size:13px;">L4 Deter</span></td>
+      <td><span style="background:#fef3c7; padding:2px 8px; border-radius:4px; font-size:13px;">L4 Audit</span></td>
     </tr>
   </tbody>
 </table>
