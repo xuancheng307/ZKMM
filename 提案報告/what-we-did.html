@@ -106,6 +106,10 @@
   <a href="what-we-did.html" class="active">技術說明</a>
 </nav>
 
+<div style="background:#fffbeb; border:1px solid #fbbf24; border-radius:8px; padding:12px 16px; margin-bottom:24px; font-size:14px; color:#92400e;">
+  <strong>歷史文件：</strong>本頁為提案階段內容。論文最終版擴展為 Delta Compliance Protocol 完整架構，詳見<a href="../協議說明/index.html" style="color:#2563eb;">協議技術文件</a>。
+</div>
+
 <h1>我們到底做了什麼？
 <small>給密碼學同學的技術說明 — 精確定義每一件事</small>
 </h1>
@@ -317,7 +321,7 @@ p* = argmin<sub>p ∈ P<sub>d</sub></sub> max<sub>x ∈ [a,b]</sub> |f(x) − p(
   <li>設計 pre-scaling 量化方案：D<sub>i</sub> = round(c<sub>i</sub> × S<sup>d+1−i</sup>)</li>
   <li>首次在 ZK 電路中做 Minimax vs Taylor 的受控比較</li>
 </ul>
-<p><strong>結果</strong>：在 13 個函數上，Minimax 比 Taylor 改善 2× ~ 4,330×。52 個配置中 29 個 Minimax 成功而 Taylor 完全失敗。</p>
+<p><strong>結果</strong>：在 13 個函數上，Minimax 比 Taylor 改善 2× ~ 4,330×。52 個配置中 32 個 Minimax 成功而 Taylor 完全失敗。</p>
 <p><strong>技術性質</strong>：這是數值逼近的應用，不是密碼學的貢獻。Minimax 逼近理論可追溯到 Chebyshev（1854），Remez 在 1934 年提出了高效計算 Minimax 多項式的算法。我們的貢獻不是發明新的逼近理論，而是把它引入 ZK 的定點數環境、提供窮舉 ULP 驗證、並量化了與 Taylor 的差距。</p>
 
 <h3>貢獻 2：延遲截斷（Deferred Truncation）</h3>
