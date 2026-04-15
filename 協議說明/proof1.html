@@ -668,7 +668,7 @@
 </table>
 
 <div class="result-box">
-  <strong>效率數據：</strong>在 pp=48 配置下，Delta 管線使用約 298 rows/position（佔總電路 ~13%）。Minimax 多項式比 Taylor 展開精度高 2&ndash;4,000 倍（相同次數下），搭配分段逼近（ln 4 段、erf 12 段）與 Method B 指數查表，端對端精度達 ~6 ULP（絕對誤差 ~2&times;10<sup>&minus;14</sup>）。
+  <strong>效率數據：</strong>在 pp=48 配置下，Delta 管線使用約 298 rows/position（佔總電路 ~13%）。Minimax 多項式比 Taylor 展開精度高數億至數百億倍（相同次數下；erf 2.6&times;10<sup>8</sup>&times;、ln 6.8&times;10<sup>10</sup>&times;，見<a href="proof1-data.html#section-2">實驗數據 Section 2</a>），搭配分段逼近（ln 4 段、erf 12 段）與 Method B 指數查表，端對端精度達 ~6 ULP（絕對誤差 ~2&times;10<sup>&minus;14</sup>）。
 </div>
 
 <h2>8.3 Put Delta 調整</h2>
@@ -681,7 +681,7 @@
   <p>現在進入<span class="emphasis">核心貢獻 — Delta 計算管線</span>。BS Delta 包含三個超越函數，我們對每個使用不同的最優策略。</p>
   <span class="pause">— 停頓 —</span>
   <p><span class="emphasis">ln 和 erf：Minimax 分段多項式 + Per-step Horner。</span></p>
-  <p>為什麼選 Minimax 而不是 Taylor？Taylor 在展開點附近好，但離開展開點誤差快速增長。Minimax 在整個區間上<strong>均勻分配誤差</strong>，由等振盪定理保證最優。同樣次數下，精度高 2,000&ndash;4,000 倍。</p>
+  <p>為什麼選 Minimax 而不是 Taylor？Taylor 在展開點附近好，但離開展開點誤差快速增長。Minimax 在整個區間上<strong>均勻分配誤差</strong>，由等振盪定理保證最優。同樣次數下，精度高<strong>數億至數百億倍</strong>（pp=48 d=14：erf 2.6&times;10<sup>8</sup>&times;、ln 6.8&times;10<sup>10</sup>&times;）。</p>
   <p>為什麼用<span class="emphasis">分段逼近</span>？單一多項式在寬區間上會遇到「量化飽和」— 高次係數的定點量化誤差被放大，增加次數反而惡化精度。切成窄段（ln 4 段 &times; 0.25，erf 12 段 &times; 0.5），每段只需 d=12 就能達到 ~1.2 ULP 的 kernel 精度。d=12 是經過 degree sweep 實驗找到的最優點 — 逼近誤差和截斷累積的 U 曲線最低點。</p>
   <p><span class="emphasis">Per-step Horner</span> 是求值法的關鍵。<span class="gesture">（指向管線表格）</span> 把多項式改寫為巢狀形式 c&#8320; + x(c&#8321; + x(c&#8322; + ...))，<strong>每一步都做截斷</strong>（除以 S = 2<sup>48</sup>），讓中間值始終保持在 S&sup2; 以內。截斷驗證用 ByteTable lookup — 把值拆成 6 個 byte，每個 byte 查一次 256-entry 的共用表。</p>
   <p><span class="emphasis">exp：Method B 查表乘法。</span>exp 利用 e<sup>a+b</sup> = e<sup>a</sup> &times; e<sup>b</sup> 的分解性質。把 48-bit 輸入拆成 6 個 byte，每個位置預先算好 256-entry 查表，然後 5 次乘法-截斷相乘。6 張表共 1,536 entries，只需 6 行電路 — 比 d=12 Horner 的 12 行更緊湊，精度 ~8 ULP。</p>
