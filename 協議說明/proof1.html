@@ -414,14 +414,12 @@
 </table>
 
 <div class="script-block" data-label="講稿 — 1 ZK Statement（~3min）">
-  <p>了解了金融背景之後，來看 Proof #1 的形式化陳述。這個證明的目標是：讓基金公司在<span class="emphasis">不揭露任何持倉細節</span>的前提下，證明投資組合的 Delta 風險在合規門檻之內。</p>
-  <p><span class="emphasis">為什麼用零知識證明？</span>三個替代方案各有致命缺點：(1) <strong>可信第三方</strong>需要揭露持倉明文；(2) <strong>MPC</strong> 需要多方在線協作，延遲高；(3) <strong>FHE</strong> 的乘法深度限制讓超越函數計算極為昂貴。ZK proof 的優勢：prover 在本地一次性計算，生成 ~1 KB 的 proof，verifier 在毫秒內驗證 — 非互動、可公開驗證、不洩漏私密輸入。</p>
+  <p>了解了金融背景，來看形式化陳述。Proof #1 的目標：讓基金公司在<span class="emphasis">不揭露任何持倉細節</span>的前提下，證明 Delta 風險在合規門檻之內。</p>
+  <p><span class="emphasis">為什麼用零知識證明？</span>三個替代方案各有致命缺點：可信第三方需要揭露持倉；MPC 需多方在線協作、延遲高；FHE 的乘法深度限制讓超越函數極為昂貴。ZKP 讓 prover 在本地一次性計算，verifier 毫秒內驗證，不洩漏任何私密輸入。</p>
   <span class="pause">— 指向 ZK Statement —</span>
-  <p><span class="emphasis">為什麼拆成兩個 proof？</span>Proof #1 做合規計算，Proof #2 做狀態完整性。拆分的理由是<strong>關注點分離</strong>：金融數學和資料結構的邏輯獨立，更新頻率也不同。</p>
-  <p>Proof #1 要證明五件事。<span class="gesture">（逐條指）</span></p>
-  <p>條件 (a)：每筆持倉存在於 State Tree — 透過 Merkle proof。這裡有個設計取捨：Proof #1 不檢查葉索引唯一性，因為唯一性需要 O(N&sup2;) 的比對，由 Proof #2 的 tree update 邏輯天然保證。</p>
-  <p>條件 (b)：市場數據通過 Merkle 驗證。條件 (c)：σ 正向驗證 — 用 σ 算出的 BS price 接近結算價。條件 (d)：到期時間 T 在電路內計算。條件 (e)：加權 Delta 總和的絕對值不超過 &tau;。</p>
-  <p>公開輸入只有 4 個。<span class="emphasis">設計原則：公開輸入越少，隱私性越強。</span>所有持倉細節都是 private witness。</p>
+  <p><span class="emphasis">為什麼拆成兩個 proof？</span>Proof #1 做合規計算，Proof #2 做狀態完整性。金融數學和資料結構邏輯獨立、更新頻率不同，拆開能獨立升級。</p>
+  <p>Proof #1 要證五件事。<span class="gesture">（逐條指）</span> (a)(b) 持倉和市場數據透過 Merkle 驗證存在性。(c) &sigma; 正向驗證 — 用 &sigma; 算出的 BS price 接近結算價。(d) 到期時間 T 電路內計算。(e) 加權 Delta 總和的絕對值不超過 &tau;。</p>
+  <p>公開輸入只有 4 個 — state_root、market_data_root、threshold、today。<span class="emphasis">公開輸入越少，隱私性越強。</span>所有持倉細節都是 private witness。</p>
 </div>
 
 <hr>
@@ -450,11 +448,11 @@
 </div>
 
 <div class="script-block" data-label="講稿 — 2 電路架構（~2min）">
-  <p>在看各部分細節之前，先說明兩個基礎選擇。</p>
-  <p><span class="emphasis">為什麼選 Halo2 + KZG？</span>Delta 計算需要可程式化的自訂閘、高效的 lookup table（用於 range reduction 和 byte decomposition）、以及成熟的工具鏈。Halo2 基於 PLONKish 算術化，支援這些需求，KZG 提供常數大小的 proof（~1 KB）和毫秒級驗證。Groth16 不支援 lookup，STARKs 的 proof 太大（~100 KB）。</p>
-  <p>第二個選擇是<span class="emphasis">定點算術 pp=48</span>。浮點數需要分別追蹤指數和尾數，每次運算都要做正規化，在 ZK 電路中代價極高。定點算術把所有數乘以 S = 2<sup>48</sup> &asymp; 281 兆，用整數運算模擬小數。pp=48 提供約 14.4 位十進位精度，端對端 BS Delta 的絕對誤差達到 ~2&times;10<sup>&minus;14</sup>，遠超金融計算的需求。</p>
+  <p>在看各部分細節之前，先說明兩個基礎設計選擇。</p>
+  <p><span class="emphasis">為什麼選 Halo2 + KZG？</span>Delta 計算需要可程式化的自訂閘、高效的 lookup table（用於 range reduction 和 byte decomposition）、以及成熟的工具鏈。Halo2 的 PLONKish 架構支援這些需求，KZG 提供常數大小的 proof（~1 KB）和毫秒級驗證。Groth16 不支援 lookup，STARKs 的 proof 太大（~100 KB）。</p>
+  <p>第二個選擇是<span class="emphasis">定點算術 pp=48</span>。浮點數在 ZK 電路中每次運算都要做指數對齊和正規化，代價極高。定點算術把所有數乘以 S = 2<sup>48</sup> &asymp; 281 兆，用整數運算模擬小數。pp=48 提供約 14.4 位十進位精度，端對端 BS Delta 絕對誤差達 ~2&times;10<sup>&minus;14</sup>，遠超金融需求。</p>
   <span class="pause">— 指向管線圖 —</span>
-  <p>整體電路分為五個部分。<span class="gesture">（逐一指）</span> Part A、A' 做 Merkle 驗證。Part A'' 驗證 &sigma;。<span class="emphasis">Part B 是核心貢獻 — Delta 計算</span>。Part C 做合規檢查。每個部分對每一筆持倉獨立執行，最多 128 slots，最後在 Part C 匯總。即使在最高精度 pp=48 下，Part B 也僅佔整體電路的 ~13%。</p>
+  <p>電路分為五個部分。<span class="gesture">（逐一指）</span> Part A 和 A' 做 Merkle 驗證 — 確認持倉和市場數據的存在性。Part A'' 驗證隱含波動率 &sigma;。<span class="emphasis">Part B 是核心 — Delta 計算管線</span>。Part C 做最終合規判定。每個部分對每筆持倉獨立執行，最多 128 slots，最後在 Part C 匯總。各部分的成本佔比等看完技術細節後再一起分析。</p>
 </div>
 
 <hr>
@@ -517,15 +515,15 @@
   <strong>為什麼 Market Data 用 Merkle 而不用 Lookup Table？</strong>Market Data 每日更新 — 如果用 Halo2 fixed column lookup，每次更新都需要重新產生 setup 和 VK。使用 Merkle tree 讓電路結構完全固定，只有 root 值（公開輸入）每日變化。
 </div>
 
-<p>Part A' 是整個電路的<strong>主要成本來源</strong>，約佔 55%（~1,386 rows/position），因為 Market Data 有 8 個欄位（需要 4 次 Poseidon permutation）且 tree depth ~20。</p>
+<p>Part A' 是整個電路的<strong>主要成本來源</strong>，約佔 61%（~1,386 rows/position），因為 Market Data 有 8 個欄位（需要 4 次 Poseidon permutation）且 tree depth ~20。</p>
 
 <div class="script-block" data-label="講稿 — 3-4 State & Market Merkle（~3min）">
-  <p>Part A 是標準的 Merkle 驗證。每個持倉有 5 個欄位，透過 Poseidon sponge 壓縮為單一 hash，再沿 7 層路徑驗證到 state_root。</p>
-  <p><span class="emphasis">為什麼用 Merkle tree 而不是 KZG 多項式承諾？</span>三個原因：O(log N) 的成員證明和更新效率、概念簡單的安全性分析、以及只要 hash 函數抗碰撞，承諾就是 binding 的。<span class="emphasis">為什麼選 Poseidon hash？</span>SHA-256 是位元運算，一次需要 ~25,000 個約束；Poseidon 是專為 ZK 設計的代數 hash，直接在有限域上運算，一次 permutation 只需 ~64 個約束 — 兩個數量級的差距。這個選擇直接決定了整個系統的可行性。</p>
+  <p>Part A 是標準的 Merkle 驗證。每個持倉有 5 個欄位，透過 Poseidon sponge 壓縮為葉 hash，再沿 7 層路徑驗證到 state_root。</p>
+  <p><span class="emphasis">為什麼選 Poseidon hash？</span>SHA-256 是位元運算，一次需要 ~25,000 個約束；Poseidon 是專為 ZK 設計的代數 hash，直接在有限域上運算，一次 permutation 只需 ~64 個約束 — 差兩個數量級。這個選擇直接決定了整個系統是否可行。</p>
   <span class="pause">— 翻到 Part A' —</span>
-  <p>Part A' 結構類似，處理市場數據（8 個欄位，4 次 Poseidon permutation）。</p>
-  <p>一個關鍵設計：<span class="emphasis">為什麼市場數據不用 Halo2 lookup table？</span>因為 fixed column 是 setup 的一部分 — 市場數據每天變，如果用 lookup 就要每天重新 setup。改用 Merkle tree，電路結構<strong>一次 setup 永久有效</strong>，只有 root 每日更新。</p>
-  <p>兩棵樹之間透過 <strong>8 條 copy constraints</strong> 連結 — PLONK 原生機制，零成本強制 cell 相等。前 4 條確保合約條款一致，後 4 條把市場參數直接綁定到 Delta 管線。Part A' 佔了整個電路的 ~61%，是最主要的成本來源。</p>
+  <p>Part A' 結構類似但更重，處理市場數據（8 個欄位，4 次 Poseidon permutation，tree depth ~20）— 它會是整個電路中最大的部分。</p>
+  <p>一個關鍵設計取捨：<span class="emphasis">為什麼市場數據不用 Halo2 lookup table？</span>因為 fixed column 是 setup 的一部分 — 市場數據每天變動，如果用 lookup 就要每天重新 setup。改用 Merkle tree，電路結構<strong>一次 setup 永久有效</strong>，只有 root 值每日更新。</p>
+  <p>兩棵樹之間透過 <strong>8 條 copy constraints</strong> 連結。前 4 條確保合約條款一致，後 4 條把市場參數直接綁定到 Delta 管線的輸入 — 用 PLONK 原生的 cell equality 機制，零額外成本。</p>
 </div>
 
 <hr>
@@ -625,9 +623,9 @@
 
 <div class="script-block" data-label="講稿 — 7 σ 正向驗證（~2min）">
   <p>&sigma; 正向驗證是<span class="emphasis">關鍵安全機制</span>。如果不驗證 &sigma;，基金可以填入讓 Delta 趨近於零的假 &sigma; 來規避合規。</p>
-  <p><span class="emphasis">為什麼用「正向驗證」而不是電路內求解 &sigma;？</span>求解需要 Newton-Raphson 迭代 — ZK 電路不支援動態迭代。但給定 &sigma; 去算一次 BS price 只需前向計算，正好就是 Delta 管線已經能做的事。策略是：prover 電路外做反向求解，電路只負責正向驗證。</p>
-  <p>容許偏差 SIGMA_TOL = 0.02（絕對容差，pp=48 下 = 0.02 &times; 2<sup>48</sup> &asymp; 5.6 兆）。<span class="emphasis">為什麼用絕對容差？</span>相對容差需要除法，成本高；絕對容差只需一個 range check。</p>
-  <p>BS price 改寫成<span class="emphasis">加法形式</span>以避免有限域 wrap-around — 把減號兩邊移到等式的不同側，所有項都是正的。結算價是公開的、不可篡改的，所以 &sigma; 成了隱函數的唯一解。</p>
+  <p><span class="emphasis">為什麼用「正向驗證」而不是電路內求解 &sigma;？</span>求解需要 Newton-Raphson 迭代 — ZK 電路不支援動態迭代。但給定 &sigma; 去算一次 BS price 只需前向計算，正好就是 Delta 管線已經能做的事。這又是「prover hint + verifier check」模式的應用。</p>
+  <p>容許偏差 SIGMA_TOL = 0.02（pp=48 下 = 0.02 &times; 2<sup>48</sup> &asymp; 5.6 兆）。為什麼用<span class="emphasis">絕對容差</span>？相對容差需要除法；絕對容差只需一個 range check。</p>
+  <p>BS price 公式改寫成<span class="emphasis">加法形式</span>：把減號兩邊移到等式不同側，所有項為正，避免有限域 wrap-around。結算價是公開的、不可篡改的，所以 &sigma; 成了隱函數的唯一解。</p>
 </div>
 
 <hr>
@@ -680,16 +678,15 @@
 </div>
 
 <div class="script-block" data-label="講稿 — 8 Delta 管線・核心貢獻（~5min）">
-  <p>現在進入<span class="emphasis">核心貢獻 — Delta 計算管線</span>。BS Delta 包含三個超越函數：ln、erf、exp。我們對每個函數使用不同的最優策略。</p>
+  <p>現在進入<span class="emphasis">核心貢獻 — Delta 計算管線</span>。BS Delta 包含三個超越函數，我們對每個使用不同的最優策略。</p>
   <span class="pause">— 停頓 —</span>
   <p><span class="emphasis">ln 和 erf：Minimax 分段多項式 + Per-step Horner。</span></p>
-  <p>為什麼選 Minimax 而不是 Taylor？Taylor 在展開點附近精度高，但離開展開點誤差快速增長。Minimax 多項式在整個區間上<strong>均勻分配誤差</strong>，由 Chebyshev 等振盪定理保證最優。同樣的次數，Minimax 比 Taylor 精度高 2,000&ndash;4,000 倍。</p>
-  <p>為什麼用<span class="emphasis">分段逼近</span>？單一多項式在寬區間上會遇到「量化飽和」— 增加次數反而惡化精度，因為高次係數的定點量化誤差被放大。分段逼近把區間切成窄段（ln 4 段 &times; 0.25，erf 12 段 &times; 0.5），每段只需低次多項式（d=12）就能達到 ~1.2 ULP 的 kernel 精度。</p>
-  <p><span class="emphasis">Per-step Horner</span> 是求值法的關鍵。<span class="gesture">（指向管線表格）</span> 把多項式改寫為巢狀形式 c₀ + x(c₁ + x(c₂ + ...))，<strong>每一步都做截斷</strong>（除以 S = 2<sup>48</sup>），讓中間值始終保持在 S&sup2; 以內。截斷驗證用 ByteTable lookup — 把值拆成 6 個 byte，每個 byte 查一次 256-entry 的共用表。配合分段逼近（segment width &lt; 1），截斷誤差呈幾何衰減，收斂到常數地板。</p>
-  <p><span class="emphasis">exp：Method B 查表乘法。</span>exp 不用多項式，而是利用 e<sup>a+b</sup> = e<sup>a</sup> &times; e<sup>b</sup> 的分解特性。把 48-bit 輸入拆成 6 個 byte，每個 byte 位置預先算好一張 256-entry 的 e<sup>byte&times;2<sup>8k</sup>/S</sup>&times;S 查表，然後 5 次乘法-截斷把 6 個中間值相乘。6 張表共 1,536 entries，只需 6 行電路 — 比 d=12 Horner（12 行）更緊湊，精度 ~8 ULP。</p>
-  <p><span class="emphasis">Range reduction</span>：每個函數的多項式只在特定區間上有效。例如 ln 先把 S/K 映射到 [1, 2)：x = 2<sup>k</sup> &times; r，求值後還原 ln(x) = ln(r) + k &times; ln(2)。erf 用 segment index 選擇對應段的係數。Range reduction 用 ByteTable lookup 實現，成本很低。</p>
-  <p>整個管線 17 個邏輯步驟，pp=48 配置下每個持倉約 <span class="emphasis">298 rows</span>，佔總電路 ~13%。相比之下，Merkle 驗證佔 ~85%。端對端 BS Delta 精度達 ~6 ULP（絕對誤差 ~2&times;10<sup>&minus;14</sup>）。</p>
-  <p>Put option 利用 <span class="emphasis">put-call parity</span>：Put &Delta; = Call &Delta; &minus; e<sup>&minus;qT</sup>，只需一個減法閘。</p>
+  <p>為什麼選 Minimax 而不是 Taylor？Taylor 在展開點附近好，但離開展開點誤差快速增長。Minimax 在整個區間上<strong>均勻分配誤差</strong>，由等振盪定理保證最優。同樣次數下，精度高 2,000&ndash;4,000 倍。</p>
+  <p>為什麼用<span class="emphasis">分段逼近</span>？單一多項式在寬區間上會遇到「量化飽和」— 高次係數的定點量化誤差被放大，增加次數反而惡化精度。切成窄段（ln 4 段 &times; 0.25，erf 12 段 &times; 0.5），每段只需 d=12 就能達到 ~1.2 ULP 的 kernel 精度。d=12 是經過 degree sweep 實驗找到的最優點 — 逼近誤差和截斷累積的 U 曲線最低點。</p>
+  <p><span class="emphasis">Per-step Horner</span> 是求值法的關鍵。<span class="gesture">（指向管線表格）</span> 把多項式改寫為巢狀形式 c&#8320; + x(c&#8321; + x(c&#8322; + ...))，<strong>每一步都做截斷</strong>（除以 S = 2<sup>48</sup>），讓中間值始終保持在 S&sup2; 以內。截斷驗證用 ByteTable lookup — 把值拆成 6 個 byte，每個 byte 查一次 256-entry 的共用表。</p>
+  <p><span class="emphasis">exp：Method B 查表乘法。</span>exp 利用 e<sup>a+b</sup> = e<sup>a</sup> &times; e<sup>b</sup> 的分解性質。把 48-bit 輸入拆成 6 個 byte，每個位置預先算好 256-entry 查表，然後 5 次乘法-截斷相乘。6 張表共 1,536 entries，只需 6 行電路 — 比 d=12 Horner 的 12 行更緊湊，精度 ~8 ULP。</p>
+  <p><span class="emphasis">Range reduction</span>：每個函數先做定義域映射。ln 把 S/K 映射到 [1, 2)，還原時加回 k &times; ln(2)。erf 用 segment index 選段。都透過 ByteTable lookup 實現，成本極低。</p>
+  <p>整個管線 17 個邏輯步驟，端對端 BS Delta 精度達 ~6 ULP（~2&times;10<sup>&minus;14</sup>）。Put option 用 put-call parity 只需一個減法：Put &Delta; = Call &Delta; &minus; e<sup>&minus;qT</sup>。</p>
 </div>
 
 <hr>
@@ -748,9 +745,9 @@
 
 <div class="script-block" data-label="講稿 — 10 電路規模（~1.5min）">
   <p>看整體規模。<span class="gesture">（指向表格）</span></p>
-  <p>pp=48 配置下，每個持倉約 2,257 rows，128 slots 共 ~289,000 rows（k &asymp; 19）。</p>
-  <p>最重要的觀察：<span class="emphasis">即使在最高精度 pp=48，Delta 管線也只佔 ~13%</span>。Merkle 驗證佔了 ~85%。這說明我們的方法 — 分段 Minimax + Per-step Horner + Method B — 讓超越函數計算的成本遠低於數據驗證。</p>
-  <p>也說明了 Poseidon hash 的選擇至關重要 — 如果用 SHA-256，Merkle 成本會再高 100 倍，電路完全不切實際。</p>
+  <p>pp=48 配置下，每個持倉約 2,257 rows。128 slots 共 ~289,000 rows，k &asymp; 19。</p>
+  <p>最重要的觀察：<span class="emphasis">Delta 管線只佔 ~13%（298 rows）</span>，而 Merkle 驗證佔了 ~85%（Part A 23% + Part A' 61%）。Part A' 因為 8 個欄位加上 depth ~20，成本是 Part A 的近三倍。</p>
+  <p>這說明我們的方法讓超越函數計算的成本遠低於數據驗證 — 也印證了前面提到的 Poseidon hash 選擇有多關鍵。</p>
 </div>
 
 <hr>
@@ -819,7 +816,7 @@
   <p><strong>位置</strong>：Part A''（&sigma; 驗證）</p>
   <p><strong>約束</strong>：<br>
   <code>bs + is_put &times; s_disc_q + term2 = term1 + is_put &times; k_disc_r</code>（加法形式 &mdash; 避免減法 wrap-around）<br>
-  <code>|bs_price &minus; settle_price| &le; SIGMA_TOL</code>（range check，容差 0.02 &times; 2<sup>24</sup>）<br>
+  <code>|bs_price &minus; settle_price| &le; SIGMA_TOL</code>（range check，容差 0.02 &times; 2<sup>48</sup>）<br>
   同一個閘用 is_put 選擇 Call/Put 公式</p>
   <p><strong>每次</strong>：~4 rows（含 range check）</p>
 </div>
@@ -832,7 +829,7 @@
   <code>acc<sub>k+1</sub> = (acc<sub>k</sub> &times; x + c<sub>d&minus;k&minus;1</sub>) / S</code>（每步乘法 + 加法 + 截斷）<br>
   每步截斷讓中間值保持在 S&sup2; 以內，避免有限域溢出<br>
   截斷驗證使用 ByteTable lookup（256-entry 共享表）</p>
-  <p><strong>每個函數</strong>：~8–16 rows（degree 6–14 依精度等級，+ 截斷 + range reduction）</p>
+  <p><strong>每個函數</strong>：~8–16 rows（degree 12（pp=48 配置），+ 截斷 + range reduction）</p>
 </div>
 
 <div class="gate-card">
@@ -861,9 +858,9 @@
 </div>
 
 <div class="script-block" data-label="講稿 — 11 自訂閘 + 總結（~1.5min）">
-  <p>以上是 Proof #1 的全部技術細節。10 種自訂閘構成一條完整的端對端管線。</p>
-  <p>總結技術選擇：<span class="emphasis">Halo2 + KZG</span> 提供可程式化的 PLONK 框架和常數大小的 proof；<span class="emphasis">Poseidon hash</span> 讓 Merkle 驗證可行（比 SHA-256 快 100 倍）；<span class="emphasis">Merkle tree</span> 讓電路結構一次 setup 永久有效；<span class="emphasis">分段 Minimax + Per-step Horner</span> 讓 ln 和 erf 在 ZK 中達到 ~1.2 ULP kernel 精度；<span class="emphasis">Method B 查表乘法</span>讓 exp 只需 6 行電路；<span class="emphasis">pp=48 定點算術</span>提供 ~2&times;10<sup>&minus;14</sup> 的端對端絕對精度。</p>
-  <p>每一個選擇都有明確的理由。精度等級的選擇經過了系統性的 degree sweep 實驗驗證 — d=12 是逼近誤差和截斷累積的 U 曲線最低點，分段數量（ln 4、erf 12）則對應各函數的曲率特徵。</p>
+  <p>以上是 Proof #1 的全部技術細節。回顧整個設計，核心挑戰是<span class="emphasis">如何在只有加法和乘法的算術電路中精確計算超越函數</span>。</p>
+  <p>我們的解法是三個技術的組合：分段 Minimax 逼近把函數拆成窄區間上的低次多項式、Per-step Horner 在每步截斷控制中間值範圍、Method B 查表法利用指數函數的分解特性。d=12 和各段數的選擇經過系統性的 degree sweep 驗證，確保每個參數都在理論最優點。</p>
+  <p>結果是：端對端精度 ~2&times;10<sup>&minus;14</sup>，而 Delta 管線僅佔電路的 13%。瓶頸不在計算，而在資料驗證 — 這是所有 ZK 鏈上狀態驗證的共同特徵。</p>
   <p>接下來看 Proof #2 如何保證 State Tree 的完整性。</p>
 </div>
 
