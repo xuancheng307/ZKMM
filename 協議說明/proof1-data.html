@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proof #1 實驗數據 — 精度 × 成本 × 方法比較</title>
+<style>
+  :root {
+    --primary: #1a365d;
+    --accent: #2b6cb0;
+    --light-bg: #f7fafc;
+    --border: #e2e8f0;
+    --highlight: #ebf8ff;
+    --warn-bg: #fffaf0;
+    --success-bg: #f0fff4;
+    --code-bg: #edf2f7;
+    --purple-bg: #faf5ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Noto Serif TC", "Times New Roman", Georgia, serif;
+    line-height: 1.8;
+    color: #2d3748;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    font-size: 17px;
+  }
+
+  h1 {
+    font-size: 28px;
+    color: var(--primary);
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 12px;
+    margin: 48px 0 24px 0;
+  }
+  h1:first-of-type { margin-top: 0; }
+
+  h2 {
+    font-size: 22px;
+    color: var(--primary);
+    margin: 36px 0 16px 0;
+    padding-left: 12px;
+    border-left: 4px solid var(--accent);
+  }
+
+  h3 { font-size: 18px; color: #4a5568; margin: 24px 0 12px 0; }
+  p { margin: 12px 0; }
+  .subtitle { font-size: 16px; color: #718096; margin-bottom: 32px; }
+
+  .key-insight {
+    background: var(--highlight);
+    border-left: 4px solid var(--accent);
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .key-insight strong { color: var(--accent); }
+
+  .problem-box {
+    background: var(--warn-bg);
+    border-left: 4px solid #ed8936;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  .result-box {
+    background: var(--success-bg);
+    border-left: 4px solid #38a169;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  .purple-box {
+    background: var(--purple-bg);
+    border-left: 4px solid #805ad5;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  /* --- Tables --- */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 15px;
+  }
+  th {
+    background: var(--primary);
+    color: white;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:nth-child(even) { background: var(--light-bg); }
+  td.num, th.num { text-align: center; font-family: "Consolas", "SF Mono", "Fira Code", monospace; }
+  td.em { font-weight: bold; color: var(--accent); }
+  td.mono { font-family: "Consolas", "SF Mono", "Fira Code", monospace; font-size: 14px; }
+
+  /* Green highlight column */
+  td.best {
+    background: #c6f6d5 !important;
+    font-weight: 600;
+  }
+  th.best-header {
+    background: #276749;
+  }
+
+  /* Badges */
+  .badge-pass {
+    display: inline-block;
+    background: #38a169;
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .badge-star {
+    color: #d69e2e;
+    font-weight: bold;
+  }
+  .badge-bottleneck {
+    display: inline-block;
+    background: #e53e3e;
+    color: white;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 15px;
+  }
+
+  .math {
+    font-family: "Times New Roman", serif;
+    font-style: italic;
+  }
+
+  .section-num {
+    color: var(--accent);
+    margin-right: 8px;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 40px 0;
+  }
+
+  .site-nav {
+    display: flex; flex-wrap: wrap;
+    background: #1a365d; border-radius: 8px; overflow: hidden;
+    margin-bottom: 32px;
+    font-family: -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 14px;
+  }
+  .site-nav a {
+    color: #cbd5e0; text-decoration: none;
+    padding: 10px 18px; transition: background 0.2s;
+  }
+  .site-nav a:hover { background: #2b6cb0; color: #fff; }
+  .site-nav a.active { background: #2b6cb0; color: #fff; font-weight: 600; }
+
+  /* Side-by-side tables */
+  .tables-row {
+    display: flex;
+    gap: 24px;
+    margin: 16px 0;
+  }
+  .tables-row .table-half {
+    flex: 1;
+    min-width: 0;
+  }
+  .tables-row .table-half h3 {
+    margin-top: 0;
+  }
+
+  /* Superscript in table */
+  sup { font-size: 0.7em; }
+
+  @media print {
+    body { font-size: 12pt; padding: 0; }
+    table { break-inside: avoid; }
+    h1 { break-before: page; }
+    th { position: static; }
+  }
+  @media (max-width: 700px) {
+    .tables-row { flex-direction: column; gap: 16px; }
+    body { padding: 20px 12px; }
+    table { font-size: 13px; }
+    td, th { padding: 6px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="../index.html">ZKMM</a>
+  <a href="index.html">協議總覽</a>
+  <a href="proof1.html">Proof #1 技術</a>
+  <a href="proof1-data.html" class="active">Proof #1 實驗數據</a>
+  <a href="proof2.html">Proof #2 技術</a>
+  <a href="merkle.html">Merkle Tree</a>
+</nav>
+
+<!-- ===== Cover ===== -->
+<div style="text-align:center; padding: 40px 0 32px 0;">
+  <h1 style="border:none; font-size:26px; margin:0;">Proof #1 實驗數據</h1>
+  <p style="font-size:18px; color:var(--primary); margin:12px 0 8px 0;">
+    精度 &times; 成本 &times; 方法比較
+  </p>
+  <p class="subtitle">Black-Scholes Delta ZK 電路的系統性精度分析與參數選擇依據</p>
+</div>
+
+<hr>
+
+<!-- ===== Section 1: E2E BS Delta 精度比較 ===== -->
+<h1><span class="section-num">1</span>E2E BS Delta 精度比較（主表）</h1>
+
+<p>4,096 組隨機參數的端對端 Black-Scholes Delta 精度測試結果。ULP = Unit in the Last Place，1 ULP = 2<sup>&minus;pp</sup>。</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>指標</th>
+      <th class="num">pp=24</th>
+      <th class="num">pp=32</th>
+      <th class="num best-header">pp=48</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Scale factor <span class="math">S</span></td>
+      <td class="num mono">2<sup>24</sup></td>
+      <td class="num mono">2<sup>32</sup></td>
+      <td class="num mono best">2<sup>48</sup></td>
+    </tr>
+    <tr>
+      <td>Polynomial degree <span class="math">d*</span></td>
+      <td class="num mono">6 (ln), 8 (erf)</td>
+      <td class="num mono">8 (ln), 10 (erf)</td>
+      <td class="num mono best">12 (ln), 12 (erf)</td>
+    </tr>
+    <tr>
+      <td>Max absolute error</td>
+      <td class="num mono">4.64&times;10<sup>&minus;7</sup></td>
+      <td class="num mono">2.00&times;10<sup>&minus;9</sup></td>
+      <td class="num mono best">2.14&times;10<sup>&minus;14</sup></td>
+    </tr>
+    <tr>
+      <td>Mean absolute error</td>
+      <td class="num mono">5.28&times;10<sup>&minus;8</sup></td>
+      <td class="num mono">2.27&times;10<sup>&minus;10</sup></td>
+      <td class="num mono best">3.25&times;10<sup>&minus;15</sup></td>
+    </tr>
+    <tr>
+      <td>Max ULP</td>
+      <td class="num mono">7.78</td>
+      <td class="num mono">8.57</td>
+      <td class="num mono best">6.04</td>
+    </tr>
+    <tr>
+      <td>Mean ULP</td>
+      <td class="num mono">0.89</td>
+      <td class="num mono">0.98</td>
+      <td class="num mono best">0.92</td>
+    </tr>
+    <tr>
+      <td>P95 ULP</td>
+      <td class="num mono">2.77</td>
+      <td class="num mono">3.23</td>
+      <td class="num mono best">2.38</td>
+    </tr>
+    <tr>
+      <td>P99 ULP</td>
+      <td class="num mono">5.15</td>
+      <td class="num mono">5.65</td>
+      <td class="num mono best">3.84</td>
+    </tr>
+    <tr>
+      <td>$100M impact (max)</td>
+      <td class="num mono">$46.35</td>
+      <td class="num mono">$0.20</td>
+      <td class="num mono best">$0.000002</td>
+    </tr>
+    <tr>
+      <td>$100M impact (mean)</td>
+      <td class="num mono">$5.28</td>
+      <td class="num mono">$0.023</td>
+      <td class="num mono best">$0.0000003</td>
+    </tr>
+    <tr>
+      <td>理論上界 ULP</td>
+      <td class="num mono">57.0</td>
+      <td class="num mono">57.8</td>
+      <td class="num mono best">57.6</td>
+    </tr>
+    <tr>
+      <td>上界通過</td>
+      <td class="num"><span class="badge-pass">&check; PASS</span></td>
+      <td class="num"><span class="badge-pass">&check; PASS</span></td>
+      <td class="num best"><span class="badge-pass">&check; PASS</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<hr>
+
+<!-- ===== Section 2: Taylor vs Minimax ===== -->
+<h1><span class="section-num">2</span>Taylor vs Minimax Kernel 精度比較</h1>
+
+<p>在 kernel 層級（單一函數、無端對端傳播）比較 Taylor 展開與 Minimax（Remez）逼近的精度差距。</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>函數</th>
+      <th class="num">pp</th>
+      <th class="num"><span class="math">d</span></th>
+      <th class="num">Taylor ULP</th>
+      <th class="num">Minimax ULP</th>
+      <th class="num">Minimax 優勢</th>
+      <th class="num">有效位元 (Taylor)</th>
+      <th class="num">有效位元 (Minimax)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="mono">ln</td>
+      <td class="num mono">32</td>
+      <td class="num mono">10</td>
+      <td class="num mono">2.04&times;10<sup>8</sup></td>
+      <td class="num mono">10.3</td>
+      <td class="num mono" style="color:#e53e3e; font-weight:600;">19,774,425&times;</td>
+      <td class="num mono">4.4 bits</td>
+      <td class="num mono" style="color:#38a169; font-weight:600;">28.6 bits</td>
+    </tr>
+    <tr>
+      <td class="mono">ln</td>
+      <td class="num mono">48</td>
+      <td class="num mono">14</td>
+      <td class="num mono">9.69&times;10<sup>12</sup></td>
+      <td class="num mono">142.5</td>
+      <td class="num mono" style="color:#e53e3e; font-weight:600;">68,043,806,829&times;</td>
+      <td class="num mono">4.9 bits</td>
+      <td class="num mono" style="color:#38a169; font-weight:600;">40.8 bits</td>
+    </tr>
+    <tr>
+      <td class="mono">erf</td>
+      <td class="num mono">32</td>
+      <td class="num mono">10</td>
+      <td class="num mono">3.21&times;10<sup>6</sup></td>
+      <td class="num mono">7.5</td>
+      <td class="num mono" style="color:#e53e3e; font-weight:600;">428,698&times;</td>
+      <td class="num mono">10.4 bits</td>
+      <td class="num mono" style="color:#38a169; font-weight:600;">29.1 bits</td>
+    </tr>
+    <tr>
+      <td class="mono">erf</td>
+      <td class="num mono">48</td>
+      <td class="num mono">14</td>
+      <td class="num mono">3.78&times;10<sup>9</sup></td>
+      <td class="num mono">14.4</td>
+      <td class="num mono" style="color:#e53e3e; font-weight:600;">263,317,498&times;</td>
+      <td class="num mono">16.2 bits</td>
+      <td class="num mono" style="color:#38a169; font-weight:600;">44.2 bits</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="problem-box">
+  <strong>Taylor 限制：</strong>ln 和 erf 的 Taylor 展開含有負係數（ln: c<sub>2</sub>=-1/2, c<sub>4</sub>=-1/4; erf: c<sub>3</sub>, c<sub>7</sub> 項為負），在 unsigned ZK 電路（BN254 質數域）中 Horner 中間值會溢位為巨大正數。因此 Taylor 無法用於 ZK 電路的 ln 和 erf 計算。exp 的 Taylor 係數全正（1/k!），理論上可用但精度遠不及 Minimax。
+</div>
+
+<hr>
+
+<!-- ===== Section 3: 電路成本比較 ===== -->
+<h1><span class="section-num">3</span>電路成本比較</h1>
+
+<p>Delta 管線（Part B）的電路列數（rows）和 lookup 查表次數。不含 Merkle 驗證和 &sigma; 驗證部分。</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>組件</th>
+      <th class="num">pp=24</th>
+      <th class="num">pp=32</th>
+      <th class="num">pp=48</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>ln rows</td>
+      <td class="num mono">36</td>
+      <td class="num mono">44</td>
+      <td class="num mono">60</td>
+    </tr>
+    <tr>
+      <td>erf rows</td>
+      <td class="num mono">55</td>
+      <td class="num mono">65</td>
+      <td class="num mono">204</td>
+    </tr>
+    <tr>
+      <td>exp rows (Method B)</td>
+      <td class="num mono">3</td>
+      <td class="num mono">4</td>
+      <td class="num mono">6</td>
+    </tr>
+    <tr>
+      <td>overhead rows</td>
+      <td class="num mono">20</td>
+      <td class="num mono">20</td>
+      <td class="num mono">20</td>
+    </tr>
+    <tr style="font-weight:700; background:#ebf8ff !important;">
+      <td><strong>Total rows</strong></td>
+      <td class="num mono"><strong>114</strong></td>
+      <td class="num mono"><strong>133</strong></td>
+      <td class="num mono"><strong>290</strong></td>
+    </tr>
+    <tr>
+      <td>Total lookups</td>
+      <td class="num mono">1,535</td>
+      <td class="num mono">1,952</td>
+      <td class="num mono">3,572</td>
+    </tr>
+    <tr>
+      <td>pp=24 比 (rows)</td>
+      <td class="num mono">1.00&times;</td>
+      <td class="num mono">1.17&times;</td>
+      <td class="num mono">2.54&times;</td>
+    </tr>
+    <tr>
+      <td>pp=24 比 (lookups)</td>
+      <td class="num mono">1.00&times;</td>
+      <td class="num mono">1.27&times;</td>
+      <td class="num mono">2.33&times;</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="result-box">
+  <strong>成本主要來自 erf 分段：</strong>pp=48 的 12 段 erf 佔 204/290 = 70% 的電路列數。
+</div>
+
+<hr>
+
+<!-- ===== Section 4: Degree Sweep ===== -->
+<h1><span class="section-num">4</span>Degree Sweep &mdash; 最佳多項式次數 <span class="math">d*</span></h1>
+
+<p>對不同多項式次數 <span class="math">d</span> 進行系統性搜索，找到精度（ULP）最低點。<span class="badge-star">&starf;</span> = 最佳 <span class="math">d*</span>（首次達到量化底線）。</p>
+
+<div class="tables-row">
+  <div class="table-half">
+    <h3>ln(1+x) degree sweep</h3>
+    <p style="font-size:14px; color:#718096;">4 segments &times; 0.25 width</p>
+    <table>
+      <thead>
+        <tr>
+          <th class="num"><span class="math">d</span></th>
+          <th class="num">pp=24 ULP</th>
+          <th class="num">pp=32 ULP</th>
+          <th class="num">pp=48 ULP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num mono">4</td>
+          <td class="num mono">5.36</td>
+          <td class="num mono">1,058.67</td>
+          <td class="num mono">69,308,105</td>
+        </tr>
+        <tr>
+          <td class="num mono">6</td>
+          <td class="num mono" style="font-weight:700; color:#2b6cb0;">1.24 <span class="badge-star">&starf;</span></td>
+          <td class="num mono">3.44</td>
+          <td class="num mono">148,125</td>
+        </tr>
+        <tr>
+          <td class="num mono">8</td>
+          <td class="num mono">1.24</td>
+          <td class="num mono" style="font-weight:700; color:#2b6cb0;">1.24 <span class="badge-star">&starf;</span></td>
+          <td class="num mono">351.59</td>
+        </tr>
+        <tr>
+          <td class="num mono">10</td>
+          <td class="num mono">1.24</td>
+          <td class="num mono">1.24</td>
+          <td class="num mono">2.06</td>
+        </tr>
+        <tr>
+          <td class="num mono">12</td>
+          <td class="num mono">1.24</td>
+          <td class="num mono">1.25</td>
+          <td class="num mono" style="font-weight:700; color:#2b6cb0;">1.24 <span class="badge-star">&starf;</span></td>
+        </tr>
+        <tr>
+          <td class="num mono">14</td>
+          <td class="num mono">1.24</td>
+          <td class="num mono">1.25</td>
+          <td class="num mono">1.23</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="table-half">
+    <h3>erf(x) degree sweep</h3>
+    <p style="font-size:14px; color:#718096;">pp24/32: 5 seg &times; 1.0; pp48: 12 seg &times; 0.5</p>
+    <table>
+      <thead>
+        <tr>
+          <th class="num"><span class="math">d</span></th>
+          <th class="num">pp=24 ULP</th>
+          <th class="num">pp=32 ULP</th>
+          <th class="num">pp=48 ULP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num mono">4</td>
+          <td class="num mono">697.63</td>
+          <td class="num mono">178,034</td>
+          <td class="num mono">1,546,634,891</td>
+        </tr>
+        <tr>
+          <td class="num mono">6</td>
+          <td class="num mono">235.97</td>
+          <td class="num mono">60,015</td>
+          <td class="num mono">5,230,345</td>
+        </tr>
+        <tr>
+          <td class="num mono">8</td>
+          <td class="num mono">4.56</td>
+          <td class="num mono">67.96</td>
+          <td class="num mono">17,359</td>
+        </tr>
+        <tr>
+          <td class="num mono">10</td>
+          <td class="num mono">5.03</td>
+          <td class="num mono">5.22</td>
+          <td class="num mono">43.62</td>
+        </tr>
+        <tr>
+          <td class="num mono">12</td>
+          <td class="num mono" style="font-weight:700; color:#2b6cb0;">4.04 <span class="badge-star">&starf;</span></td>
+          <td class="num mono">4.44</td>
+          <td class="num mono" style="font-weight:700; color:#2b6cb0;">1.61 <span class="badge-star">&starf;</span></td>
+        </tr>
+        <tr>
+          <td class="num mono">14</td>
+          <td class="num mono">4.98</td>
+          <td class="num mono" style="font-weight:700; color:#2b6cb0;">5.22 <span class="badge-star">&starf;</span></td>
+          <td class="num mono">1.62</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="key-insight">
+  <strong>量化底線現象：</strong>當 Remez 逼近誤差降到可忽略時，所有 pp 水準都收斂到相同的 ~1.24 ULP 量化底線（ln, width=0.25）。erf 因為 segment width 較寬（1.0 或 0.5），底線較高（~4 ULP 或 ~1.6 ULP）。這是 fixed-point floor division 的固有限制。
+</div>
+
+<hr>
+
+<!-- ===== Section 5: 誤差傳播路徑 ===== -->
+<h1><span class="section-num">5</span>誤差傳播路徑（16 步 Pipeline）</h1>
+
+<p>每一步的理論誤差上界（ULP），追蹤從輸入到最終 Delta 的誤差累積與放大。</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Step</th>
+      <th>Operation</th>
+      <th class="num">pp=24 bound (ULP)</th>
+      <th class="num">pp=48 bound (ULP)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="mono">B1</td>
+      <td>S/K ratio</td>
+      <td class="num mono">1.00</td>
+      <td class="num mono">1.00</td>
+    </tr>
+    <tr>
+      <td class="mono">B2</td>
+      <td>ln(ratio)</td>
+      <td class="num mono">2.24</td>
+      <td class="num mono">2.24</td>
+    </tr>
+    <tr>
+      <td class="mono">B3&ndash;B6</td>
+      <td>drift terms</td>
+      <td class="num mono">4.00</td>
+      <td class="num mono">4.00</td>
+    </tr>
+    <tr>
+      <td class="mono">B7</td>
+      <td>numerator</td>
+      <td class="num mono">6.24</td>
+      <td class="num mono">6.24</td>
+    </tr>
+    <tr>
+      <td class="mono">B8&ndash;B9</td>
+      <td>&sigma;&radic;T</td>
+      <td class="num mono">1.50</td>
+      <td class="num mono">1.50</td>
+    </tr>
+    <tr style="background:#fff5f5 !important;">
+      <td class="mono">B10</td>
+      <td>d<sub>1</sub> = num/denom &ensp;<span class="badge-bottleneck">bottleneck</span></td>
+      <td class="num mono" style="color:#e53e3e; font-weight:600;">125.73</td>
+      <td class="num mono" style="color:#e53e3e; font-weight:600;">125.84</td>
+    </tr>
+    <tr>
+      <td class="mono">B11</td>
+      <td>d<sub>1</sub>/&radic;2</td>
+      <td class="num mono">89.90</td>
+      <td class="num mono">89.98</td>
+    </tr>
+    <tr>
+      <td class="mono">B12</td>
+      <td>erf(d<sub>1</sub>/&radic;2)</td>
+      <td class="num mono">105.98</td>
+      <td class="num mono">103.12</td>
+    </tr>
+    <tr>
+      <td class="mono">B13</td>
+      <td>&Phi;(d<sub>1</sub>)</td>
+      <td class="num mono">53.49</td>
+      <td class="num mono">52.06</td>
+    </tr>
+    <tr>
+      <td class="mono">B14&ndash;B15</td>
+      <td>e<sup>&minus;qT</sup></td>
+      <td class="num mono">5.00</td>
+      <td class="num mono">9.00</td>
+    </tr>
+    <tr style="font-weight:700; background:#ebf8ff !important;">
+      <td class="mono">B16</td>
+      <td>Final &Delta;</td>
+      <td class="num mono"><strong>57.0</strong></td>
+      <td class="num mono"><strong>57.6</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="key-insight">
+  <strong>瓶頸步驟：</strong>B10 除法將誤差放大 ~20 倍（6.24 &rarr; 125.7）。但 B12 的 erf 阻尼效應（erf'&rarr;0 for large |x|）抵消了大部分放大，使最終誤差回到 ~57 ULP 上界。這個「除法放大 &rarr; erf 壓縮」的動態平衡是整個管線能維持低誤差的關鍵。
+</div>
+
+<hr>
+
+<!-- ===== Section 6: Pareto 最優前緣 ===== -->
+<h1><span class="section-num">6</span>Pareto 最優前緣</h1>
+
+<p>三個精度等級的成本-精度權衡總覽。</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Level</th>
+      <th class="num">Circuit rows</th>
+      <th class="num">Max abs error</th>
+      <th class="num">$100M impact</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>pp=24</strong></td>
+      <td class="num mono">114</td>
+      <td class="num mono">4.64&times;10<sup>&minus;7</sup></td>
+      <td class="num mono">$46.35</td>
+    </tr>
+    <tr>
+      <td><strong>pp=32</strong></td>
+      <td class="num mono">133 (+17%)</td>
+      <td class="num mono">2.00&times;10<sup>&minus;9</sup></td>
+      <td class="num mono">$0.20</td>
+    </tr>
+    <tr style="background:#c6f6d5 !important;">
+      <td><strong>pp=48</strong></td>
+      <td class="num mono">290 (+154%)</td>
+      <td class="num mono">2.14&times;10<sup>&minus;14</sup></td>
+      <td class="num mono">$0.000002</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="purple-box">
+  <strong>pp=24&rarr;pp=32</strong> 只增加 17% 成本但精度提升 232 倍；<strong>pp=32&rarr;pp=48</strong> 增加 118% 成本但精度再提升 93,000 倍。pp=32 是生產環境的甜蜜點：$100M 投組的最大誤差影響僅 $0.20，遠低於任何金融容差門檻。
+</div>
+
+<hr>
+
+<!-- ===== Footer ===== -->
+<div style="text-align: center; padding: 32px 0; color: #718096; font-size: 14px;">
+  <p><a href="proof1.html" style="color: var(--accent); text-decoration: none;">&larr; Proof #1 技術細節</a>
+  &ensp;|&ensp;
+  <a href="proof2.html" style="color: var(--accent); text-decoration: none;">Proof #2 技術細節 &rarr;</a></p>
+  <p style="margin-top: 8px;"><a href="../index.html" style="color: var(--accent); text-decoration: none;">ZKMM</a> &mdash; Zero-Knowledge Financial Compliance</p>
+</div>
+
+</body>
+</html>

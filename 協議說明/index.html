@@ -558,6 +558,7 @@
   <a href="../index.html">ZKMM</a>
   <a href="index.html" class="active">協議總覽</a>
   <a href="proof1.html">Proof #1 技術</a>
+  <a href="proof1-data.html">Proof #1 實驗數據</a>
   <a href="proof2.html">Proof #2 技術</a>
   <a href="merkle.html">Merkle Tree</a>
 </nav>
@@ -591,6 +592,21 @@
     <p style="font-size:13px; color:#276749; font-weight:600; margin-top:12px;">結果：隱私與合規同時達成</p>
   </div>
 </div>
+
+<h2>合規公式</h2>
+
+<div style="background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 16px 0; font-family: 'Times New Roman', serif; font-size: 17px; line-height: 2.2; text-align: center;">
+  <strong style="font-size: 19px;">|&Sigma;<sub>i</sub> w<sub>i</sub> &times; &Delta;<sub>i</sub>| &le; &tau;</strong><br>
+  <span style="font-size: 14px; color: #718096;">
+    w = 持倉數量（正=做多，負=做空）&ensp;|&ensp;&Delta; = Black-Scholes Delta&ensp;|&ensp;&tau; = 合規門檻
+  </span>
+</div>
+
+<p style="font-size: 15px;">選擇權的 Delta 由 <strong>Black-Scholes 公式</strong>計算，涉及三個超越函數：
+<code>ln</code>（自然對數）、<code>erf</code>（誤差函數）、<code>exp</code>（指數函數）。
+這些函數在 ZK 電路中不存在 &mdash; 電路只有加法和乘法。
+本論文的核心貢獻是用 <strong>Minimax 多項式逼近 + Horner 求值法</strong> 在電路內重建這三個函數。
+完整公式見 <a href="proof1.html" style="color: var(--accent);">Proof #1 技術細節 &sect;0</a>。</p>
 
 <h2>協議的五大保證</h2>
 
@@ -1181,7 +1197,7 @@
 <hr>
 
 <div style="text-align: center; padding: 32px 0; color: #718096; font-size: 14px;">
-  <p><a href="../index.html" style="color: var(--accent); text-decoration: none;">ZKMM</a> &mdash; Zero-Knowledge Machine Learning Research</p>
+  <p><a href="../index.html" style="color: var(--accent); text-decoration: none;">ZKMM</a> &mdash; Zero-Knowledge Financial Compliance</p>
   <p style="margin-top: 8px;">
     <a href="proof1.html" style="color: var(--accent); text-decoration: none;">Proof #1 技術細節</a>
     &ensp;|&ensp;
