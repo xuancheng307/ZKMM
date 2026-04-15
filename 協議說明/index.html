@@ -811,19 +811,31 @@
     <span>&#x25BC; Poseidon hash</span>
   </div>
 
-  <!-- Roots -->
+  <!-- Roots with proof attribution -->
   <div class="trees-row" style="gap:8px;">
-    <div style="text-align:center; padding:6px; background:#fef3c7; border:2px solid #f59e0b; border-radius:6px;">
-      <div style="font-family:monospace; font-size:12px; font-weight:700;">state_root</div>
+    <div style="text-align:center;">
+      <div style="padding:6px; background:#fef3c7; border:2px solid #f59e0b; border-radius:6px;">
+        <div style="font-family:monospace; font-size:12px; font-weight:700;">state_root</div>
+      </div>
+      <div style="font-size:10px; margin-top:3px;"><span style="color:#6366f1; font-weight:600;">PF1</span> + <span style="color:#0891b2; font-weight:600;">PF2</span></div>
     </div>
-    <div style="text-align:center; padding:6px; background:#fef3c7; border:2px solid #f59e0b; border-radius:6px;">
-      <div style="font-family:monospace; font-size:12px; font-weight:700;">batch_root</div>
+    <div style="text-align:center;">
+      <div style="padding:6px; background:#fef3c7; border:2px solid #f59e0b; border-radius:6px;">
+        <div style="font-family:monospace; font-size:12px; font-weight:700;">batch_root</div>
+      </div>
+      <div style="font-size:10px; color:#0891b2; font-weight:600; margin-top:3px;">PF2</div>
     </div>
-    <div style="text-align:center; padding:6px; background:#fef3c7; border:2px solid #f59e0b; border-radius:6px;">
-      <div style="font-family:monospace; font-size:12px; font-weight:700;">market_data_root</div>
+    <div style="text-align:center;">
+      <div style="padding:6px; background:#fef3c7; border:2px solid #f59e0b; border-radius:6px;">
+        <div style="font-family:monospace; font-size:12px; font-weight:700;">market_data_root</div>
+      </div>
+      <div style="font-size:10px; color:#6366f1; font-weight:600; margin-top:3px;">PF1</div>
     </div>
-    <div style="text-align:center; padding:6px; background:#fef3c7; border:2px solid #f59e0b; border-radius:6px;">
-      <div style="font-family:monospace; font-size:12px; font-weight:700;">event_root</div>
+    <div style="text-align:center;">
+      <div style="padding:6px; background:#fef3c7; border:2px solid #f59e0b; border-radius:6px;">
+        <div style="font-family:monospace; font-size:12px; font-weight:700;">event_root</div>
+      </div>
+      <div style="font-size:10px; color:#0891b2; font-weight:600; margin-top:3px;">PF2</div>
     </div>
   </div>
 
@@ -1049,12 +1061,14 @@
 <h2>5.5 四棵樹的資料流向</h2>
 
 <div class="dataflow">
+  <!-- PF2: Trade + Event → Position State Tree -->
+  <div style="font-size:12px; color:#0891b2; font-weight:700; margin-bottom:4px;">Proof #2 資料流 &mdash; 狀態更新</div>
   <div class="df-row">
     <div class="df-box tree" style="border-color:#38bdf8;">Trade Action Tree</div>
     <div class="df-arrow">&rarr;</div>
     <div style="text-align:center; font-size:13px;">
       <strong>驅動更新</strong><br>
-      <span class="df-label">Proof #2 驗證簽名 + 套用</span>
+      <span class="df-label">驗證 EdDSA 簽名 + 套用</span>
     </div>
     <div class="df-arrow">&rarr;</div>
     <div class="df-box tree" style="border-color:#a78bfa;">Position State Tree</div>
@@ -1064,25 +1078,48 @@
     <div class="df-arrow">&rarr;</div>
     <div style="text-align:center; font-size:13px;">
       <strong>非交易變更</strong><br>
-      <span class="df-label">Proof #2 驗證 Merkle proof + 套用比率</span>
+      <span class="df-label">驗證 Merkle proof + 套用比率</span>
     </div>
     <div class="df-arrow">&nearr;</div>
   </div>
-  <div style="display:flex; gap:120px;">
-    <div class="df-arrow-down">&darr;</div>
-    <div class="df-arrow-down">&darr;</div>
-    <div class="df-arrow-down">&darr;</div>
-  </div>
+
+  <!-- PF1: Position State Tree + Market Data Tree → Delta -->
+  <div style="font-size:12px; color:#6366f1; font-weight:700; margin:16px 0 4px;">Proof #1 資料流 &mdash; 合規計算</div>
   <div class="df-row">
-    <div class="df-box root">batch_root</div>
-    <div class="df-box root">event_root</div>
-    <div class="df-box root">state_root</div>
+    <div class="df-box tree" style="border-color:#a78bfa;">Position State Tree</div>
+    <div class="df-arrow">&rarr;</div>
     <div style="text-align:center; font-size:13px;">
-      <span class="df-label">&larr; 跨樹約束 &rarr;</span>
+      <strong>跨樹配對讀取</strong><br>
+      <span class="df-label">持倉 + 市場數據 &rarr; BS Delta</span>
     </div>
-    <div class="df-box root">market_data_root</div>
+    <div class="df-arrow">&larr;</div>
+    <div class="df-box tree" style="border-color:#68d391;">Market Data Tree</div>
   </div>
-  <div class="df-arrow-down">&darr;</div>
+
+  <!-- Roots grouped by proof -->
+  <div style="display:flex; justify-content:center; gap:24px; margin:16px 0; flex-wrap:wrap;">
+    <div style="border:2px solid #0891b2; border-radius:8px; padding:10px 14px; text-align:center;">
+      <div style="font-size:11px; color:#0891b2; font-weight:700; margin-bottom:6px;">Proof #2 公開輸入</div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center;">
+        <div class="df-box root">state_root_prev</div>
+        <div class="df-box root" style="border-color:#e53e3e;">state_root</div>
+        <div class="df-box root">batch_root</div>
+        <div class="df-box root">event_root</div>
+      </div>
+    </div>
+    <div style="border:2px solid #6366f1; border-radius:8px; padding:10px 14px; text-align:center;">
+      <div style="font-size:11px; color:#6366f1; font-weight:700; margin-bottom:6px;">Proof #1 公開輸入</div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center;">
+        <div class="df-box root" style="border-color:#e53e3e;">state_root</div>
+        <div class="df-box root">market_data_root</div>
+      </div>
+    </div>
+  </div>
+  <div style="text-align:center; font-size:12px; color:#e53e3e; font-weight:600; margin-bottom:12px;">
+    state_root 出現在兩組 &mdash; 驗證者檢查兩邊值一致
+  </div>
+
+  <!-- Bottom: Two proofs linked -->
   <div class="df-row">
     <div class="df-box proof p2">Proof #2</div>
     <div class="df-arrow">&rarr;</div>
@@ -1093,7 +1130,7 @@
     <div class="df-box proof p1">Proof #1</div>
   </div>
 </div>
-<p class="fig-caption">圖 3：四棵 Merkle 樹之間的資料流向。Trade Tree 和 Event Tree 共同驅動 Position Tree 更新（Proof #2），Position Tree 與 Market Data Tree 跨樹約束（Proof #1），兩個 Proof 透過 state_root 銜接。</p>
+<p class="fig-caption">圖 3：四棵 Merkle 樹的資料流向。上半：Trade Tree 和 Event Tree 驅動 Position Tree 更新（Proof #2）。中段：Position Tree 與 Market Data Tree 跨樹配對計算 Delta（Proof #1）。公開輸入按 Proof 分組，state_root（紅框）是兩者的銜接點。</p>
 
 <div class="script-block" data-label="講稿 — 5 四棵 Merkle Tree（~4min）">
   <p>協議使用四棵 Merkle 樹來組織所有資料。<span class="gesture">（逐一指）</span></p>
