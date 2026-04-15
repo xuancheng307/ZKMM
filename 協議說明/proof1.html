@@ -1049,6 +1049,16 @@
       <td>利用有限域 wrap-around 偽造正數</td>
       <td>compliance_range 用 4-byte（32-bit）分解；wide_range 用 7-byte（56-bit）。任何超出範圍的值會使 byte lookup 失敗</td>
     </tr>
+    <tr>
+      <td>&sigma; 容差操縱（Deep OTM）</td>
+      <td>灌水 &sigma; 讓 Deep OTM 的 Delta 從 ~0 變正</td>
+      <td>數學不成立：大幅改 &sigma; 時 BS_price 同步暴增（因 Vega &asymp; 0 僅為局部性質），bs_price gate 拒絕。小幅改 &sigma;（容差內）時 Vanna &asymp; 0，Delta 也不動。<em>計畫強化：相對容差</em></td>
+    </tr>
+    <tr>
+      <td>T&rarr;0 快照欺騙（Pin Risk）</td>
+      <td>ATM 近到期部位 snapshot 合規但 Gamma 極高</td>
+      <td>Proof 在 snapshot 時間點數學正確（by design）；OP_EXPIRY 已排除已到期部位（T&le;0）。<em>計畫強化：T<sub>min</sub> 下限排除極近到期部位</em></td>
+    </tr>
   </tbody>
 </table>
 
@@ -1090,6 +1100,16 @@
   遠小於任何合理的監管門檻 &tau;（通常 &ge; 0.01）。<strong>soundness gap 在實務上可忽略。</strong>
 </div>
 
+<h3>12.7.1 已知邊界與計畫強化</h3>
+
+<p>以下不影響 Proof #1 的數學 soundness，但屬於工程層面的精進方向：</p>
+
+<ol style="margin:8px 0 16px 24px; line-height:2.0;">
+  <li><strong>bs_price 容差模式：</strong>現行為固定絕對容差（|gap| &le; 0.02）。對低價選擇權（settle &asymp; $0.01），相對誤差較寬鬆。計畫改為混合容差：gap &le; max(ABS_MIN, REL_TOL &times; settle_price)。</li>
+  <li><strong>近到期部位過濾：</strong>現行 OP_EXPIRY 排除 T &le; 0 的已到期部位。極近到期（T &lt; 1 day）的 ATM 部位 Delta 變化劇烈（pin risk），snapshot 合規的實質意義減弱。計畫加入 T<sub>min</sub> 下限，將此類部位排除或強制全額備兌。</li>
+  <li><strong>&sigma; 來源：</strong>現行 &sigma; 為 prover witness，由 bs_price gate 正向驗證。終極設計方向為 &sigma; 由 Market Data Tree 直接提供，消除 prover 對 &sigma; 的 witness 自由度。</li>
+</ol>
+
 <div class="script-block" data-label="講稿 — 12 ZK Proof of Knowledge（~4min）">
   <p>最後一個 section 是 ZK Proof of Knowledge — 把前面所有的電路設計串成一個<span class="emphasis">完整的安全論證</span>。</p>
   <span class="pause">— 停頓 —</span>
@@ -1104,7 +1124,7 @@
   <p>exp 比較特殊 — Method B result 是 witness，理論上有自由度。但安全由<span class="emphasis">&sigma; 正向驗證</span>兜底：如果 exp 結果偏離，算出的 BS price 就不等於結算價，bs_price gate 會拒絕。這就是 Section 7 &sigma; 驗證的真正安全意義。</p>
   <span class="pause">— 停頓 —</span>
 
-  <p>Under-constrained 分析列出了八個潛在攻擊 — <span class="gesture">（指向表格）</span> — 包括偽造 &sigma;、偽造 Horner 結果、偽造符號、重複持倉、遺漏持倉。每個都被具體的機制擋住。注意最後兩個（重複和遺漏）是<strong>Proof #1 不防的</strong> — by design 交給 Proof #2。這就是拆成兩個 proof 的分工。</p>
+  <p>Under-constrained 分析列出了<strong>十個</strong>潛在攻擊 — <span class="gesture">（指向表格）</span> — 包括偽造 &sigma;、偽造 Horner 結果、偽造符號、重複持倉、遺漏持倉，以及兩個新增的邊界分析：deep OTM &sigma; 容差操縱和 T&rarr;0 pin risk。每個都被具體的機制擋住或歸類為計畫強化項目。注意重複和遺漏是<strong>Proof #1 不防的</strong> — by design 交給 Proof #2。</p>
   <span class="pause">— 停頓 —</span>
 
   <p><span class="emphasis">Zero-knowledge</span> 直接 delegate 給 PLONK — Halo2 的 blinding factors 確保 KZG commitment 不洩漏 witness。Private witness 包含持倉明細、&sigma;、Merkle 路徑、所有中間值 — 全在 advice columns，受 blinding 保護。Public input 只有 4 個值。</p>
