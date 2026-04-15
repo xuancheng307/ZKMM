@@ -702,113 +702,200 @@
 <!-- ===== Section 5: 誤差傳播路徑 ===== -->
 <h1><span class="section-num">5</span>誤差傳播路徑（17 步 Pipeline）</h1>
 
-<p>每一步的理論誤差上界（ULP），追蹤從輸入到最終 Delta 的誤差累積與放大。</p>
+<p>BS Delta 管線有 <strong>4 條輸入分支</strong>，在 B7、B10、B16 三處匯合。不同分支的誤差<strong>獨立累積</strong>，只在匯合點合併。</p>
+
+<div class="key-insight">
+  <strong>4 條獨立分支：</strong>
+  <ul style="margin:8px 0 0 20px; font-size:15px;">
+    <li><span style="color:#2b6cb0; font-weight:600;">A.</span> S, K &rarr; B1-B2 (ratio, ln) &rarr; 匯入 <strong>B7</strong></li>
+    <li><span style="color:#c05621; font-weight:600;">B.</span> r, q, &sigma;, T &rarr; B3-B6 (drift terms) &rarr; 匯入 <strong>B7</strong></li>
+    <li><span style="color:#38a169; font-weight:600;">C.</span> &sigma;, T &rarr; B8-B9 (&sigma;&radic;T) &rarr; 匯入 <strong>B10</strong></li>
+    <li><span style="color:#805ad5; font-weight:600;">D.</span> q, T &rarr; B14-B15 (exp(&minus;qT)) &rarr; 匯入 <strong>B16</strong></li>
+  </ul>
+  <p style="margin:8px 0 0 0;"><strong>主幹：</strong>B7(加) &rarr; <span style="color:#e53e3e; font-weight:700;">B10(除 &mdash; 放大器)</span> &rarr; B11-B13(壓縮) &rarr; B16(乘 &mdash; 與分支 D 合併) &rarr; &Delta;</p>
+</div>
+
+<h2>如何讀下表</h2>
+
+<ul style="margin:8px 0 16px 24px;">
+  <li><strong>本步 &delta;</strong> &mdash; 這一步「自己製造」的新誤差（截斷誤差 + kernel 近似誤差）。</li>
+  <li><strong>累積上界</strong> &mdash; 該中間值的<strong>總誤差帳戶餘額</strong>：先前累積的誤差，被本步放大或壓縮後，再加上本步 &delta;。</li>
+</ul>
+
+<div class="purple-box" style="font-size:16px;">
+  <strong>公式：</strong>累積上界 = 放大係數 &times; 輸入累積上界 + &delta;<br>
+  放大係數 &gt; 1（如 B10 除法 &times;20）&rarr; 累積暴增 &ensp;|&ensp; &lt; 1（如 B13 &times;0.5）&rarr; 累積壓縮
+</div>
+
+<h2>誤差傳播明細（pp=48）</h2>
 
 <table>
   <thead>
     <tr>
       <th>Step</th>
       <th>Operation</th>
-      <th class="num">pp=24 bound (ULP)</th>
-      <th class="num">pp=48 bound (ULP)</th>
+      <th class="num">本步 &delta; (ULP)</th>
+      <th class="num">放大 / 壓縮</th>
+      <th class="num">累積上界 (ULP)</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
+    <tr style="background:#ebf8ff;">
       <td class="mono">B1</td>
       <td>S/K ratio</td>
       <td class="num mono">1.00</td>
+      <td class="num">&mdash;</td>
       <td class="num mono">1.00</td>
     </tr>
-    <tr>
+    <tr style="background:#ebf8ff;">
       <td class="mono">B2</td>
-      <td>ln(ratio)</td>
-      <td class="num mono">2.24</td>
+      <td>ln(ratio) &mdash; Minimax kernel</td>
+      <td class="num mono">1.24</td>
+      <td class="num">&times;1</td>
       <td class="num mono">2.24</td>
     </tr>
-    <tr>
+    <tr style="background:#fffaf0;">
       <td class="mono">B3&ndash;B6</td>
-      <td>drift terms</td>
+      <td>drift (r, q, &sigma;, T)</td>
       <td class="num mono">4.00</td>
+      <td class="num" style="color:#805ad5; font-weight:600;">獨立分支 B</td>
       <td class="num mono">4.00</td>
     </tr>
     <tr>
       <td class="mono">B7</td>
-      <td>numerator</td>
-      <td class="num mono">6.24</td>
+      <td>numerator = ln + drift</td>
+      <td class="num mono">0</td>
+      <td class="num">合併(+)</td>
       <td class="num mono">6.24</td>
     </tr>
-    <tr>
+    <tr style="background:#f0fff4;">
       <td class="mono">B8&ndash;B9</td>
       <td>&sigma;&radic;T</td>
       <td class="num mono">1.50</td>
+      <td class="num" style="color:#805ad5; font-weight:600;">獨立分支 C</td>
       <td class="num mono">1.50</td>
     </tr>
     <tr style="background:#fff5f5 !important;">
       <td class="mono">B10</td>
-      <td>d<sub>1</sub> = num/denom &ensp;<span class="badge-bottleneck">bottleneck</span></td>
-      <td class="num mono" style="color:#e53e3e; font-weight:600;">125.73</td>
+      <td>d<sub>1</sub> = num &divide; denom &ensp;<span class="badge-bottleneck">放大器</span></td>
+      <td class="num mono">1.00</td>
+      <td class="num" style="color:#e53e3e; font-weight:700;">&times;20 &uarr;</td>
       <td class="num mono" style="color:#e53e3e; font-weight:600;">125.84</td>
     </tr>
     <tr>
       <td class="mono">B11</td>
-      <td>d<sub>1</sub>/&radic;2</td>
-      <td class="num mono">89.90</td>
+      <td>d<sub>1</sub> / &radic;2</td>
+      <td class="num mono">1.00</td>
+      <td class="num" style="color:#38a169;">&times;0.707 &darr;</td>
       <td class="num mono">89.98</td>
     </tr>
     <tr>
       <td class="mono">B12</td>
-      <td>erf(d<sub>1</sub>/&radic;2)</td>
-      <td class="num mono">105.98</td>
+      <td>erf(d<sub>1</sub>/&radic;2) &mdash; Minimax kernel</td>
+      <td class="num mono">1.61</td>
+      <td class="num">&times;1.13</td>
       <td class="num mono">103.12</td>
     </tr>
     <tr>
       <td class="mono">B13</td>
-      <td>&Phi;(d<sub>1</sub>)</td>
-      <td class="num mono">53.49</td>
+      <td>&Phi;(d<sub>1</sub>) = 0.5 + 0.5&middot;erf</td>
+      <td class="num mono">0.50</td>
+      <td class="num" style="color:#38a169;">&times;0.50 &darr;</td>
       <td class="num mono">52.06</td>
     </tr>
-    <tr>
+    <tr style="background:#faf5ff !important;">
       <td class="mono">B14&ndash;B15</td>
-      <td>e<sup>&minus;qT</sup></td>
-      <td class="num mono">5.00</td>
+      <td>e<sup>&minus;qT</sup> (Method B 6-byte)</td>
+      <td class="num mono">9.00</td>
+      <td class="num" style="color:#805ad5; font-weight:600;">獨立分支 D</td>
       <td class="num mono">9.00</td>
     </tr>
     <tr style="font-weight:700; background:#ebf8ff !important;">
       <td class="mono">B16</td>
-      <td>Final &Delta;</td>
-      <td class="num mono"><strong>57.0</strong></td>
-      <td class="num mono"><strong>57.6</strong></td>
+      <td>Final &Delta; = exp &times; &Phi;</td>
+      <td class="num mono">1.00</td>
+      <td class="num">合併(&times;)</td>
+      <td class="num mono"><strong>57.56</strong></td>
+    </tr>
+    <tr style="background:#edf2f7;">
+      <td></td>
+      <td><strong>&Sigma;&delta; 加總</strong></td>
+      <td class="num mono" style="color:#2b6cb0; font-weight:700;"><strong>~22</strong></td>
+      <td></td>
+      <td class="num mono" style="color:#718096;">(&ne; 57.56)</td>
     </tr>
   </tbody>
 </table>
 
+<p style="font-size:14px; color:#718096;">
+  pp=24 相同結構。差異：B12 erf kernel &delta;=4.6（pp=48: 1.6）、B14-B15 Method B 3-byte &delta;=5（pp=48: 9）。最終上界 57.0 vs 57.6 ULP。
+</p>
+
 <div class="key-insight">
-  <strong>瓶頸步驟：</strong>B10 除法將誤差放大 ~20 倍（6.24 &rarr; 125.7）。但後續三道「天然煞車」— erf 有界性、&Phi; 的 0.5 縮放、discount &le;1 的乘法 — 將誤差逐步壓回 ~57 ULP。這不是巧合，而是 BS 公式的結構性質。
+  <strong>為什麼累積上界（57.6）&ne; &Sigma;&delta;（~22）？</strong><br>
+  因為 B10 除法不只貢獻 &delta;=1 &mdash; 它把之前累積的 6.24 ULP <strong>放大了 ~20 倍</strong>（除以小的 &sigma;&radic;T）。額外的 ~119 ULP 經三道壓縮後，最終多貢獻了 ~36 ULP。<br>
+  <strong>57.6 &asymp; 22（各步自製）+ 36（B10 放大殘留）</strong>
 </div>
 
-<div class="script-block" data-label="講稿 — 5 誤差傳播：為什麼中間 126 ULP 最後變成 57（~3min）">
-  <p>這張表最令人困惑的地方：<span class="emphasis">B10 的誤差上界高達 126 ULP，但最終結果卻只有 57 ULP</span>。看起來像是誤差憑空消失了。讓我解釋為什麼。</p>
-  <span class="pause">— 停頓 —</span>
+<div class="key-insight">
+  <strong>為什麼 B14&ndash;B15 只有 9 ULP？</strong><br>
+  因為 e<sup>&minus;qT</sup> 是<strong>完全獨立的分支 D</strong>：從 q, T 直接計算，不經過 d<sub>1</sub>。Method B 的 6-byte 查表鏈 ~8 ULP + qT 乘法 1 ULP = 9 ULP。<strong>不受 B10 那 126 ULP 的影響</strong>。
+</div>
 
-  <p><span class="emphasis">第一個問題：B10 為什麼會放大 20 倍？</span></p>
-  <p>B10 計算 d<sub>1</sub> = numerator / (&sigma;&radic;T)。分子累積了 ~6.24 ULP 的誤差，而分母 &sigma;&radic;T 可以很小（低波動率、短到期）。除以一個小數 = 放大誤差。具體地：誤差上界 &asymp; (分子誤差 / 分母) + (分母誤差 &times; 值 / 分母&sup2;) &asymp; 6.24 &times; 20 &asymp; 126 ULP。<span class="gesture">（指向 B10 紅色列）</span> 這個 20 倍放大是<strong>不可避免的</strong> — 它是 BS 公式的數學結構決定的。</p>
-  <span class="pause">— 停頓 —</span>
+<h2>放大與煞車：126 &rarr; 52 的壓縮路徑</h2>
 
-  <p><span class="emphasis">第二個問題：為什麼不繼續惡化？三道天然煞車。</span></p>
+<p>B10 之後，三道煞車的淨壓縮率 = 0.707 &times; 1.13 &times; 0.50 &asymp; <strong>0.40</strong>：</p>
 
-  <p><strong>煞車 1 — erf 的飽和壓縮。</strong> erf(x) 是 S 型函數，值域固定在 [&minus;1, +1]。它的導數 erf'(x) = (2/&radic;&pi;)e<sup>&minus;x&sup2;</sup> — 當 |x| 增大時<strong>指數衰減到 0</strong>。關鍵觀察：<span class="emphasis">造成 B10 高誤差的輸入（小 &sigma;&radic;T），正好讓 |d<sub>1</sub>| 很大</span>。而 |d<sub>1</sub>| 大 &rarr; erf 幾乎平坦 &rarr; 輸入誤差被壓縮。反過來，erf 導數最大的地方（d<sub>1</sub>&asymp;0），B10 的實際誤差也小。這個<strong>反相關</strong>是 BS 公式的結構性質。</p>
+<div style="background:#f7fafc; border:1px solid var(--border); border-radius:8px; padding:16px 24px; margin:16px 0; font-size:15px; line-height:2.2;">
+  <span class="mono">6.24</span> ULP 進入 B10<br>
+  &ensp;&ensp;<span style="color:#e53e3e; font-weight:700;">&rarr; B10 &divide;(&sigma;&radic;T)：&times;20</span> &rarr; <span class="mono" style="color:#e53e3e;">125.84</span> ULP<br>
+  &ensp;&ensp;<span style="color:#38a169; font-weight:700;">&rarr; B11 &divide;&radic;2：&times;0.707</span> &rarr; <span class="mono">89.98</span> ULP<br>
+  &ensp;&ensp;<span>&rarr; B12 erf：&times;1.13</span> &rarr; <span class="mono">103.12</span> ULP<br>
+  &ensp;&ensp;<span style="color:#38a169; font-weight:700;">&rarr; B13 &Phi;：&times;0.50</span> &rarr; <span class="mono" style="font-weight:700;">52.06</span> ULP
+</div>
 
-  <p>但上界分析必須考慮最壞情況。在 d<sub>1</sub>&asymp;0 附近，erf'&asymp;1.13，所以 B12 上界 = 89.98 &times; 1.13 + 1.61（kernel 誤差）&asymp; 103 ULP。<span class="gesture">（指向 B11→B12）</span> 注意：90 &rarr; 103 只是微幅增加，而不是再次 20 倍放大。erf <strong>阻止了誤差的指數增長</strong>。</p>
-  <span class="pause">— 停頓 —</span>
+<p><strong>B16 合併：</strong>|exp| &times; &epsilon;<sub>&Phi;</sub> + |&Phi;| &times; &epsilon;<sub>exp</sub> + &delta; = 1 &times; 52.06 + 0.5 &times; 9.00 + 1.00 = <strong>57.56 ULP</strong></p>
 
-  <p><strong>煞車 2 — &Phi; 的 0.5 縮放。</strong> &Phi;(d<sub>1</sub>) = 0.5 + 0.5 &times; erf(d<sub>1</sub>/&radic;2)。那個 <strong>0.5 係數</strong>直接把 erf 階段的 103 ULP 砍半：103 &times; 0.5 + 0.5 &asymp; <strong>52 ULP</strong>。<span class="gesture">（指向 B13）</span> 這是純粹的數學定義給的免費壓縮。</p>
+<h2>上界 vs 實測</h2>
 
-  <p><strong>煞車 3 — discount &le; 1。</strong> 最終 &Delta; = e<sup>&minus;qT</sup> &times; &Phi;(d<sub>1</sub>)。折現因子 e<sup>&minus;qT</sup> &le; 1，所以乘法不會放大 &Phi; 的誤差。合併兩項誤差：52 &times; 1 + 9 &times; 0.5 + 1（截斷）&asymp; <strong>57.6 ULP</strong>。</p>
-  <span class="pause">— 停頓 —</span>
+<p>57.6 ULP 是<strong>最壞情況上界</strong>（假設每步同時碰到最壞輸入）。但 B10 和 B12 的最壞情況<strong>互斥</strong>：</p>
 
-  <p><span class="emphasis">上界 vs 實測。</span> 57 ULP 是<strong>理論上界</strong>：假設每一步都碰到最壞情況。但如前述，B10 最壞和 B12 最壞不能同時發生（反相關）。實測 4,096 組隨機參數，E2E 最大誤差只有 <strong>6.04 ULP</strong> — 比上界寬鬆了 ~10 倍。這個差距正是「反相關效應」的量化證據。</p>
-  <p>結論：BS Delta 管線的誤差<strong>不是靠運氣控制的</strong> — 除法放大和 erf 壓縮在數學上互相制衡，而 &Phi; 的 0.5 和 discount &le;1 提供額外的保險。整個 17 步管線的理論上界穩穩落在 ~57 ULP，實測遠低於此。</p>
+<ul style="margin:8px 0 8px 24px;">
+  <li>B10 最壞（&times;20 放大）&rarr; 小 &sigma;&radic;T &rarr; 大 |d<sub>1</sub>| &rarr; erf 平坦 &rarr; <strong>B12 強力壓縮</strong></li>
+  <li>B12 最壞（&times;1.13）&rarr; d<sub>1</sub> &asymp; 0 &rarr; &sigma;&radic;T 正常 &rarr; <strong>B10 放大倍數低</strong></li>
+</ul>
+
+<div class="result-box">
+  <strong>實測驗證：</strong>4,096 組隨機參數，E2E 最大誤差 = <strong>6.04 ULP</strong> &mdash; 僅為理論上界的 <strong>1/10</strong>。這個差距是「B10-B12 反相關效應」的量化證據。
+</div>
+
+<div class="script-block" data-label="講稿 — 5 誤差傳播：δ 加總 vs 累積上界，為什麼是 57 不是 22（~4min）">
+  <p><span class="emphasis">最常見的誤解：「每一步各自製造一些誤差，全部加起來就是最終誤差。」</span>如果這樣理解，&delta; 欄加起來約 22 ULP &mdash; 那最終怎麼是 57？多出的 35 從哪來？</p>
+  <span class="pause">&mdash; 停頓 &mdash;</span>
+
+  <p>答案：<span class="emphasis">誤差不只「加總」，還會被「放大」</span>。</p>
+  <p>想像管線是一條水管，每個閥門（步驟）會往水裡加一點染料（&delta;）。如果水管口徑不變，最終染料濃度就是所有閥門加的總和 ~22 ULP。但 B10 是一個<strong>瓶頸口</strong> &mdash; 水管突然變窄 20 倍。之前加進去的所有染料被壓進更小的截面，濃度暴增。之前累積的 6.24 ULP 在 B10 變成 6.24 &times; 20 &asymp; 125 ULP。<span class="gesture">（指向表中 B10 紅色列）</span></p>
+  <span class="pause">&mdash; 停頓 &mdash;</span>
+
+  <p><span class="emphasis">那為什麼 125 又降回 52？</span></p>
+  <p>因為後面有三個<strong>緩衝段</strong>，把管道拓寬了回去。<span class="gesture">（指向壓縮路徑圖）</span></p>
+  <p><strong>B11 &divide;&radic;2</strong>：管道拓寬 &times;0.707。因為只是做常數縮放。</p>
+  <p><strong>B12 erf</strong>：S 型函數，導數最大才 1.13。不管輸入多大，erf 只微幅放大（d<sub>1</sub>&asymp;0 時）或強力壓縮（|d<sub>1</sub>| 大時）。</p>
+  <p><strong>B13 &Phi; = 0.5 + 0.5&middot;erf</strong>：那個 0.5 直接砍半。</p>
+  <p>淨壓縮：0.707 &times; 1.13 &times; 0.50 &asymp; <strong>0.40</strong>。所以 126 &times; 0.40 + &delta; &asymp; 52 ULP。</p>
+  <span class="pause">&mdash; 停頓 &mdash;</span>
+
+  <p><span class="emphasis">B14-B15 為什麼只有 9 ULP？</span></p>
+  <p>因為 exp(&minus;qT) 是一條<strong>完全獨立的支線</strong>（分支 D）。它從 q 和 T 直接計算，跟 d<sub>1</sub> 毫無關係。Method B 用 6 個 byte 查表做乘法鏈，累積 ~8 ULP kernel 誤差 + qT 乘法的 1 ULP = 9 ULP。它<strong>根本不在 B10 那條管線上</strong>，所以不會繼承 126 ULP。<span class="gesture">（指向分支結構圖紫色路徑）</span></p>
+  <span class="pause">&mdash; 停頓 &mdash;</span>
+
+  <p><span class="emphasis">最後合併：B16。</span></p>
+  <p>&Delta; = exp(&minus;qT) &times; &Phi;(d<sub>1</sub>)。主幹帶著 52 ULP，分支 D 帶著 9 ULP。乘法的誤差公式：|exp| &times; 52 + |&Phi;| &times; 9 + 1 = 1 &times; 52 + 0.5 &times; 9 + 1 = <strong>57.6 ULP</strong>。exp &le; 1 不放大 &Phi;；&Phi; 典型值 0.5 只放大 exp 一半。</p>
+  <span class="pause">&mdash; 停頓 &mdash;</span>
+
+  <p><span class="emphasis">為什麼實測只有 6 ULP？</span></p>
+  <p>因為 B10 和 B12 的最壞情況<strong>數學上互斥</strong>。B10 放大 20 倍需要 &sigma;&radic;T 很小 &rarr; |d<sub>1</sub>| 大 &rarr; erf' 趨近 0 &rarr; B12 幾乎不傳播誤差。反過來，B12 &times;1.13 需要 d<sub>1</sub>&asymp;0 &rarr; &sigma;&radic;T 正常 &rarr; B10 放大倍數遠小於 20。57 是「假設兩個最壞同時發生」&mdash; 但在 BS 公式中，這<strong>不可能</strong>。</p>
+  <p>總結：<strong>57.6 = 22（各步 &delta;）+ 36（B10 放大殘留）</strong>。22 是「自製誤差」，36 是「被放大再壓回來的殘留」。實測 6 ULP 遠低於理論上界，因為 BS 公式的結構讓最壞情況不會同時發生。</p>
 </div>
 
 <hr>
