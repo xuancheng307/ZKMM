@@ -753,114 +753,104 @@
 <hr>
 
 <!-- ===== 11. Self-Contained Gates ===== -->
-<h1><span class="section-num">11</span>自訂閘清單與約束方程</h1>
+<h1><span class="section-num">11</span>自訂閘清單（31 gates &times; 6 模組）</h1>
 
-<p>以下列出 Proof #1 電路的 10 種自訂閘，每個閘對應一組多項式約束。Halo2 的 PLONKish 架構允許 degree &le; 5 的自訂閘，每個閘在啟用時（selector = 1）強制其約束方程為零。</p>
+<p>Proof #1 電路（<code>PortfolioCircuit</code>）共註冊 <strong>31 個自訂閘</strong>（<code>create_gate</code>），分布在 6 個 Rust 模組中。在 Halo2 的 PLONKish 架構中，每個閘定義一組多項式約束 &mdash; 閘啟用時（selector = 1），該 row 上的所有約束方程必須同時為零。一個邏輯操作（如 Poseidon permutation）需要跨多行重複啟用閘。</p>
 
-<div class="gate-card">
-  <h4>q_poseidon &mdash; Poseidon Permutation</h4>
-  <p><strong>位置</strong>：Part A（State Merkle）、Part A'（Market Data Merkle）</p>
-  <p><strong>約束</strong>：對 t=3 的狀態向量 (s<sub>0</sub>, s<sub>1</sub>, s<sub>2</sub>) 施加完整的 Poseidon round &mdash; S-box（x<sup>5</sup>）+ MDS 矩陣乘法 + round constant 加法。每次 permutation 需要完整的 full rounds + partial rounds。</p>
-  <p><strong>每次</strong>：~66 rows/permutation</p>
-</div>
+<h3>poseidon.rs &mdash; Poseidon Hash（2 gates）</h3>
+<p>Part A、A' 的 Merkle 路徑驗證核心。t=3 狀態向量，S-box 為 x<sup>5</sup>。</p>
 
 <div class="gate-card">
-  <h4>q_merkle_swap &mdash; Merkle 路徑選擇</h4>
-  <p><strong>位置</strong>：Part A、Part A'</p>
-  <p><strong>約束</strong>：根據 position_bit 決定 hash 順序<br>
-  <code>bit &times; (1 &minus; bit) = 0</code>（布林約束）<br>
-  <code>left = bit &times; sibling + (1 &minus; bit) &times; current</code><br>
-  <code>right = bit &times; current + (1 &minus; bit) &times; sibling</code></p>
-  <p><strong>每次</strong>：1 row/層</p>
+  <h4>poseidon_full_round</h4>
+  <p>3 個元素全部施加 S-box + MDS 矩陣乘法。<strong>9 constraints/row</strong>（3 &times; sq 驗證 + 3 &times; p=sq&sup2;&middot;a 驗證 + 3 &times; MDS state update）。</p>
+</div>
+<div class="gate-card">
+  <h4>poseidon_partial_round</h4>
+  <p>只對第一個元素施加 S-box，其餘為線性層。<strong>5 constraints/row</strong>。每次 permutation = 8 full + 57 partial = <strong>65 rows</strong>。</p>
 </div>
 
-<div class="gate-card">
-  <h4>q_type_decomp &mdash; 資產類型分解</h4>
-  <p><strong>位置</strong>：每持倉一次</p>
-  <p><strong>約束</strong>：<br>
-  <code>asset_type = is_put + 2 &times; is_equity</code>（值分解）<br>
-  <code>is_equity &times; (1 &minus; is_equity) = 0</code>（布林約束）<br>
-  is_put 的布林性由 Delta 管線隱式保證</p>
-  <p><strong>每次</strong>：1 row</p>
-</div>
+<h3>proof1/merkle.rs &mdash; Merkle 驗證（2 gates）</h3>
 
 <div class="gate-card">
-  <h4>q_time_verify &mdash; 到期時間驗證</h4>
-  <p><strong>位置</strong>：每持倉一次</p>
-  <p><strong>約束</strong>：<br>
-  <code>T<sub>i</sub> &times; 365 = expiry_date<sub>i</sub> &minus; today</code>（乘法驗證）<br>
-  Prover 在電路外計算 T<sub>i</sub>，電路只驗證正確性 &mdash; 避免電路內除法</p>
-  <p><strong>每次</strong>：1 row</p>
+  <h4>sponge_absorb</h4>
+  <p>Poseidon sponge 吸收：rate=2，將 2 個欄位加到 state 上。<strong>3 constraints/row</strong>（state[0..2] 更新）。</p>
+</div>
+<div class="gate-card">
+  <h4>merkle_swap</h4>
+  <p>根據 position_bit 決定 hash 順序：<code>bit &in; {0,1}</code>，<code>left = bit ? sibling : current</code>。<strong>3 constraints/row</strong>。</p>
 </div>
 
-<div class="gate-card">
-  <h4>q_equity_mux &mdash; Equity/Option MUX</h4>
-  <p><strong>位置</strong>：每持倉一次</p>
-  <p><strong>約束</strong>：<br>
-  <code>effective_delta = is_equity &times; 1.0 + (1 &minus; is_equity) &times; bs_delta</code><br>
-  Equity 部位 &Delta; = 1.0（跳過 BS 計算），Option 部位使用完整管線結果</p>
-  <p><strong>每次</strong>：1 row（2 乘法 + 1 加法）</p>
-</div>
+<h3>kernel.rs &mdash; Per-step Horner 求值核心（3 gates）</h3>
+<p>本論文核心貢獻。用於 ln（4-segment piecewise）和 erf（12-segment piecewise）的 Minimax 多項式求值。</p>
 
 <div class="gate-card">
-  <h4>q_d2_sub &mdash; d<sub>2</sub> 帶符號減法</h4>
-  <p><strong>位置</strong>：Part A''（&sigma; 驗證）</p>
-  <p><strong>約束</strong>：<br>
-  <code>d<sub>2</sub> = d<sub>1</sub> &minus; &sigma; &times; &radic;T</code>（帶符號，結果可能為負）<br>
-  使用符號位 + 絕對值表示法，避免有限域 wrap-around</p>
-  <p><strong>每次</strong>：1 row</p>
+  <h4>horner_per_step</h4>
+  <p>巢狀求值每一步：<code>acc<sub>next</sub> &times; S + rem = acc &times; r + coeff</code>，同時做截斷的 6-byte 分解驗證。<strong>2 constraints/row</strong>。d=12 多項式需要 12 次啟用 = 12 rows。</p>
+</div>
+<div class="gate-card">
+  <h4>r_byte_decomp &sol; w_byte_decomp</h4>
+  <p>Range reduction 輸入和 Horner 輸出的 6-byte 分解驗證。<code>b<sub>0</sub> + 256&middot;b<sub>1</sub> + &hellip; + 256<sup>5</sup>&middot;b<sub>5</sub> = value</code>。每個 byte 經 ByteTable lookup 確保 &in; [0, 255]。<strong>1 constraint/row each</strong>。</p>
 </div>
 
-<div class="gate-card">
-  <h4>q_bs_price &mdash; BS Price 正向驗證</h4>
-  <p><strong>位置</strong>：Part A''（&sigma; 驗證）</p>
-  <p><strong>約束</strong>：<br>
-  <code>bs + is_put &times; s_disc_q + term2 = term1 + is_put &times; k_disc_r</code>（加法形式 &mdash; 避免減法 wrap-around）<br>
-  <code>|bs_price &minus; settle_price| &le; SIGMA_TOL</code>（range check，容差 0.02 &times; 2<sup>48</sup>）<br>
-  同一個閘用 is_put 選擇 Call/Put 公式</p>
-  <p><strong>每次</strong>：~4 rows（含 range check）</p>
-</div>
+<h3>gadgets/ &mdash; 共用元件（3 gates）</h3>
 
-<div class="gate-card">
-  <h4>q_kernel_* &mdash; Per-step Horner 多項式求值（ln / erf / exp）</h4>
-  <p><strong>位置</strong>：Part B（Delta 管線）&mdash; 本論文核心貢獻</p>
-  <p><strong>約束</strong>：Per-step Horner 求值鏈<br>
-  <code>acc<sub>0</sub> = c<sub>d</sub></code>（最高次係數）<br>
-  <code>acc<sub>k+1</sub> = (acc<sub>k</sub> &times; x + c<sub>d&minus;k&minus;1</sub>) / S</code>（每步乘法 + 加法 + 截斷）<br>
-  每步截斷讓中間值保持在 S&sup2; 以內，避免有限域溢出<br>
-  截斷驗證使用 ByteTable lookup（256-entry 共享表）</p>
-  <p><strong>每個函數</strong>：~8–16 rows（degree 12（pp=48 配置），+ 截斷 + range reduction）</p>
-</div>
+<table>
+  <thead><tr><th>閘名</th><th>Constraints</th><th>用途</th></tr></thead>
+  <tbody>
+    <tr><td><code>lead_bit</code></td><td class="num">3</td><td>ln 的 range reduction：找到最高位元，將 S/K 映射到 [1, 2)。v = (S+r)&middot;2<sup>e</sup> + low，low 和 gap 各做 3-byte 分解</td></tr>
+    <tr><td><code>int_div</code></td><td class="num">2</td><td>整數除法（exp 的 range reduction：qT &divide; ln2）。q&middot;d + r = x，gap 做 6-byte 分解確保 r &lt; d</td></tr>
+    <tr><td><code>sign_extend</code></td><td class="num">2</td><td>帶符號數分解為（sign, |x|）。sign 布林約束 + |x| &minus; 2&middot;sign&middot;|x| = x。用於 w 的正負分離</td></tr>
+  </tbody>
+</table>
 
-<div class="gate-card">
-  <h4>q_sign_extend &mdash; 符號擴展</h4>
-  <p><strong>位置</strong>：Part C（合規累加）</p>
-  <p><strong>約束</strong>：<br>
-  <code>w_sign &times; (1 &minus; w_sign) = 0</code>（布林約束）<br>
-  <code>w = w_sign &times; (&minus;|w|) + (1 &minus; w_sign) &times; |w|</code>（2's complement 還原）<br>
-  將 w 分解為符號位和絕對值，供後續正負分離累加使用</p>
-  <p><strong>每次</strong>：1 row</p>
-</div>
+<h3>proof1/delta.rs &mdash; Delta 計算管線（13 gates）</h3>
+<p>BS Delta 17 步管線的核心算術。所有運算使用 pp=48 定點（S = 2<sup>48</sup>）。</p>
 
-<div class="gate-card">
-  <h4>q_compliance &mdash; 雙向合規 Range Check</h4>
-  <p><strong>位置</strong>：Part C（合規檢查）&mdash; 全電路最後一步</p>
-  <p><strong>約束</strong>：<br>
-  <code>&tau; + negative_sum &ge; positive_sum</code>（range check #1）<br>
-  <code>&tau; + positive_sum &ge; negative_sum</code>（range check #2）<br>
-  兩者同時成立 &hArr; |positive_sum &minus; negative_sum| &le; &tau;<br>
-  使用加法形式避免有限域中的負數 wrap-around 問題</p>
-  <p><strong>每次</strong>：2 rows（2 個 range check）</p>
-</div>
+<table>
+  <thead><tr><th>閘名</th><th>C</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr><td><code>fp_mul</code></td><td class="num">2</td><td>定點乘法：a&middot;b = w&middot;S + rem，rem 做 6-byte 分解</td></tr>
+    <tr><td><code>fp_div</code></td><td class="num">2</td><td>定點除法：w&middot;b + rem = a&middot;S，gap 做 8-byte 分解（除數可能 &gt; 2<sup>48</sup>）</td></tr>
+    <tr><td><code>arith_add</code></td><td class="num">1</td><td>加法：a + b = w</td></tr>
+    <tr><td><code>arith_sub</code></td><td class="num">1</td><td>減法：a &minus; b = w</td></tr>
+    <tr><td><code>arith_div2</code></td><td class="num">2</td><td>除以 2：w&middot;2 + rem = a，rem &in; {0, 1}</td></tr>
+    <tr><td><code>sqrt_verify</code></td><td class="num">1</td><td>isqrt 驗證：d&middot;(d&minus;1) = 0 where d = a &minus; b（準確度 &le; 1 ULP）</td></tr>
+    <tr><td><code>exp_recon</code></td><td class="num">1</td><td>exp 還原：result = method_b_output &times; 2<sup>k</sup>（k 查 pow2 table）</td></tr>
+    <tr><td><code>ln_recon</code></td><td class="num">1</td><td>ln 還原：result = e&middot;ln(2)&middot;S + horner_output</td></tr>
+    <tr><td><code>erf_flip</code></td><td class="num">1</td><td>erf 符號翻轉：result = w&middot;(1 &minus; 2&middot;sign)，利用 erf 奇函數性質</td></tr>
+    <tr><td><code>bool_check</code></td><td class="num">1</td><td>布林約束：val&middot;(1 &minus; val) = 0</td></tr>
+    <tr><td><code>mux</code></td><td class="num">1</td><td>二選一：out = b + sel&middot;(a &minus; b)</td></tr>
+    <tr><td><code>signed_num</code></td><td class="num">2</td><td>帶符號分子：num&middot;(1&minus;2&middot;sign) = ln_term &plusmn; drift_term</td></tr>
+    <tr><td><code>phi_signed</code></td><td class="num">2</td><td>帶符號 &Phi;：phi&middot;2 + rem = S + erf_w&middot;(1&minus;2&middot;sign)</td></tr>
+  </tbody>
+</table>
+
+<h3>proof1/portfolio.rs &mdash; 組合層（8 gates）</h3>
+<p>多持倉管線、&sigma; 正向驗證、合規判定。</p>
+
+<table>
+  <thead><tr><th>閘名</th><th>C</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr><td><code>type_decomp</code></td><td class="num">2</td><td>asset_type = is_put + 2&middot;is_equity + is_equity 布林約束</td></tr>
+    <tr><td><code>time_verify</code></td><td class="num">4</td><td>T 驗證：is_equity 布林、t_days = expiry &minus; today、T&middot;365 + rem = t_days&middot;S、rem 2-byte 分解</td></tr>
+    <tr><td><code>equity_mux</code></td><td class="num">1</td><td>Equity bypass：out = delta_mag + is_equity&middot;(S &minus; delta_mag)</td></tr>
+    <tr><td><code>d2_sub</code></td><td class="num">2</td><td>d<sub>2</sub> 帶符號減法：d<sub>2</sub>&middot;(1&minus;2&middot;sign) + denom = d<sub>1</sub>&middot;(1&minus;2&middot;num_sign)</td></tr>
+    <tr><td><code>bs_price</code></td><td class="num">1</td><td>BS price 加法形式驗證（含 is_put MUX），容差 SIGMA_TOL = 0.02 &times; 2<sup>48</sup></td></tr>
+    <tr><td><code>route_accum</code></td><td class="num">3</td><td>帶符號累加：sign = w_sign XOR is_put，正負分別累加到 pos_sum / neg_sum</td></tr>
+    <tr><td><code>compliance_range</code></td><td class="num">2</td><td>合規 range check：gap = &tau; + addend &minus; subtrahend，4-byte 分解（32-bit）</td></tr>
+    <tr><td><code>wide_range</code></td><td class="num">2</td><td>寬域 range check：7-byte 分解（56-bit），用於 fp_mul/fp_div 等超過 48-bit 的結果驗證</td></tr>
+  </tbody>
+</table>
 
 <div class="key-insight">
-  <strong>閘與管線的對應關係：</strong>每個閘對應 BS Delta 計算的一個步驟。資料從 Merkle 驗證（q_poseidon, q_merkle_swap）→ 前處理（q_type_decomp, q_time_verify）→ 金融計算（q_kernel_*, q_d2_sub, q_bs_price）→ 合規判定（q_equity_mux, q_sign_extend, q_compliance），形成一條完整的約束管線。
+  <strong>Gate vs. Gadget：</strong>每個 gate 是 1 row 上的一組多項式約束。邏輯操作（gadget）跨多行啟用 gate：Poseidon permutation = 65 rows，Horner d=12 = 12 rows，Method B exp = 5 次 fp_mul + 6 lookup = 11 rows。31 個 gate 組成一條完整的端對端管線：Merkle 驗證（poseidon + merkle 4 gates）&rarr; 前處理（type_decomp, time_verify 2 gates）&rarr; Delta 計算（kernel 3 + delta 13 + gadgets 3 = 19 gates）&rarr; 合規判定（portfolio 累加 + range check 5 gates）。
 </div>
 
-<div class="script-block" data-label="講稿 — 11 自訂閘 + 總結（~1.5min）">
-  <p>以上是 Proof #1 的全部技術細節。回顧整個設計，核心挑戰是<span class="emphasis">如何在只有加法和乘法的算術電路中精確計算超越函數</span>。</p>
-  <p>我們的解法是三個技術的組合：分段 Minimax 逼近把函數拆成窄區間上的低次多項式、Per-step Horner 在每步截斷控制中間值範圍、Method B 查表法利用指數函數的分解特性。d=12 和各段數的選擇經過系統性的 degree sweep 驗證，確保每個參數都在理論最優點。</p>
-  <p>結果是：端對端精度 ~2&times;10<sup>&minus;14</sup>，而 Delta 管線僅佔電路的 13%。瓶頸不在計算，而在資料驗證 — 這是所有 ZK 鏈上狀態驗證的共同特徵。</p>
+<div class="script-block" data-label="講稿 — 11 自訂閘 + 總結（~2min）">
+  <p>最後看自訂閘的全貌。整個 Proof #1 電路共 <span class="emphasis">31 個 create_gate</span>，分布在 6 個模組中。</p>
+  <p>這裡要區分兩個層次。<span class="emphasis">Gate 是硬體層：1 gate = 1 row</span>，selector 啟用時該行的所有約束必須同時為零 — 例如 fp_mul 在一行上同時施加乘法正確性和餘數 byte 分解兩條約束。<span class="emphasis">Gadget 是邏輯層：1 操作 = 多 rows</span> — Poseidon permutation 需要 65 行（8 full + 57 partial rounds），Horner d=12 需要 12 行，Method B exp 需要 11 行（5 次 fp_mul + 6 lookup）。</p>
+  <p>模組分布反映了關注點分離：<span class="gesture">（指向清單）</span> poseidon.rs 2 個、merkle.rs 2 個處理資料驗證；kernel.rs 3 個是 Horner 核心；gadgets/ 3 個是共用工具（lead_bit 做 ln 的 range reduction、int_div 做 exp 的 range reduction、sign_extend 做符號分離）；delta.rs 13 個是 BS Delta 管線的算術；portfolio.rs 8 個處理多持倉管線和合規。</p>
+  <p>回顧整個設計：核心挑戰是在只有加法和乘法的算術電路中精確計算超越函數。結果是端對端精度 ~2&times;10<sup>&minus;14</sup>，Delta 管線僅佔電路的 13%。</p>
   <p>接下來看 Proof #2 如何保證 State Tree 的完整性。</p>
 </div>
 
