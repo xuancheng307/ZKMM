@@ -718,15 +718,39 @@
 <!-- ===== Section 7: Naive Lookup vs Polynomial ===== -->
 <h1><span class="section-num">7</span>Naive Lookup Table vs 多項式方法：精度等價成本</h1>
 
-<p>如果不使用 Minimax 多項式和 Method B 查表，而是以最直接的<strong>分段線性插值查表</strong>（piecewise linear interpolation）達到相同的 pp=48 精度（&epsilon; = 2<sup>&minus;48</sup> &asymp; 3.55&times;10<sup>&minus;15</sup>），需要多少 lookup table entries？</p>
+<p>本系統的 E2E 精度為 <strong>~2&times;10<sup>&minus;14</sup></strong>（6.04 ULP，Section 1）。如果不使用 Minimax 多項式和 Method B，而是以最直接的<strong>分段線性插值查表</strong>（piecewise linear interpolation）達到同樣的精度，需要多大的 lookup table？對整個 Proof #1 電路又有什麼影響？</p>
+
+<h2>精度匹配原則</h2>
+
+<div class="key-insight">
+  <strong>為何不能直接用 E2E 誤差 2&times;10<sup>&minus;14</sup> 作為每個函數的精度目標？</strong><br>
+  因為誤差會在 17 步管線中<strong>傳播與放大</strong>（Section 5：B10 除法放大 ~20&times;）。無論用多項式或查表，管線結構不變、放大倍率不變。因此，naive lookup 必須匹配我們<strong>每個函數的 kernel 精度</strong>，才能達到相同的 E2E 結果。
+</div>
+
+<p>各函數的 kernel 精度目標（取自 Section 4 degree sweep 最佳值）：</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>函數</th>
+      <th class="num">Kernel ULP</th>
+      <th class="num">&epsilon; (absolute)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="mono">ln</td><td class="num mono">1.24</td><td class="num mono">4.40&times;10<sup>&minus;15</sup></td></tr>
+    <tr><td class="mono">erf</td><td class="num mono">1.61</td><td class="num mono">5.72&times;10<sup>&minus;15</sup></td></tr>
+    <tr><td class="mono">exp</td><td class="num mono">8.0</td><td class="num mono">2.84&times;10<sup>&minus;14</sup></td></tr>
+  </tbody>
+</table>
 
 <h2>理論基礎</h2>
 
-<p>分段線性插值在等距分割下的最大誤差上界：</p>
+<p>分段線性插值在等距 <span class="math">N</span> 分割下的最大誤差上界：</p>
 
-<div class="key-insight" style="font-family: 'Times New Roman', serif; font-size: 17px;">
-  <span class="math">E</span><sub>max</sub> &le; <span class="math">h</span><sup>2</sup> / 8 &times; max|<span class="math">f</span>&Prime;(<span class="math">x</span>)|<br><br>
-  要求 <span class="math">E</span><sub>max</sub> &le; &epsilon; = 2<sup>&minus;48</sup>，解得所需分割數：<br>
+<div class="purple-box" style="font-family: 'Times New Roman', serif; font-size: 17px;">
+  <span class="math">E</span><sub>max</sub> &le; <span class="math">h</span><sup>2</sup> / 8 &times; max|<span class="math">f</span>&Prime;(<span class="math">x</span>)| &ensp;&ensp; where <span class="math">h</span> = (<span class="math">b &minus; a</span>) / <span class="math">N</span><br><br>
+  解 <span class="math">E</span><sub>max</sub> &le; &epsilon; 得所需分割數：<br>
   <span class="math">N</span> &ge; (<span class="math">b &minus; a</span>) &times; &radic;(max|<span class="math">f</span>&Prime;| / (8&epsilon;))
 </div>
 
@@ -738,6 +762,7 @@
       <th>函數</th>
       <th>定義域</th>
       <th class="num">max|<span class="math">f</span>&Prime;|</th>
+      <th class="num">&epsilon;</th>
       <th class="num">Naive entries</th>
       <th class="num">我們的方法</th>
       <th class="num">壓縮比</th>
@@ -748,43 +773,50 @@
       <td class="mono">ln(1+x)</td>
       <td class="mono">[0, 1)</td>
       <td class="num mono">1.00</td>
-      <td class="num mono" style="color:#e53e3e; font-weight:600;">5,931,642</td>
+      <td class="num mono">4.40&times;10<sup>&minus;15</sup></td>
+      <td class="num mono" style="color:#e53e3e; font-weight:600;">5,326,771</td>
       <td class="num mono" style="color:#38a169; font-weight:600;">52 coefficients<sup>&dagger;</sup></td>
-      <td class="num mono">114,070&times;</td>
+      <td class="num mono">102,438&times;</td>
     </tr>
     <tr>
       <td class="mono">erf(x)</td>
       <td class="mono">[0, 6)</td>
-      <td class="num mono">1.77</td>
-      <td class="num mono" style="color:#e53e3e; font-weight:600;">35,013,664</td>
+      <td class="num mono">0.97</td>
+      <td class="num mono">5.72&times;10<sup>&minus;15</sup></td>
+      <td class="num mono" style="color:#e53e3e; font-weight:600;">27,594,633</td>
       <td class="num mono" style="color:#38a169; font-weight:600;">156 coefficients<sup>&dagger;</sup></td>
-      <td class="num mono">224,447&times;</td>
+      <td class="num mono">176,889&times;</td>
     </tr>
     <tr>
       <td class="mono">exp(x)</td>
       <td class="mono">[0, ln2)</td>
       <td class="num mono">2.00</td>
-      <td class="num mono" style="color:#e53e3e; font-weight:600;">5,814,540</td>
+      <td class="num mono">2.84&times;10<sup>&minus;14</sup></td>
+      <td class="num mono" style="color:#e53e3e; font-weight:600;">2,055,750</td>
       <td class="num mono" style="color:#38a169; font-weight:600;">1,536 entries<sup>&Dagger;</sup></td>
-      <td class="num mono">3,785&times;</td>
+      <td class="num mono">1,338&times;</td>
     </tr>
     <tr style="font-weight:700; background:#ebf8ff !important;">
       <td><strong>Total</strong></td>
       <td></td>
       <td></td>
-      <td class="num mono"><strong>~46,760,000</strong></td>
+      <td></td>
+      <td class="num mono"><strong>~34,977,000</strong></td>
       <td class="num mono"><strong>~2,000</strong></td>
-      <td class="num mono"><strong>23,380&times;</strong></td>
+      <td class="num mono"><strong>17,489&times;</strong></td>
     </tr>
   </tbody>
 </table>
 
 <p style="font-size:14px; color:#718096;">
-  <sup>&dagger;</sup> Minimax 多項式：ln = 4 段 &times; d=12 + 1 常數 = 52 係數；erf = 12 段 &times; d=12 + 1 = 156 係數。<br>
-  <sup>&Dagger;</sup> Method B 查表：6 byte positions &times; 256 entries = 1,536。
+  <sup>&dagger;</sup> Minimax 多項式：ln = 4 段 &times; (d=12 + 1) = 52 係數；erf = 12 段 &times; (d=12 + 1) = 156 係數。<br>
+  <sup>&Dagger;</sup> Method B 查表：6 byte positions &times; 256 entries = 1,536。<br>
+  max|erf&Prime;| = (4/<span class="math">&radic;&pi;</span>) &times; (1/<span class="math">&radic;e</span>) &asymp; 0.9679（取 <span class="math">x</span> = 1/<span class="math">&radic;2</span> 處的極值）。
 </p>
 
-<h2>電路規模影響</h2>
+<h2>整體 Proof #1 電路影響</h2>
+
+<p>Naive lookup table 是<strong>電路全域共用</strong>的：無論幾個持倉，表只載入一次。但 ~3,500 萬筆 table 會直接決定電路 <span class="math">k</span> 的下界，連帶拖慢整個證明（包括不受影響的 Merkle 和投組彙總部分）。</p>
 
 <table>
   <thead>
@@ -797,48 +829,61 @@
   </thead>
   <tbody>
     <tr>
-      <td>Lookup table entries</td>
+      <td>Lookup table 筆數</td>
       <td class="num mono" style="color:#38a169; font-weight:600;">~2,000</td>
-      <td class="num mono" style="color:#e53e3e;">~46,760,000</td>
-      <td class="num mono">23,380&times;</td>
+      <td class="num mono" style="color:#e53e3e;">~34,977,000</td>
+      <td class="num mono">17,489&times;</td>
     </tr>
     <tr>
-      <td>電路最低 <span class="math">k</span><sup>&lowast;</sup></td>
-      <td class="num mono" style="color:#38a169; font-weight:600;">19</td>
+      <td>Delta 佔比<sup>&sect;</sup></td>
+      <td class="num mono" style="color:#38a169; font-weight:600;">13%</td>
+      <td class="num mono" style="color:#e53e3e;">99.9%</td>
+      <td class="num mono">成本結構逆轉</td>
+    </tr>
+    <tr>
+      <td>電路 <span class="math">k</span><sup>&lowast;</sup> (20 positions)</td>
+      <td class="num mono" style="color:#38a169; font-weight:600;">16</td>
       <td class="num mono" style="color:#e53e3e;">26</td>
-      <td class="num mono">+7 levels</td>
+      <td class="num mono">+10 levels</td>
     </tr>
     <tr>
-      <td>電路 rows 上界 (2<sup><span class="math">k</span></sup>)</td>
-      <td class="num mono">524,288</td>
+      <td>電路 rows (2<sup><span class="math">k</span></sup>)</td>
+      <td class="num mono">65,536</td>
       <td class="num mono">67,108,864</td>
-      <td class="num mono">128&times;</td>
+      <td class="num mono">1,024&times;</td>
     </tr>
     <tr>
       <td>Proving time (est.)</td>
       <td class="num mono" style="color:#38a169; font-weight:600;">~1.2s</td>
-      <td class="num mono" style="color:#e53e3e;">~2.5 min</td>
-      <td class="num mono">~128&times;</td>
+      <td class="num mono" style="color:#e53e3e;">~20 min</td>
+      <td class="num mono">~1,024&times;</td>
     </tr>
     <tr>
-      <td>Proof size</td>
-      <td class="num mono">unchanged</td>
-      <td class="num mono">unchanged</td>
-      <td class="num mono">&mdash;</td>
+      <td>Proof size (bytes)</td>
+      <td class="num mono">~1.5 KB</td>
+      <td class="num mono">~1.5 KB</td>
+      <td class="num mono">不變 (PLONK)</td>
+    </tr>
+    <tr>
+      <td>Verification time</td>
+      <td class="num mono">~5 ms</td>
+      <td class="num mono">~5 ms</td>
+      <td class="num mono">不變 (O(1))</td>
     </tr>
   </tbody>
 </table>
 
 <p style="font-size:14px; color:#718096;">
-  <sup>&lowast;</sup> <span class="math">k</span> = circuit size parameter, 2<sup><span class="math">k</span></sup> = maximum rows。Naive 方案的 lookup table 需要 &ge;46.8M rows，因此 <span class="math">k</span> &ge; 26。Proof size 不受 <span class="math">k</span> 影響（PLONK/KZG 證明大小恆定），但 proving time 隨 2<sup><span class="math">k</span></sup> 線性增長。
+  <sup>&sect;</sup> 20-position portfolio：當前 Delta 管線 ~290 rows/position &times; 20 = 5,800 rows，佔 44,615 total 的 13%。Naive 方案的 ~3,500 萬筆 lookup table 佔 35,021,770 total 的 99.9%。<br>
+  <sup>&lowast;</sup> <span class="math">k</span> = circuit size parameter, 2<sup><span class="math">k</span></sup> = maximum rows。PLONK/KZG proof size 恆定（不隨 <span class="math">k</span> 變化），但 proving time 隨 2<sup><span class="math">k</span></sup> 線性增長。
 </p>
 
 <div class="problem-box">
-  <strong>Naive Lookup 的根本瓶頸：</strong>分段線性插值的收斂速度是 O(<span class="math">h</span><sup>2</sup>)，每多一位元精度需要表格大小增為 ~1.41 倍。對於 pp=48（14+ 位十進位精度），表格膨脹到 ~4,700 萬筆。相比之下，d=12 Minimax 多項式的收斂速度是 O(<span class="math">h</span><sup>13</sup>)，每增加一個分段或一次多項式的精度增益是指數級的。
+  <strong>Naive Lookup 的根本瓶頸：</strong>分段線性插值的收斂速度是 O(<span class="math">h</span><sup>2</sup>)，每多一位元精度需要表格大小 &times;1.41。要達到 ~10<sup>&minus;14</sup> 精度，表格膨脹到 ~3,500 萬筆。相比之下，d=12 Minimax 多項式的收斂速度是 O(<span class="math">h</span><sup>13</sup>)，每增加一個分段的精度增益是指數級的 — 同樣精度只需 ~2,000 筆參數。
 </div>
 
 <div class="result-box">
-  <strong>結論：</strong>多項式方法以 ~2,000 筆參數達到 pp=48 精度，佔 Delta 管線電路約 <strong>13%</strong>。若改用 naive lookup table，同樣精度需要 ~4,700 萬筆 — 電路從 k=19 膨脹到 k=26，proving time 增加 128 倍。Proof #1 的 87% 電路（Merkle 驗證、投組彙總）不受影響，但那 13% 的 Delta 核心會膨脹到佔比 <strong>&gt;99%</strong>，完全逆轉成本結構。
+  <strong>結論：</strong>多項式方法以 ~2,000 筆參數實現 E2E ~2&times;10<sup>&minus;14</sup> 精度，Delta 管線僅佔 Proof #1 電路的 <strong>13%</strong>。若改用 naive lookup table 達到同樣的 per-kernel 精度，需要 ~3,500 萬筆 table entries — 整個電路的 <span class="math">k</span> 從 16 膨脹到 26（20-position portfolio），proving time 增加 <strong>~1,024 倍</strong>。原本佔 13% 的 Delta 核心膨脹到佔比 <strong>99.9%</strong>，完全逆轉 Proof #1 的成本結構。
 </div>
 
 <hr>
