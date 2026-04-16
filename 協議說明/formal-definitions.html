@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>形式化定義 — ZKMM Protocol</title>
+<style>
+  :root {
+    --primary: #1a365d;
+    --accent: #2b6cb0;
+    --light-bg: #f7fafc;
+    --border: #e2e8f0;
+    --highlight: #ebf8ff;
+    --warn-bg: #fffaf0;
+    --success-bg: #f0fff4;
+    --code-bg: #edf2f7;
+    --purple-bg: #faf5ff;
+    --def-border: #6366f1;
+    --thm-border: #d97706;
+    --lem-border: #059669;
+    --prop-border: #7c3aed;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Noto Serif TC", "Times New Roman", Georgia, serif;
+    line-height: 1.8;
+    color: #2d3748;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    font-size: 17px;
+  }
+
+  h1 {
+    font-size: 28px;
+    color: var(--primary);
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 12px;
+    margin: 48px 0 24px 0;
+  }
+  h1:first-of-type { margin-top: 0; }
+  .part-label {
+    display: inline-block;
+    background: var(--primary);
+    color: white;
+    padding: 2px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    margin-right: 8px;
+    vertical-align: middle;
+    letter-spacing: 1px;
+  }
+  .section-num {
+    display: inline-block;
+    background: var(--accent);
+    color: white;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 32px;
+    font-size: 16px;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  h2 {
+    font-size: 22px;
+    color: var(--primary);
+    margin: 36px 0 16px 0;
+    padding-left: 12px;
+    border-left: 4px solid var(--accent);
+  }
+  h3 { font-size: 18px; color: #4a5568; margin: 24px 0 12px 0; }
+  p { margin: 12px 0; }
+
+  /* ===== Definition / Theorem / Lemma cards ===== */
+  .def-card, .thm-card, .lem-card, .prop-card {
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 15px;
+    line-height: 1.9;
+  }
+  .def-card {
+    background: #eef2ff;
+    border-left: 5px solid var(--def-border);
+  }
+  .thm-card {
+    background: #fffbeb;
+    border-left: 5px solid var(--thm-border);
+  }
+  .lem-card {
+    background: #ecfdf5;
+    border-left: 5px solid var(--lem-border);
+  }
+  .prop-card {
+    background: #f5f3ff;
+    border-left: 5px solid var(--prop-border);
+  }
+  .card-label {
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+  .def-card .card-label { color: var(--def-border); }
+  .thm-card .card-label { color: var(--thm-border); }
+  .lem-card .card-label { color: var(--lem-border); }
+  .prop-card .card-label { color: var(--prop-border); }
+
+  .math {
+    font-family: "Times New Roman", "Latin Modern Math", serif;
+    font-style: italic;
+  }
+  .math-block {
+    display: block;
+    text-align: center;
+    margin: 12px 0;
+    font-family: "Times New Roman", "Latin Modern Math", serif;
+    font-size: 16px;
+    line-height: 2;
+    overflow-x: auto;
+  }
+  .math-block.small { font-size: 14px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  th {
+    background: var(--primary);
+    color: white;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:hover { background: var(--light-bg); }
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 13px;
+  }
+
+  .note-box {
+    background: var(--highlight);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+
+  .site-nav {
+    display: flex; flex-wrap: wrap;
+    background: #1a365d; border-radius: 8px; overflow: hidden;
+    margin-bottom: 32px;
+    font-family: -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 14px;
+  }
+  .site-nav a {
+    color: #cbd5e0; text-decoration: none;
+    padding: 10px 18px; transition: background 0.2s;
+  }
+  .site-nav a:hover { background: #2b6cb0; color: #fff; }
+  .site-nav a.active { background: #2b6cb0; color: #fff; font-weight: 600; }
+
+  .footer-nav {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 2px solid var(--border);
+    text-align: center;
+    font-size: 14px;
+    color: #718096;
+  }
+  .footer-nav a { color: var(--accent); text-decoration: none; font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 12px; font-size: 15px; }
+    table { font-size: 12px; }
+    td, th { padding: 6px 8px; }
+    .def-card, .thm-card, .lem-card, .prop-card { padding: 12px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="../index.html">ZKMM</a>
+  <a href="index.html">協議總覽</a>
+  <a href="proof1.html">Proof #1 技術</a>
+  <a href="proof1-data.html">Proof #1 實驗數據</a>
+  <a href="proof2.html">Proof #2 技術</a>
+  <a href="merkle.html">Merkle Tree</a>
+  <a href="financial-domain.html">金融對照表</a>
+  <a href="formal-definitions.html" class="active">形式化定義</a>
+</nav>
+
+<!-- ===== Cover ===== -->
+<div style="text-align:center; padding: 40px 0 32px 0;">
+  <h1 style="border:none; font-size:26px; margin:0;">形式化定義</h1>
+  <p style="font-size:20px; color:var(--primary); margin:16px 0 8px 0;">
+    Formal Definitions
+  </p>
+  <p style="font-size:15px; color:#718096;">
+    本協議使用的所有數學、密碼學與金融原語的精確定義<br>
+    Precise definitions of all mathematical, cryptographic, and financial primitives
+  </p>
+</div>
+
+<hr>
+
+<!-- ============================================================ -->
+<!-- PART I: ALGEBRAIC FOUNDATIONS                                  -->
+<!-- ============================================================ -->
+
+<h1><span class="part-label">PART I</span> 代數基礎</h1>
+
+<!-- ===== §1 Notation ===== -->
+<h1><span class="section-num">1</span>符號表與約定</h1>
+
+<table>
+  <tr><th>符號</th><th>定義</th><th>備註</th></tr>
+  <tr><td class="math">&#x1D53D;<sub>p</sub></td><td>BN254 素數域</td><td>p = 21888...87 (254 bits)</td></tr>
+  <tr><td class="math">&#x1D53E;<sub>1</sub>, &#x1D53E;<sub>2</sub>, &#x1D53E;<sub>T</sub></td><td>BN254 橢圓曲線群與目標群</td><td>pairing: e : G<sub>1</sub> &times; G<sub>2</sub> &rarr; G<sub>T</sub></td></tr>
+  <tr><td class="math">[x]<sub>1</sub>, [x]<sub>2</sub></td><td>群元素表記 xG<sub>1</sub>, xG<sub>2</sub></td><td>KZG bracket notation</td></tr>
+  <tr><td class="math">&#x210D;</td><td>乘法子群 of order 2<sup>k</sup></td><td>NTT evaluation domain</td></tr>
+  <tr><td class="math">&omega;</td><td>&#x210D; 的生成元（primitive root of unity）</td><td>&omega;<sup>2<sup>k</sup></sup> = 1</td></tr>
+  <tr><td class="math">pp</td><td>定點數精度參數（precision parameter）</td><td>pp &isin; {24, 32, 48}</td></tr>
+  <tr><td class="math">S = 2<sup>pp</sup></td><td>定點數尺度因子（scale factor）</td><td></td></tr>
+  <tr><td class="math">d</td><td>多項式次數（degree）</td><td></td></tr>
+  <tr><td class="math">n</td><td>電路列數（number of rows）</td><td></td></tr>
+  <tr><td class="math">k</td><td>電路大小指數 n = 2<sup>k</sup></td><td></td></tr>
+  <tr><td class="math">&lfloor;x&rfloor;</td><td>floor 函數</td><td></td></tr>
+  <tr><td class="math">&lfloor;x&rceil;</td><td>四捨五入至最近整數</td><td></td></tr>
+  <tr><td class="math">negl(&lambda;)</td><td>可忽略函數（negligible function）</td><td>安全參數 &lambda;</td></tr>
+  <tr><td class="math">PPT</td><td>概率多項式時間（probabilistic polynomial-time）</td><td></td></tr>
+</table>
+
+<!-- ===== §2 Finite Fields ===== -->
+<h1><span class="section-num">2</span>有限域</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 2.1 — BN254 素數域 &#x1D53D;<sub>p</sub></div>
+  <p>令 <span class="math">p</span> = 21888242871839275222246405745257275088548364400416034343698204186575808495617，
+  <span class="math">p</span> 為 254-bit 素數。<strong>素數域</strong> &#x1D53D;<sub>p</sub> = {0, 1, &hellip;, p &minus; 1}，配備模 <span class="math">p</span> 的加法與乘法。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 2.2 — 域擴張 &#x1D53D;<sub>p<sup>2</sup></sub></div>
+  <p>&#x1D53D;<sub>p<sup>2</sup></sub> = &#x1D53D;<sub>p</sub>[u] / (u<sup>2</sup> + 1)，元素表為 a + bu，a, b &isin; &#x1D53D;<sub>p</sub>。用於 BN254 的 G<sub>2</sub> 定義。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 2.3 — 乘法子群 &#x210D;</div>
+  <p>取最大 <span class="math">k</span> 使得 2<sup>k</sup> | (p &minus; 1)。令 &omega; 為 &#x1D53D;<sub>p</sub> 中 2<sup>k</sup> 次本原單位根。
+  對任意電路大小 n = 2<sup>s</sup> (s &le; k)，evaluation domain &#x210D; = {1, &omega;, &omega;<sup>2</sup>, &hellip;, &omega;<sup>n&minus;1</sup>}。</p>
+  <p>BN254 的 k = 28，故最大電路大小 n = 2<sup>28</sup> = 268,435,456 行。</p>
+</div>
+
+<!-- ===== §3 Elliptic Curves ===== -->
+<h1><span class="section-num">3</span>橢圓曲線</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 3.1 — BN254 曲線</div>
+  <p><span class="math">E</span>(&#x1D53D;<sub>p</sub>) : y<sup>2</sup> = x<sup>3</sup> + 3，群階 |E(&#x1D53D;<sub>p</sub>)| = r，其中</p>
+  <div class="math-block">r = 21888242871839275222246405745257275088548364400416034343698204186575808495617</div>
+  <p>注意：BN254 的 r = p（self-pairing 特性），scalar field 與 base field 同構。</p>
+  <p><strong>G<sub>1</sub></strong> = E(&#x1D53D;<sub>p</sub>)[r]（r-torsion subgroup over &#x1D53D;<sub>p</sub>）</p>
+  <p><strong>G<sub>2</sub></strong> = E'(&#x1D53D;<sub>p<sup>2</sup></sub>)[r]（twisted curve over 域擴張）</p>
+  <p><strong>G<sub>T</sub></strong> &sub; &#x1D53D;<sub>p<sup>12</sup></sub><sup>*</sup>（目標群，r 階子群）</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 3.2 — Bilinear Pairing</div>
+  <p>最優 Ate pairing e : G<sub>1</sub> &times; G<sub>2</sub> &rarr; G<sub>T</sub>，滿足：</p>
+  <ol style="margin-left: 20px; font-size: 15px;">
+    <li><strong>Bilinearity</strong>：e(aP, bQ) = e(P, Q)<sup>ab</sup>，&forall; a, b &isin; &#x1D53D;<sub>r</sub></li>
+    <li><strong>Non-degeneracy</strong>：e(G<sub>1</sub>, G<sub>2</sub>) &ne; 1<sub>G<sub>T</sub></sub>（G<sub>1</sub>, G<sub>2</sub> 為生成元時）</li>
+    <li><strong>Efficient computability</strong>：存在 PPT 演算法計算 e</li>
+  </ol>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 3.3 — BabyJubjub 曲線</div>
+  <p>Twisted Edwards curve over &#x1D53D;<sub>p</sub>（BN254 scalar field）：</p>
+  <div class="math-block">ax<sup>2</sup> + y<sup>2</sup> = 1 + dx<sup>2</sup>y<sup>2</sup></div>
+  <p>其中 a = 168700, d = 168696。群階 = 8 &times; r'（cofactor 8），r' 為大素數。</p>
+  <p>用途：EdDSA 簽章。選用原因：定義在 BN254 scalar field 上，可直接在 halo2 電路中做群運算（無需非原生域算術）。</p>
+</div>
+
+<!-- ===== §4 Fixed-Point Arithmetic ===== -->
+<h1><span class="section-num">4</span>定點數算術</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 4.1 — 定點數表示 FP<sub>pp</sub></div>
+  <p>給定精度參數 <span class="math">pp</span> &isin; &#x2124;<sub>+</sub>，實數 x &isin; &#x211D; 的定點數表示為：</p>
+  <div class="math-block">fp<sub>pp</sub>(x) = &lfloor;x &middot; 2<sup>pp</sup>&rceil; &isin; &#x2124;</div>
+  <p>逆映射（解碼）：x &asymp; fp<sub>pp</sub>(x) / 2<sup>pp</sup>。表示誤差 |x &minus; fp<sub>pp</sub>(x)/2<sup>pp</sup>| &le; 2<sup>&minus;(pp+1)</sup>。</p>
+  <p>在電路中，fp<sub>pp</sub>(x) 嵌入 &#x1D53D;<sub>p</sub>（要求 fp<sub>pp</sub>(x) &lt; p）。負數以 p &minus; |fp<sub>pp</sub>(x)| 表示。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 4.2 — 定點乘法 fpmul</div>
+  <p>對 a, b &isin; FP<sub>pp</sub>，定點乘法定義為：</p>
+  <div class="math-block">fpmul(a, b) = &lfloor;a &middot; b / 2<sup>pp</sup>&rfloor;</div>
+  <p>在電路中實現為：計算 a &middot; b（得到 2pp-bit 中間值），然後右移 pp 位（截斷低 pp 位）。</p>
+  <p>截斷約束：a &middot; b = q &middot; 2<sup>pp</sup> + rem，其中 0 &le; rem &lt; 2<sup>pp</sup>，輸出 q。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 4.3 — 定點除法 fpdiv</div>
+  <p>對 a, b &isin; FP<sub>pp</sub>（b &ne; 0），定點除法定義為：</p>
+  <div class="math-block">fpdiv(a, b) = &lfloor;a &middot; 2<sup>pp</sup> / b&rfloor;</div>
+  <p>在電路中實現為：先左移 a（乘 2<sup>pp</sup>），再整除 b。約束：a &middot; 2<sup>pp</sup> = q &middot; b + rem，0 &le; rem &lt; b。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 4.4 — ULP（Unit in the Last Place）</div>
+  <p>對精確值 x<sub>exact</sub> 與電路計算值 x<sub>circuit</sub>，ULP 誤差定義為：</p>
+  <div class="math-block">ULP(x) = |fp<sub>pp</sub>(x<sub>exact</sub>) &minus; x<sub>circuit</sub>|</div>
+  <p>1 ULP = 2<sup>&minus;pp</sup> 的絕對誤差。ULP 是無量綱整數，量測定點數的最小分辨單位誤差。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 4.5 — 有效位數（Effective Bits）</div>
+  <p>給定最大 ULP 誤差 ULP<sub>max</sub>，有效位數定義為：</p>
+  <div class="math-block">b<sub>eff</sub> = pp &minus; log<sub>2</sub>(ULP<sub>max</sub>)</div>
+  <p>例：pp = 32, ULP<sub>max</sub> = 8 &rArr; b<sub>eff</sub> = 32 &minus; 3 = 29 有效位。</p>
+</div>
+
+<div class="lem-card">
+  <div class="card-label">Lemma 4.1 — 單次截斷誤差界</div>
+  <p>每次 fpmul 或 fpdiv 操作引入的截斷誤差滿足 |&epsilon;<sub>trunc</sub>| &le; 1 ULP。</p>
+  <p><em>Proof sketch</em>：floor 除法丟棄餘數 rem &isin; [0, 2<sup>pp</sup>)，最大損失 = 2<sup>pp</sup> &minus; 1 &lt; 2<sup>pp</sup> = 1 ULP（以原尺度計）。&marker;</p>
+</div>
+
+<div class="lem-card">
+  <div class="card-label">Lemma 4.2 — Horner d 步累積截斷界</div>
+  <p>Horner 求值法對 d 次多項式執行 d 次 fpmul + d 次加法。Per-step truncation 下：</p>
+  <div class="math-block">ULP<sub>total</sub> &le; &Sigma;<sub>i=1..d</sub> |c<sub>i</sub>| / 2<sup>pp</sup> + d</div>
+  <p>其中第一項為係數量化誤差的放大，第二項為 d 次截斷的累積。實務中由第二項主導，故 ULP<sub>total</sub> &asymp; d/2（期望值）。</p>
+</div>
+
+<hr>
+
+<!-- ============================================================ -->
+<!-- PART II: CRYPTOGRAPHIC PRIMITIVES                             -->
+<!-- ============================================================ -->
+
+<h1><span class="part-label">PART II</span> 密碼學原語</h1>
+
+<!-- ===== §5 Poseidon ===== -->
+<h1><span class="section-num">5</span>Poseidon 雜湊</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 5.1 — Poseidon 置換</div>
+  <p>Poseidon 置換 &pi; : &#x1D53D;<sub>p</sub><sup>t</sup> &rarr; &#x1D53D;<sub>p</sub><sup>t</sup> 由 R = r<sub>f</sub> + r<sub>p</sub> 輪組成，每輪依序執行：</p>
+  <ol style="margin-left: 20px; font-size: 15px;">
+    <li><strong>AddRoundConstants (ARC)</strong>：x<sub>i</sub> &larr; x<sub>i</sub> + c<sub>r,i</sub></li>
+    <li><strong>S-box</strong>：x<sub>i</sub> &larr; x<sub>i</sub><sup>&alpha;</sup>，其中 &alpha; = 5
+      <br>&emsp;Full round（前 r<sub>f</sub>/2 輪 + 後 r<sub>f</sub>/2 輪）：所有 t 個元素套用 S-box
+      <br>&emsp;Partial round（中間 r<sub>p</sub> 輪）：僅第一個元素套用 S-box</li>
+    <li><strong>MDS mixing</strong>：<strong>x</strong> &larr; M &middot; <strong>x</strong>，M &isin; &#x1D53D;<sub>p</sub><sup>t&times;t</sup> 為 MDS 矩陣</li>
+  </ol>
+  <p>BN254 參數：t = 3（2-to-1 hash），r<sub>f</sub> = 8, r<sub>p</sub> = 57，&alpha; = 5。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 5.2 — Poseidon 海綿雜湊</div>
+  <p>H<sub>Poseidon</sub> : &#x1D53D;<sub>p</sub><sup>*</sup> &rarr; &#x1D53D;<sub>p</sub>，使用海綿結構（sponge construction）：</p>
+  <ol style="margin-left: 20px; font-size: 15px;">
+    <li>初始化狀態 s = (0, 0, &hellip;, 0) &isin; &#x1D53D;<sub>p</sub><sup>t</sup></li>
+    <li><strong>Absorb</strong>：將輸入分為 rate 大小的區塊，每區塊加入狀態前 r 個元素後執行 &pi;</li>
+    <li><strong>Squeeze</strong>：輸出狀態第一個元素作為雜湊值</li>
+  </ol>
+  <p>rate = t &minus; 1 = 2，capacity = 1。本協議中，Merkle 雜湊取 H(left, right) = Poseidon(left, right)。</p>
+</div>
+
+<div class="prop-card">
+  <div class="card-label">Proposition 5.1 — Poseidon 安全性</div>
+  <p>在 algebraic attack model 下，Poseidon 的碰撞抵抗（collision resistance）與原像抵抗（preimage resistance）由輪數保證：
+  r<sub>f</sub> + r<sub>p</sub> 需超過 Gröbner basis 攻擊與差分/線性攻擊的安全邊界。BN254 參數提供 128-bit 安全等級。</p>
+  <p>選用 Poseidon 而非 SHA-256 的原因：Poseidon 以 &#x1D53D;<sub>p</sub> 原生運算定義，電路成本約 ~330 constraints vs SHA-256 的 ~25,000 constraints。</p>
+</div>
+
+<!-- ===== §6 Merkle Tree ===== -->
+<h1><span class="section-num">6</span>Merkle 樹</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 6.1 — Poseidon Merkle 樹</div>
+  <p>深度 d 的 Poseidon Merkle 樹 T(d, H) 定義為完整二元樹：</p>
+  <ul style="margin-left: 20px; font-size: 15px;">
+    <li><strong>葉節點</strong>：L<sub>i</sub> = H<sub>Poseidon</sub>(field<sub>0</sub>, field<sub>1</sub>, &hellip;, field<sub>m&minus;1</sub>)，i &isin; [0, 2<sup>d</sup>)</li>
+    <li><strong>內部節點</strong>：N<sub>j</sub> = H<sub>Poseidon</sub>(N<sub>left(j)</sub>, N<sub>right(j)</sub>)</li>
+    <li><strong>Root</strong>：root = N<sub>0</sub>（頂層節點）</li>
+  </ul>
+  <p>空葉以全零欄位表示：L<sub>empty</sub> = H<sub>Poseidon</sub>(0, 0, &hellip;, 0)。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 6.2 — Merkle Membership Proof</div>
+  <p>對葉 L<sub>i</sub>，membership proof 為 &pi;<sub>Merkle</sub> = (s<sub>0</sub>, s<sub>1</sub>, &hellip;, s<sub>d&minus;1</sub>, b)，其中：</p>
+  <ul style="margin-left: 20px; font-size: 15px;">
+    <li>s<sub>j</sub> &isin; &#x1D53D;<sub>p</sub>：第 j 層的 sibling hash</li>
+    <li>b &isin; {0, 1}<sup>d</sup>：index 的二進位表示（決定左/右）</li>
+  </ul>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 6.3 — Merkle 驗證函數</div>
+  <p>MerkleVerify(root, leaf, idx, &pi;) &rarr; {0, 1}：</p>
+  <div style="background: var(--code-bg); padding: 12px 16px; border-radius: 6px; font-family: monospace; font-size: 13px; margin: 8px 0; line-height: 1.8;">
+    cur &larr; leaf<br>
+    for j = 0 to d &minus; 1:<br>
+    &emsp;&emsp;if b[j] = 0: cur &larr; H(cur, s[j])<br>
+    &emsp;&emsp;else: cur &larr; H(s[j], cur)<br>
+    return (cur == root)
+  </div>
+</div>
+
+<!-- ===== §7 EdDSA ===== -->
+<h1><span class="section-num">7</span>EdDSA 簽章</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 7.1 — EdDSA 金鑰生成</div>
+  <p>KeyGen() &rarr; (sk, pk)：</p>
+  <ol style="margin-left: 20px; font-size: 15px;">
+    <li>隨機取 sk &isin;<sub>$</sub> &#x1D53D;<sub>r'</sub></li>
+    <li>pk = sk &middot; B，B 為 BabyJubjub 的基點</li>
+  </ol>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 7.2 — EdDSA 簽名</div>
+  <p>Sign(sk, m) &rarr; (R, s)：</p>
+  <ol style="margin-left: 20px; font-size: 15px;">
+    <li>r = H<sub>Poseidon</sub>(sk, m)（確定性 nonce）</li>
+    <li>R = r &middot; B</li>
+    <li>h = H<sub>Poseidon</sub>(R.x, R.y, pk.x, pk.y, m)</li>
+    <li>s = r + h &middot; sk mod r'</li>
+  </ol>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 7.3 — EdDSA 驗簽</div>
+  <p>Verify(pk, m, R, s) &rarr; {0, 1}：</p>
+  <ol style="margin-left: 20px; font-size: 15px;">
+    <li>h = H<sub>Poseidon</sub>(R.x, R.y, pk.x, pk.y, m)</li>
+    <li>檢查 s &middot; B == R + h &middot; pk（橢圓曲線點等式）</li>
+  </ol>
+  <p>電路內驗簽：Step 2 的點等式展開為 &#x1D53D;<sub>p</sub> 上的加法與乘法約束（約 ~1,500 constraints）。</p>
+</div>
+
+<!-- ===== §8 KZG ===== -->
+<h1><span class="section-num">8</span>KZG 多項式承諾</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 8.1 — Structured Reference String (SRS)</div>
+  <p>給定最大多項式次數 d<sub>max</sub>，可信設置產生：</p>
+  <div class="math-block">SRS = ([1]<sub>1</sub>, [&tau;]<sub>1</sub>, [&tau;<sup>2</sup>]<sub>1</sub>, &hellip;, [&tau;<sup>d<sub>max</sub></sup>]<sub>1</sub>, &ensp; [1]<sub>2</sub>, [&tau;]<sub>2</sub>)</div>
+  <p>其中 &tau; &isin;<sub>$</sub> &#x1D53D;<sub>r</sub> 為 toxic waste（設置完成後必須銷毀）。</p>
+  <p>本協議使用 Hermez/Zcash Powers of Tau ceremony 產生的 SRS。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 8.2 — KZG Commit</div>
+  <p>對多項式 f(X) = &Sigma;<sub>i=0..d</sub> c<sub>i</sub> X<sup>i</sup> &isin; &#x1D53D;<sub>r</sub>[X]：</p>
+  <div class="math-block">Commit(f, SRS) = &Sigma;<sub>i=0..d</sub> c<sub>i</sub> [&tau;<sup>i</sup>]<sub>1</sub> = [f(&tau;)]<sub>1</sub> &isin; &#x1D53E;<sub>1</sub></div>
+  <p>承諾為單個群元素（48 bytes compressed）。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 8.3 — KZG Open（Evaluation Proof）</div>
+  <p>證明 f(z) = v：</p>
+  <ol style="margin-left: 20px; font-size: 15px;">
+    <li>計算商多項式 q(X) = (f(X) &minus; v) / (X &minus; z)</li>
+    <li>proof &pi; = [q(&tau;)]<sub>1</sub> = Commit(q, SRS)</li>
+    <li>輸出 (v, &pi;)</li>
+  </ol>
+  <p>q(X) 整除的充要條件恰好是 f(z) = v（多項式餘式定理）。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 8.4 — KZG Verify</div>
+  <p>Verify(C, z, v, &pi;) &rarr; {0, 1}：</p>
+  <div class="math-block">e(C &minus; [v]<sub>1</sub>, &ensp; [1]<sub>2</sub>) &ensp; ≟ &ensp; e(&pi;, &ensp; [&tau; &minus; z]<sub>2</sub>)</div>
+  <p>等價於檢查 f(&tau;) &minus; v = q(&tau;) &middot; (&tau; &minus; z)，利用 pairing 在指數層驗證。</p>
+  <p>驗證成本：2 pairings（恆定，與多項式次數無關）。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 8.5 — SHPLONK 批次開啟</div>
+  <p>SHPLONK（Simplified HPLONK）將多個多項式在多個點的 evaluation proof 聚合為單一 proof：</p>
+  <p>給定 {(f<sub>i</sub>, z<sub>i</sub>, v<sub>i</sub>)}<sub>i=1..m</sub>，verifier 選隨機挑戰 &gamma;，聚合為：</p>
+  <div class="math-block">h(X) = &Sigma;<sub>i</sub> &gamma;<sup>i</sup> &middot; (f<sub>i</sub>(X) &minus; v<sub>i</sub>) / (X &minus; z<sub>i</sub>)</div>
+  <p>proof = [h(&tau;)]<sub>1</sub>，驗證為單一 pairing check。</p>
+  <p>本協議 halo2+KZG 使用 SHPLONK 作為最終 opening scheme。</p>
+</div>
+
+<div class="thm-card">
+  <div class="card-label">Theorem 8.1 — KZG Binding</div>
+  <p>在 d-Strong Diffie-Hellman (d-SDH) 假設下，KZG 承諾滿足 evaluation binding：</p>
+  <p>對任何 PPT 對手 A，Pr[A 輸出 (C, z, v, &pi;, v', &pi;') 使得 v &ne; v' 且 Verify(C, z, v, &pi;) = Verify(C, z, v', &pi;') = 1] &le; negl(&lambda;)。</p>
+  <p>直覺：若 f(z) = v 且 f(z) = v'（v &ne; v'），則 f(X) &minus; v 和 f(X) &minus; v' 不可能同時被 (X &minus; z) 整除。</p>
+</div>
+
+<div class="note-box">
+  <strong>Note</strong>：標準 KZG 不具備 hiding 性質（承諾 C 洩漏 f(&tau;)）。halo2 在 advice columns 加入 blinding rows（隨機列），使承諾統計上不可區分，從而達成 zero-knowledge。
+</div>
+
+<hr>
+
+<!-- ============================================================ -->
+<!-- PART III: PROOF SYSTEM                                        -->
+<!-- ============================================================ -->
+
+<h1><span class="part-label">PART III</span> 證明系統</h1>
+
+<!-- ===== §9 Plonkish / halo2 ===== -->
+<h1><span class="section-num">9</span>Plonkish 算術化（halo2）</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 9.1 — Plonkish Arithmetization</div>
+  <p>A Plonkish arithmetization over &#x1D53D;<sub>p</sub> is a tuple A = (n, m<sub>a</sub>, m<sub>f</sub>, m<sub>i</sub>, <strong>S</strong>, <strong>G</strong>, <strong>L</strong>, &sigma;) where：</p>
+  <ul style="margin-left: 20px; font-size: 15px;">
+    <li><strong>n</strong>：行數（rows），包含 usable rows + blinding rows</li>
+    <li><strong>m<sub>a</sub></strong>：advice column 數（private witness）</li>
+    <li><strong>m<sub>f</sub></strong>：fixed column 數（public constants, selectors）</li>
+    <li><strong>m<sub>i</sub></strong>：instance column 數（public inputs）</li>
+    <li><strong>S</strong> = {s<sub>j</sub> : [n] &rarr; {0, 1}}：selector 多項式集合（啟用/禁用 gate）</li>
+    <li><strong>G</strong> = {g<sub>k</sub>}：gate 多項式集合，每個 g<sub>k</sub> 定義一組多項式約束</li>
+    <li><strong>L</strong> = {(T<sub>l</sub>, input<sub>l</sub>)}：lookup 引數集合（table + input expression）</li>
+    <li><strong>&sigma;</strong>：cell 置換（copy constraints over all columns）</li>
+  </ul>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 9.2 — Satisfying Assignment</div>
+  <p>給定 A，一個 satisfying assignment 為 advice matrix W &isin; &#x1D53D;<sub>p</sub><sup>n &times; m<sub>a</sub></sup>，滿足：</p>
+  <ol style="margin-left: 20px; font-size: 15px;">
+    <li><strong>Gate constraints</strong>：&forall; k, &forall; i &isin; [n]: s<sub>k</sub>(i) &middot; g<sub>k</sub>(W<sub>i,&middot;</sub>, F<sub>i,&middot;</sub>) = 0</li>
+    <li><strong>Lookup constraints</strong>：&forall; (T<sub>l</sub>, input<sub>l</sub>): input<sub>l</sub>(W, F) &isin; T<sub>l</sub> &ensp;（on every active row）</li>
+    <li><strong>Copy constraints</strong>：&forall; (c<sub>1</sub>, c<sub>2</sub>) &isin; &sigma;: W[c<sub>1</sub>] = W[c<sub>2</sub>]</li>
+    <li><strong>Instance constraints</strong>：指定的 instance cells 與公開輸入值一致</li>
+  </ol>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 9.3 — halo2 Relation</div>
+  <div class="math-block">
+    R<sub>halo2</sub> = { (<strong>x</strong>, <strong>w</strong>) : <strong>x</strong> = instance columns, <strong>w</strong> = advice columns, (<strong>x</strong>, <strong>w</strong>) is a satisfying assignment of A }
+  </div>
+  <p><strong>x</strong>（public input）是 verifier 已知的；<strong>w</strong>（witness）是 prover 的私有輸入。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 9.4 — halo2 Proof System</div>
+  <p>halo2 proof system 為三元組 &Pi; = (Setup, Prove, Verify)：</p>
+  <ul style="margin-left: 20px; font-size: 15px;">
+    <li><strong>Setup</strong>(A, SRS) &rarr; (pk, vk)
+      <br>&emsp;pk 包含：所有 fixed column commitments, permutation commitments, lookup table commitments
+      <br>&emsp;vk 包含：fixed column commitments（的子集）+ 電路結構雜湊</li>
+    <li><strong>Prove</strong>(pk, <strong>x</strong>, <strong>w</strong>) &rarr; &pi;
+      <br>&emsp;Step 1: Commit advice columns（含 blinding rows）
+      <br>&emsp;Step 2: Commit lookup permuted columns
+      <br>&emsp;Step 3: Commit permutation argument / lookup argument / gate quotient
+      <br>&emsp;Step 4: Evaluate all polynomials at challenge point &xi;
+      <br>&emsp;Step 5: SHPLONK opening proof</li>
+    <li><strong>Verify</strong>(vk, <strong>x</strong>, &pi;) &rarr; {0, 1}
+      <br>&emsp;Step 1: 驗證 transcript consistency（Fiat-Shamir challenges）
+      <br>&emsp;Step 2: 驗證 gate/lookup/permutation 商多項式在 &xi; 處的值
+      <br>&emsp;Step 3: SHPLONK pairing check</li>
+  </ul>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 9.5 — Custom Gate</div>
+  <p>一個 custom gate 是一個多變量多項式 g : &#x1D53D;<sub>p</sub><sup>m</sup> &rarr; &#x1D53D;<sub>p</sub>，作用於同一列的 <em>相對行</em> cells。</p>
+  <p>例：本協議的 Horner gate（2 relative rows, 4 columns）：</p>
+  <div style="background: var(--code-bg); padding: 12px 16px; border-radius: 6px; font-family: monospace; font-size: 13px; margin: 8px 0;">
+    g<sub>horner</sub>(a<sub>cur</sub>, b<sub>cur</sub>, a<sub>next</sub>, coeff) = a<sub>cur</sub> &middot; b<sub>cur</sub> + coeff &minus; a<sub>next</sub> &middot; 2<sup>pp</sup> &minus; rem
+  </div>
+  <p>selector s<sub>horner</sub>(i) = 1 僅在 Horner 步驟的行啟用。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 9.6 — Lookup Argument</div>
+  <p>Lookup 引數證明一組 input expressions 的值都存在於預定義的 table 中：</p>
+  <div class="math-block">{input(W<sub>i,&middot;</sub>, F<sub>i,&middot;</sub>) : i &isin; active rows} &subseteq; Table</div>
+  <p>halo2 使用基於 permutation 的 lookup（類似 Plookup）。本協議使用的 table：</p>
+  <ul style="margin-left: 20px; font-size: 15px;">
+    <li><strong>ByteTable[0..255]</strong>：range check（byte decomposition）</li>
+    <li><strong>Pow2Table</strong>：2 的冪次（用於 bit shift）</li>
+    <li><strong>Method B exp tables</strong>：預計算 e<sup>byte&middot;2<sup>8k</sup>/S</sup> &middot; S（per byte position）</li>
+  </ul>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 9.7 — Copy Constraint（Permutation Argument）</div>
+  <p>置換引數 &sigma; 定義了跨不同 columns/rows 的 cell 等式約束：</p>
+  <div class="math-block">W[col<sub>a</sub>, row<sub>i</sub>] = W[col<sub>b</sub>, row<sub>j</sub>]</div>
+  <p>用途：將一個 gate 的輸出連接到另一個 gate 的輸入，構成計算 pipeline。</p>
+  <p>實現：grand product argument over &sigma;-permuted column indices。</p>
+</div>
+
+<!-- ===== §10 ZK Proof System ===== -->
+<h1><span class="section-num">10</span>零知識證明系統</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 10.1 — 非互動式論證系統</div>
+  <p>一個非互動式論證系統（Non-Interactive Argument）for relation R 為三元組 &Pi; = (Setup, Prove, Verify)：</p>
+  <ul style="margin-left: 20px; font-size: 15px;">
+    <li>Setup(1<sup>&lambda;</sup>, R) &rarr; (crs, pk, vk)：產生公共參數</li>
+    <li>Prove(pk, <strong>x</strong>, <strong>w</strong>) &rarr; &pi;：給定 (<strong>x</strong>, <strong>w</strong>) &isin; R，產生證明</li>
+    <li>Verify(vk, <strong>x</strong>, &pi;) &rarr; {0, 1}：驗證證明</li>
+  </ul>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 10.2 — Completeness</div>
+  <p>若 (<strong>x</strong>, <strong>w</strong>) &isin; R，則誠實 prover 產生的 proof 一定被接受：</p>
+  <div class="math-block">Pr[Verify(vk, <strong>x</strong>, Prove(pk, <strong>x</strong>, <strong>w</strong>)) = 1] = 1</div>
+  <p>（Perfect completeness：概率恰好為 1。）</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 10.3 — Knowledge Soundness</div>
+  <p>對任何 PPT prover P*，若 P* 能使 verifier 接受，則存在 PPT extractor E 使得：</p>
+  <div class="math-block">Pr[Verify(vk, <strong>x</strong>, &pi;) = 1 &and; (<strong>x</strong>, <strong>w</strong>) &notin; R : &pi; &larr; P*(pk, <strong>x</strong>), <strong>w</strong> &larr; E(pk, <strong>x</strong>, P*)] &le; negl(&lambda;)</div>
+  <p>直覺：不存在「知道 proof 但不知道 witness」的作弊者。Extractor 可以從作弊者的內部狀態提取出合法的 witness。</p>
+  <p>halo2+KZG 在 Algebraic Group Model (AGM) + Random Oracle (RO) 下滿足此性質。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 10.4 — Zero-Knowledge</div>
+  <p>存在 PPT simulator S 使得：對任何 PPT distinguisher D，</p>
+  <div class="math-block">|Pr[D(Prove(pk, <strong>x</strong>, <strong>w</strong>)) = 1] &minus; Pr[D(S(pk, <strong>x</strong>)) = 1]| &le; negl(&lambda;)</div>
+  <p>直覺：真實 proof 與 simulator（不知道 <strong>w</strong>）產生的 proof 不可區分。Verifier 從 proof 中學不到任何關於 <strong>w</strong> 的資訊。</p>
+  <p>halo2 通過 blinding rows（advice columns 的最後若干行填入隨機值）實現統計零知識。</p>
+</div>
+
+<div class="thm-card">
+  <div class="card-label">Theorem 10.1 — halo2+KZG 安全性</div>
+  <p>令 &Pi; = halo2 with KZG+SHPLONK backend over BN254。在以下假設下：</p>
+  <ul style="margin-left: 20px; font-size: 15px;">
+    <li>d-SDH assumption holds in (G<sub>1</sub>, G<sub>2</sub>)</li>
+    <li>Algebraic Group Model (AGM)</li>
+    <li>Random Oracle Model (transcript hash modeled as RO)</li>
+  </ul>
+  <p>&Pi; 滿足 perfect completeness、computational knowledge soundness、statistical zero-knowledge。</p>
+  <p>Proof size = O(1) group elements（與電路大小無關）。Verify time = O(1) pairings + O(|<strong>x</strong>|) field ops。</p>
+</div>
+
+<hr>
+
+<!-- ============================================================ -->
+<!-- PART IV: FINANCIAL MODELS                                     -->
+<!-- ============================================================ -->
+
+<h1><span class="part-label">PART IV</span> 金融模型</h1>
+
+<!-- ===== §11 Black-Scholes ===== -->
+<h1><span class="section-num">11</span>Black-Scholes 選擇權定價</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 11.1 — 幾何布朗運動（GBM）</div>
+  <p>標的資產價格 S<sub>t</sub> 遵循：</p>
+  <div class="math-block">dS<sub>t</sub> = (r &minus; q) S<sub>t</sub> dt + &sigma; S<sub>t</sub> dW<sub>t</sub></div>
+  <p>其中 r = 無風險利率，q = 連續股息率，&sigma; = 波動率，W<sub>t</sub> = 標準 Wiener process。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 11.2 — Black-Scholes 定價公式</div>
+  <p>歐式看漲選擇權價格：</p>
+  <div class="math-block">C = S e<sup>&minus;qT</sup> N(d<sub>1</sub>) &minus; K e<sup>&minus;rT</sup> N(d<sub>2</sub>)</div>
+  <p>歐式看跌選擇權價格（put-call parity）：</p>
+  <div class="math-block">P = K e<sup>&minus;rT</sup> N(&minus;d<sub>2</sub>) &minus; S e<sup>&minus;qT</sup> N(&minus;d<sub>1</sub>)</div>
+  <p>其中 S = 現貨價，K = 履約價，T = 到期時間（年），r, q, &sigma; 如 Definition 11.1。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 11.3 — d<sub>1</sub>, d<sub>2</sub> 參數</div>
+  <div class="math-block">
+    d<sub>1</sub> = [ln(S/K) + (r &minus; q + &sigma;<sup>2</sup>/2) T] / (&sigma; &radic;T)
+  </div>
+  <div class="math-block">
+    d<sub>2</sub> = d<sub>1</sub> &minus; &sigma; &radic;T
+  </div>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 11.4 — 標準常態分佈 CDF 與 erf 的關係</div>
+  <p>標準常態累積分佈函數 N(x) 定義為：</p>
+  <div class="math-block">N(x) = &frac12; [1 + erf(x / &radic;2)]</div>
+  <p>其中 erf 為誤差函數：</p>
+  <div class="math-block">erf(x) = (2/&radic;&pi;) &int;<sub>0</sub><sup>x</sup> e<sup>&minus;t<sup>2</sup></sup> dt</div>
+  <p>本協議透過 Minimax 多項式逼近 erf 來實現 N(x)（見 Part V）。</p>
+</div>
+
+<!-- ===== §12 Greeks ===== -->
+<h1><span class="section-num">12</span>BS Greeks</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 12.1 — Delta (&Delta;)</div>
+  <p>選擇權價格對標的資產價格的一階偏導數：</p>
+  <div class="math-block">
+    &Delta;<sub>call</sub> = &part;C/&part;S = e<sup>&minus;qT</sup> N(d<sub>1</sub>) &ensp;&ensp;&ensp;
+    &Delta;<sub>put</sub> = &part;P/&part;S = &minus;e<sup>&minus;qT</sup> N(&minus;d<sub>1</sub>)
+  </div>
+  <p>&Delta; &isin; [0, 1] for calls，&Delta; &isin; [&minus;1, 0] for puts。</p>
+  <p>在電路中，&Delta; 以 FP<sub>pp</sub> 表示。計算 pipeline 共 17 步（見 <a href="proof1.html" style="color:var(--accent);">Proof #1 §5</a>）。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 12.2 — Gamma (&Gamma;)</div>
+  <p>Delta 對標的資產價格的一階偏導數（選擇權價格的二階偏導數）：</p>
+  <div class="math-block">&Gamma; = &part;&Delta;/&part;S = e<sup>&minus;qT</sup> &phi;(d<sub>1</sub>) / (S &sigma; &radic;T)</div>
+  <p>其中 &phi;(x) = (1/&radic;(2&pi;)) e<sup>&minus;x<sup>2</sup>/2</sup> 為標準常態 PDF。</p>
+  <p>&Gamma; &ge; 0（凸性）。計算需額外一次 exp 求值（e<sup>&minus;d<sub>1</sub><sup>2</sup>/2</sup>），複用 d<sub>1</sub> pipeline。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 12.3 — Vega (V)</div>
+  <p>選擇權價格對波動率的偏導數：</p>
+  <div class="math-block">V = &part;C/&part;&sigma; = S e<sup>&minus;qT</sup> &phi;(d<sub>1</sub>) &radic;T</div>
+  <p>與 Gamma 共用 &phi;(d<sub>1</sub>) 計算。</p>
+</div>
+
+<div class="note-box">
+  <strong>可擴展性</strong>：所有 BS Greeks 共用 d<sub>1</sub> 計算 pipeline（17 步中的 B1-B12）。不同 Greeks 僅在 B13 之後分叉。新增一個 Greek 的邊際電路成本約 10-30%（非 100%）。
+</div>
+
+<!-- ===== §13 Merton ===== -->
+<h1><span class="section-num">13</span>Merton 結構模型</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 13.1 — 違約距離（Distance to Default）</div>
+  <div class="math-block">DD = [ln(V/D) + (&mu; &minus; &sigma;<sub>V</sub><sup>2</sup>/2) T] / (&sigma;<sub>V</sub> &radic;T)</div>
+  <p>V = 公司資產價值，D = 債務面值，&mu; = 資產預期報酬率，&sigma;<sub>V</sub> = 資產波動率。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 13.2 — 違約機率（Probability of Default）</div>
+  <div class="math-block">PD = N(&minus;DD) = &frac12; erfc(DD / &radic;2)</div>
+  <p>利用 erf 的互補關係 erfc(x) = 1 &minus; erf(x)。</p>
+  <p>電路中複用 ln + erf kernel（與 BS Delta 共用），僅參數不同。</p>
+</div>
+
+<!-- ===== §14 Compliance Functions ===== -->
+<h1><span class="section-num">14</span>合規函數</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 14.1 — Portfolio Weighted Delta</div>
+  <p>給定 N 個持倉 {(w<sub>i</sub>, &Delta;<sub>i</sub>)}<sub>i=1..N</sub>：</p>
+  <div class="math-block">&Delta;<sub>port</sub> = &Sigma;<sub>i=1</sub><sup>N</sup> w<sub>i</sub> &middot; &Delta;<sub>i</sub></div>
+  <p>w<sub>i</sub> &isin; &#x2124;（正=做多，負=做空），&Delta;<sub>i</sub> &isin; FP<sub>pp</sub>。加法在 &#x1D53D;<sub>p</sub> 中精確（無截斷）。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 14.2 — Delta 合規謂詞</div>
+  <div class="math-block">&phi;(&Delta;<sub>port</sub>, &tau;) := |&Delta;<sub>port</sub>| &le; &tau;</div>
+  <p>在電路中實現為：計算 |&Delta;<sub>port</sub>|（取絕對值），然後 range check &tau; &minus; |&Delta;<sub>port</sub>| &ge; 0。</p>
+  <p>&tau; 為 instance column（public input），verifier 可見。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 14.3 — 門檻語義</div>
+  <p>&tau; 以 Delta 單位表示（非名目金額）：</p>
+  <ul style="margin-left: 20px; font-size: 15px;">
+    <li>&tau; = 0.05 &middot; 2<sup>pp</sup>：portfolio net Delta 不超過 5% of notional</li>
+    <li>&tau; = 0：完美 delta-neutral（實務中不可能精確達成）</li>
+  </ul>
+  <p>換算為名目金額：|exposure| = |&Delta;<sub>port</sub>| &middot; S &middot; multiplier，其中 S = 標的現價，multiplier = 合約乘數。</p>
+</div>
+
+<hr>
+
+<!-- ============================================================ -->
+<!-- PART V: POLYNOMIAL APPROXIMATION THEORY                       -->
+<!-- ============================================================ -->
+
+<h1><span class="part-label">PART V</span> 多項式逼近理論</h1>
+
+<!-- ===== §15 Minimax ===== -->
+<h1><span class="section-num">15</span>Minimax 逼近</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 15.1 — 最佳一致逼近（Best Uniform Approximation）</div>
+  <p>給定連續函數 f : [a, b] &rarr; &#x211D; 和多項式次數 d，最佳一致逼近為：</p>
+  <div class="math-block">p* = arg min<sub>p &isin; P<sub>d</sub></sub> &Vert;f &minus; p&Vert;<sub>&infin;</sub></div>
+  <p>其中 P<sub>d</sub> 為次數 &le; d 的多項式集合，&Vert;g&Vert;<sub>&infin;</sub> = max<sub>x &isin; [a,b]</sub> |g(x)|。</p>
+  <p>p* 稱為 <strong>Minimax 多項式</strong>，也稱 Chebyshev 最佳逼近。</p>
+</div>
+
+<div class="thm-card">
+  <div class="card-label">Theorem 15.1 — Chebyshev Equioscillation Theorem</div>
+  <p>p* &isin; P<sub>d</sub> 是 f 在 [a, b] 上的最佳一致逼近 <strong>若且唯若</strong> 誤差 e(x) = f(x) &minus; p*(x) 在 [a, b] 上有至少 d + 2 個交替極值點 x<sub>0</sub> &lt; x<sub>1</sub> &lt; &hellip; &lt; x<sub>d+1</sub>，使得：</p>
+  <div class="math-block">e(x<sub>i</sub>) = (&minus;1)<sup>i</sup> &middot; &Vert;e&Vert;<sub>&infin;</sub> &ensp; &forall; i</div>
+  <p>推論：</p>
+  <ul style="margin-left: 20px; font-size: 15px;">
+    <li><strong>存在性</strong>：p* 一定存在（Weierstrass 定理 + 緊集）</li>
+    <li><strong>唯一性</strong>：p* 是唯一的</li>
+    <li><strong>最優性特徵</strong>：任何其他 d 次多項式的最大誤差嚴格大於 &Vert;e&Vert;<sub>&infin;</sub></li>
+  </ul>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 15.2 — Remez Exchange Algorithm</div>
+  <p>迭代求解 Minimax 多項式的標準演算法：</p>
+  <ol style="margin-left: 20px; font-size: 15px;">
+    <li><strong>Init</strong>：選取 d + 2 個初始參考點 {x<sub>i</sub>}<sub>0..d+1</sub>（通常取 Chebyshev 節點）</li>
+    <li><strong>Level</strong>：解 (d + 2) &times; (d + 2) 線性系統 p(x<sub>i</sub>) + (&minus;1)<sup>i</sup> E = f(x<sub>i</sub>)，得多項式 p 和等振幅 E</li>
+    <li><strong>Exchange</strong>：找 |f(x) &minus; p(x)| 的全域極值點，替換參考集中偏差最小的點</li>
+    <li><strong>Converge</strong>：重複 2-3 直到 E 收斂（通常 10-20 次迭代）</li>
+  </ol>
+  <p>收斂後的 p 即為 Minimax 多項式 p*（在機器精度內）。</p>
+</div>
+
+<!-- ===== §16 Horner ===== -->
+<h1><span class="section-num">16</span>Horner 求值法</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 16.1 — Horner 遞推（實數域）</div>
+  <p>多項式 p(x) = c<sub>0</sub> + c<sub>1</sub>x + &hellip; + c<sub>d</sub>x<sup>d</sup> 的 Horner 求值：</p>
+  <div style="background: var(--code-bg); padding: 12px 16px; border-radius: 6px; font-family: monospace; font-size: 13px; margin: 8px 0; line-height: 1.8;">
+    h<sub>0</sub> = c<sub>d</sub><br>
+    h<sub>k+1</sub> = h<sub>k</sub> &middot; x + c<sub>d&minus;k&minus;1</sub> &ensp; for k = 0, 1, &hellip;, d &minus; 1<br>
+    p(x) = h<sub>d</sub>
+  </div>
+  <p>運算量：d 次乘法 + d 次加法（最優）。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 16.2 — 定點 Horner（Per-step Truncation）</div>
+  <p>在 FP<sub>pp</sub> 中，每步乘法後截斷以防溢位：</p>
+  <div style="background: var(--code-bg); padding: 12px 16px; border-radius: 6px; font-family: monospace; font-size: 13px; margin: 8px 0; line-height: 1.8;">
+    h<sub>0</sub> = c<sub>d</sub><br>
+    h<sub>k+1</sub> = &lfloor;h<sub>k</sub> &middot; x / 2<sup>pp</sup>&rfloor; + c<sub>d&minus;k&minus;1</sub> &ensp; for k = 0, &hellip;, d &minus; 1<br>
+    output = h<sub>d</sub>
+  </div>
+  <p>每步中間值 &le; 2<sup>2pp+1</sup>（已截斷），永遠不超過 &#x1D53D;<sub>p</sub> 容量。</p>
+  <p>電路約束：h<sub>k</sub> &middot; x = q<sub>k</sub> &middot; 2<sup>pp</sup> + rem<sub>k</sub>，rem<sub>k</sub> &isin; [0, 2<sup>pp</sup>) 以 byte decomposition range check 保證。</p>
+</div>
+
+<div class="def-card">
+  <div class="card-label">Definition 16.3 — 定點 Horner（Deferred Truncation）</div>
+  <p>推遲截斷：所有乘法和加法在整數域完成，最後一次截斷：</p>
+  <div style="background: var(--code-bg); padding: 12px 16px; border-radius: 6px; font-family: monospace; font-size: 13px; margin: 8px 0; line-height: 1.8;">
+    h<sub>0</sub> = c<sub>d</sub><br>
+    h<sub>k+1</sub> = h<sub>k</sub> &middot; x + c<sub>d&minus;k&minus;1</sub> &middot; 2<sup>k&middot;pp</sup> &ensp; (no truncation)<br>
+    output = &lfloor;h<sub>d</sub> / 2<sup>d&middot;pp</sup>&rfloor;
+  </div>
+  <p>優點：只截斷一次（ULP &le; 1）。缺點：中間值需 (d+1)&middot;pp bits。</p>
+</div>
+
+<div class="thm-card">
+  <div class="card-label">Theorem 16.1 — Deferred Truncation 溢位條件</div>
+  <p>Deferred Horner 可行的充要條件：中間值不超過 &#x1D53D;<sub>p</sub> 的表示範圍：</p>
+  <div class="math-block">(d + 1) &middot; pp &lt; &lceil;log<sub>2</sub> p&rceil; = 254 &ensp; (for BN254)</div>
+  <table>
+    <tr><th>pp</th><th>最大 d（deferred）</th><th>狀態</th></tr>
+    <tr><td>16</td><td>d &le; 14</td><td>可行 &mdash; 所有實務需求 d &le; 7</td></tr>
+    <tr><td>24</td><td>d &le; 9</td><td>可行 &mdash; 本協議 d = 8</td></tr>
+    <tr><td>32</td><td>d &le; 6</td><td>不足 &mdash; 需 d = 10（ln, erf）</td></tr>
+    <tr><td>48</td><td>d &le; 4</td><td>不足 &mdash; 需 d = 14</td></tr>
+  </table>
+  <p>結論：pp &ge; 32 時 deferred truncation 溢位，<strong>必須</strong>使用 per-step truncation。</p>
+</div>
+
+<div class="thm-card">
+  <div class="card-label">Theorem 16.2 — Per-step 累積誤差界</div>
+  <p>Per-step Horner 的總 ULP 誤差由兩部分組成：</p>
+  <div class="math-block">ULP<sub>total</sub> = ULP<sub>Remez</sub> + ULP<sub>trunc</sub></div>
+  <ul style="margin-left: 20px; font-size: 15px;">
+    <li>ULP<sub>Remez</sub>：Minimax 多項式逼近誤差（固定，由 Remez 保證）</li>
+    <li>ULP<sub>trunc</sub> &le; d（最壞情況），期望值 &asymp; d/2</li>
+  </ul>
+  <p>存在最優 d* 使得 ULP<sub>total</sub> 最小：d &lt; d* 時 Remez 誤差主導，d &gt; d* 時截斷主導。</p>
+</div>
+
+<!-- ===== §17 Coefficient Conditioning ===== -->
+<h1><span class="section-num">17</span>係數條件數</h1>
+
+<div class="def-card">
+  <div class="card-label">Definition 17.1 — 係數條件數（Coefficient Conditioning）</div>
+  <p>在相同 kernel 參數 (pp, d, nbytes) 下，不同函數因 Minimax 係數結構的差異，產生不同的定點數精度：</p>
+  <div class="math-block">CR(f, g) = ULP<sub>max</sub>(f) / ULP<sub>max</sub>(g)</div>
+  <p>影響因子：</p>
+  <ul style="margin-left: 20px; font-size: 15px;">
+    <li><strong>有效 Horner 步數</strong>：奇函數（如 erf）半數係數為零，實際僅 &lceil;d/2&rceil; 步有截斷</li>
+    <li><strong>係數交替性</strong>：交替正負係數（如 ln）每步截斷誤差可能加強</li>
+    <li><strong>量化靈敏度</strong>：高 pp 時，定點表示的相對誤差更小，但累積步數更多</li>
+  </ul>
+</div>
+
+<div class="prop-card">
+  <div class="card-label">Observation 17.1 — Conditioning 隨 pp 放大</div>
+  <p>實驗觀測（同 d, 同 kernel 架構）：</p>
+  <table>
+    <tr><th>pp</th><th>ln ULP<sub>max</sub></th><th>erf ULP<sub>max</sub></th><th>CR(ln/erf)</th></tr>
+    <tr><td>16</td><td>1</td><td>1</td><td>~1.0x</td></tr>
+    <tr><td>32</td><td>~9</td><td>~6</td><td>~1.5x</td></tr>
+    <tr><td>48 (d=14)</td><td>~142</td><td>~15</td><td>~9.4x</td></tr>
+  </table>
+  <p>此現象在 ZK 定點數文獻中為<strong>首次報導</strong>。它表明目標函數的數學性質直接影響電路精度，獨立於 kernel 設計。</p>
+</div>
+
+<hr>
+
+<!-- ===== Footer ===== -->
+<div class="footer-nav">
+  <a href="financial-domain.html">&larr; 金融對照表</a>
+  &ensp;|&ensp;
+  <a href="index.html">協議總覽 &rarr;</a>
+  <br><br>
+  ZKMM Protocol &mdash; Financial Compliance via Zero-Knowledge Proofs
+</div>
+
+</body>
+</html>
