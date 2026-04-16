@@ -1135,6 +1135,9 @@
   <p>接著定義 Relation R<sub>1</sub> &mdash; <strong>五個條件</strong>：<span class="gesture">（逐一指出）</span> (a) 每筆持倉在 State Tree、(b) 市場資料在 Market Data Tree、(c) &sigma; 滿足 BS price 驗證、(d) 時間 T 正確計算、(e) 加權 Delta 合規。<strong>五個條件對應電路的五個模組群</strong> &mdash; 這就是 completeness 和 soundness 的證明結構。</p>
   <span class="pause">&mdash; 停頓 &mdash;</span>
 
+  <p>這裡要釐清一個關鍵問題：<span class="emphasis">PLONK 的 soundness 已經被 Gabizon 等人證明了，為什麼我們還要再證？</span>因為安全論證分<strong>兩層</strong>。PLONK 的 soundness 保證的是密碼學層：「如果 verifier accept，extractor 可以萃取出滿足所有<strong>電路約束</strong>的 witness」&mdash; 它不管約束代表什麼金融含義。我們的 Section 12 要證的是應用層：「滿足所有電路約束」&rArr;「witness 滿足 R<sub>1</sub> 的<strong>五個金融條件</strong>」。兩段接起來才是完整的鏈：Verifier accept &rarr; <em>（PLONK）</em> witness 滿足電路約束 &rarr; <em>（我們的論證）</em> witness 滿足金融合規條件。換句話說，<span class="emphasis">我們證明的是電路約束與金融語義之間的等價性</span>。</p>
+  <span class="pause">&mdash; 停頓 &mdash;</span>
+
   <p><span class="emphasis">Completeness 是最簡單的部分</span> &mdash; 合法 witness 代入電路，31 個 gate 的 66 條約束方程都是等式，直接代入驗證。五個模組群的映射：Poseidon+Merkle（4 gates、20 constraints）保證 (a)(b)，Type+Time（2 gates、6 constraints）保證 (d)，&sigma; 驗證（2 gates）保證 (c)，Kernel+Delta（19 gates、29 constraints）是 (e) 的前置計算，Portfolio 累加+range check（4 gates、8 constraints）完成 (e) 的合規判定。</p>
   <span class="pause">&mdash; 停頓 &mdash;</span>
 
