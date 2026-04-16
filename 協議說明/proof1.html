@@ -1135,7 +1135,7 @@
   <p>接著定義 Relation R<sub>1</sub> &mdash; <strong>五個條件</strong>：<span class="gesture">（逐一指出）</span> (a) 每筆持倉在 State Tree、(b) 市場資料在 Market Data Tree、(c) &sigma; 滿足 BS price 驗證、(d) 時間 T 正確計算、(e) 加權 Delta 合規。<strong>五個條件對應電路的五個模組群</strong> &mdash; 這就是 completeness 和 soundness 的證明結構。</p>
   <span class="pause">&mdash; 停頓 &mdash;</span>
 
-  <p><span class="emphasis">Completeness 是最簡單的部分</span> &mdash; 合法 witness 代入電路，31 個 gate 的 66 條約束方程都是等式，直接代入驗證。五個模組群的映射：Poseidon+Merkle（4 gates、20 constraints）保證 (a)(b)，Type+Time（2 gates、6 constraints）保證 (d)，&sigma; 驗證（2 gates）保證 (c)，Kernel+Delta（19 gates、29 constraints）是 (e) 的前置計算，Portfolio 累加+range check（6 gates、11 constraints）完成 (e) 的合規判定。</p>
+  <p><span class="emphasis">Completeness 是最簡單的部分</span> &mdash; 合法 witness 代入電路，31 個 gate 的 66 條約束方程都是等式，直接代入驗證。五個模組群的映射：Poseidon+Merkle（4 gates、20 constraints）保證 (a)(b)，Type+Time（2 gates、6 constraints）保證 (d)，&sigma; 驗證（2 gates）保證 (c)，Kernel+Delta（19 gates、29 constraints）是 (e) 的前置計算，Portfolio 累加+range check（4 gates、8 constraints）完成 (e) 的合規判定。</p>
   <span class="pause">&mdash; 停頓 &mdash;</span>
 
   <p><span class="emphasis">Soundness 是核心。</span> 反方向：假設 verifier accept，推出 witness 必然滿足 relation。我們用<strong>三層結構</strong>論證：<span class="gesture">（指向 12.4）</span></p>
@@ -1143,7 +1143,7 @@
   <p><strong>Layer 1 &mdash; 算術閘不可繞。</strong> fp_mul 的 a&times;b = w&times;S + rem，如果 w 偽造，rem 超出 [0, S)，byte decomposition 的 lookup 拒絕。這是<span class="emphasis">最基礎的安全機制</span>：byte decomp + ByteTable lookup，結構簡單到不可能繞過。delta.rs 的 13 個 gate 中有 5 個算術閘（fp_mul、fp_div、arith_add、arith_sub、arith_div2）全部用這個機制。</p>
 
   <p><strong>Layer 2 &mdash; 超越函數不可繞。</strong> horner_per_step 每一步都有約束 + byte decomposition &mdash; 係數是 hardcoded 常數，prover 改不了。d=12 的多項式 prover 需要 12 步全部通過，truncation 被 byte table lookup 鎖定。偏差上界：每步 &le; 1 ULP，12 步累積 &le; 12 ULP。<strong>ln 和 erf 都被這個機制鎖死。</strong></p>
-  <p>exp 比較特殊 &mdash; Method B result 目前是 witness，內部的 lookup+multiply 約束鏈是<strong>計畫強化項目</strong>。當前安全由<span class="emphasis">bs_price gate</span> 兜底：如果 exp 結果偏離，算出的 BS price 不等於結算價，gate 拒絕。完整的 Method B 約束實作後，exp 將跟 ln/erf 一樣被算術閘鎖死。三個超越函數的安全等級總結：<span class="emphasis">ln &check; 完全約束、erf &check; 完全約束、exp &Delta; 間接約束（bs_price 兜底）</span>。</p>
+  <p>exp 比較特殊 &mdash; Method B result 目前是 witness，內部的 lookup+multiply 約束鏈是<strong>計畫強化項目</strong>。當前安全由<span class="emphasis">bs_price gate</span> 兜底：如果 exp 結果偏離，算出的 BS price 不等於結算價，gate 拒絕。完整的 Method B 約束實作後，exp 將跟 ln/erf 一樣被算術閘鎖死。三個超越函數的安全等級總結：<span class="emphasis">ln &check; 完全約束、erf &check; 完全約束、exp &#9888; 間接約束（bs_price 兜底）</span>。</p>
   <span class="pause">&mdash; 停頓 &mdash;</span>
 
   <p><strong>Layer 3 &mdash; 合規判定不可繞。</strong> route_accum 按符號分流，wide_range 做 7-byte 分解（56-bit）強制 gap &ge; 0。&tau; 來自 public input（constrain_instance），prover 無法篡改。</p>
@@ -1152,8 +1152,8 @@
   <span class="pause">&mdash; 停頓 &mdash;</span>
 
   <p>Under-constrained 分析列出了<strong>十個</strong>潛在攻擊向量。<span class="gesture">（指向表格）</span> 按攻擊目標分四類：</p>
-  <p><strong>操縱輸入參數</strong>（3 個）：偽造 &sigma;、篡改 &tau;/today、deep OTM 的 &sigma; 容差操縱。<strong>操縱計算結果</strong>（3 個）：偽造 Horner 結果、偽造 exp、偽造符號。<strong>操縱投組組成</strong>（2 個）：重複計入、遺漏持倉 &mdash; 這兩個是<strong>Proof #1 不防的</strong>，by design 交給 Proof #2。<strong>利用數值弱點</strong>（2 個）：range check overflow、T&rarr;0 pin risk。</p>
-  <p>按防禦機制分：<span class="emphasis">Gate 約束直接擋住 5 個</span>（偽造 &sigma; &rarr; bs_price、偽造 Horner &rarr; horner_per_step、偽造符號 &rarr; sign_extend、篡改公開輸入 &rarr; constrain_instance、overflow &rarr; wide_range byte decomp）。<span class="emphasis">數學與經濟學天然防堵 2 個</span>（deep OTM 的 Vanna-Vega 聯動 &mdash; 大幅改 &sigma; 會讓 price 暴增過不了閘，T&rarr;0 pin risk 在 snapshot 時間點數學正確）。<span class="emphasis">跨 Proof 分工 2 個</span>（重複/遺漏 &rarr; Proof #2 的 State Tree 完整性保證）。<span class="emphasis">間接約束 + 計畫強化 1 個</span>（exp 的 bs_price 兜底 + Method B 約束鏈 TODO）。</p>
+  <p><strong>操縱輸入參數</strong>（2 個）：偽造 &sigma;、deep OTM 的 &sigma; 容差操縱。<strong>操縱計算結果</strong>（3 個）：偽造 Horner 結果、偽造 exp、偽造符號。<strong>操縱投組組成</strong>（2 個）：重複計入、遺漏持倉 &mdash; 這兩個是<strong>Proof #1 不防的</strong>，by design 交給 Proof #2。<strong>利用數值弱點</strong>（2 個）：range check overflow、T&rarr;0 pin risk。另外 &tau;/today 是 public input（verifier 提供），prover 本來就不控制 &mdash; constrain_instance 確保電路內部一致，屬於<strong>架構保證</strong>而非需要防禦的攻擊。</p>
+  <p>按防禦機制分：<span class="emphasis">Gate 約束直接擋住 4 個</span>（偽造 &sigma; &rarr; bs_price、偽造 Horner &rarr; horner_per_step、偽造符號 &rarr; sign_extend、overflow &rarr; wide_range byte decomp）。<span class="emphasis">數學與經濟學天然防堵 2 個</span>（deep OTM 的 Vanna-Vega 聯動 &mdash; 大幅改 &sigma; 會讓 price 暴增過不了閘，T&rarr;0 pin risk 在 snapshot 時間點數學正確）。<span class="emphasis">跨 Proof 分工 2 個</span>（重複/遺漏 &rarr; Proof #2 的 State Tree 完整性保證）。<span class="emphasis">間接約束 + 計畫強化 1 個</span>（exp 的 bs_price 兜底 + Method B 約束鏈 TODO）。<span class="emphasis">架構保證 1 個</span>（&tau;/today 為 verifier 提供的 public input，不可篡改）。</p>
   <span class="pause">&mdash; 停頓 &mdash;</span>
 
   <p><span class="emphasis">Zero-knowledge</span> 直接 delegate 給 PLONK &mdash; Halo2 的 blinding factors 確保 KZG commitment 不洩漏 witness。Private witness 包含持倉明細、&sigma;、Merkle 路徑、所有中間值 &mdash; 全在 advice columns，受 blinding 保護。Public input 只有 <strong>4 個值</strong>（state_root, market_data_root, &tau;, today）。隱私保護範圍：<span class="emphasis">verifier 知道「投組合規」但不知道任何一筆持倉的內容</span>。</p>
