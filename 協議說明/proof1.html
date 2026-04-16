@@ -945,7 +945,7 @@
     <tr>
       <td>Portfolio<br>(4 gates)</td>
       <td>(e)</td>
-      <td>route_accum 按符號正確累加到 pos_sum / neg_sum。compliance_range 驗證 &tau; + neg_sum &ge; pos_sum（及反向），由條件 (e) |net delta| &le; &tau; 直接保證 gap &ge; 0。</td>
+      <td>route_accum 按符號正確累加到 pos_sum / neg_sum。wide_range 驗證 &tau; + neg_sum &ge; pos_sum（及反向，7-byte 分解確保 gap &ge; 0），由條件 (e) |net delta| &le; &tau; 直接保證。</td>
     </tr>
   </tbody>
 </table>
