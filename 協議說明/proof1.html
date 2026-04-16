@@ -837,8 +837,8 @@
     <tr><td><code>d2_sub</code></td><td class="num">2</td><td>d<sub>2</sub> 帶符號減法：d<sub>2</sub>&middot;(1&minus;2&middot;sign) + denom = d<sub>1</sub>&middot;(1&minus;2&middot;num_sign)</td></tr>
     <tr><td><code>bs_price</code></td><td class="num">1</td><td>BS price 加法形式驗證（含 is_put MUX），容差 SIGMA_TOL = 0.02 &times; 2<sup>48</sup></td></tr>
     <tr><td><code>route_accum</code></td><td class="num">3</td><td>帶符號累加：sign = w_sign XOR is_put，正負分別累加到 pos_sum / neg_sum</td></tr>
-    <tr><td><code>compliance_range</code></td><td class="num">2</td><td>合規 range check：gap = &tau; + addend &minus; subtrahend，4-byte 分解（32-bit）</td></tr>
-    <tr><td><code>wide_range</code></td><td class="num">2</td><td>寬域 range check：7-byte 分解（56-bit），用於 fp_mul/fp_div 等超過 48-bit 的結果驗證</td></tr>
+    <tr><td><code>compliance_range</code></td><td class="num">2</td><td>窄域 range check：gap = &tau; + addend &minus; subtrahend，4-byte 分解（32-bit）。用於已知 &lt; 2<sup>32</sup> 的場景</td></tr>
+    <tr><td><code>wide_range</code></td><td class="num">2</td><td>寬域 range check：7-byte 分解（56-bit），用於合規判定（&tau; 與加權 Delta 在 pp=48 規模 &gt; 2<sup>32</sup>）及 fp_mul/fp_div 驗證</td></tr>
   </tbody>
 </table>
 
@@ -961,8 +961,8 @@
   <strong>Claim.</strong> time_verify gate 滿足 &rArr; T<sub>i</sub> &times; 365 = expiry_date<sub>i</sub> &minus; today。<br><br>
 
   <strong>Proof.</strong>
-  time_verify 施加四條約束：(1) is_equity 布林、(2) t_days = expiry &minus; today、(3) T &times; 365 + rem = t_days &times; S、(4) rem 的 2-byte decomposition（確保 0 &le; rem &lt; 365 &times; S / 365）。<br>
-  today 來自 public input（constrain_instance），prover 無法篡改。expiry_date 來自 Merkle 驗證過的葉節點。因此 T 被唯一確定為 (expiry &minus; today) / 365 的 floor-division 結果。&square;
+  time_verify 施加四條約束：(1) is_equity 布林、(2) t_days = expiry &minus; today、(3) T &times; 365 + rem = t_days &times; S、(4) rem 的 2-byte decomposition（確保 0 &le; rem &lt; 2<sup>16</sup>）。<br>
+  today 來自 public input（constrain_instance），prover 無法篡改。expiry_date 來自 Merkle 驗證過的葉節點。2-byte 允許 rem &le; 65535，理論上 prover 可偏移 T 至多 &lfloor;65535/365&rfloor; = 179 個定點單位。在 pp=48 下，179/S = 6.4&times;10<sup>&minus;13</sup> 年（&lt; 0.02 毫秒），對 Delta 的影響遠小於 1 ULP，可忽略。因此 T 被確定至精度 179/S 以內。&square;
 </div>
 
 <h3>12.4.3 條件 (c): &sigma; 正向驗證</h3>
@@ -995,10 +995,10 @@
 
 <p><strong>Layer 2 — 超越函數不可繞。</strong></p>
 <p>ln、erf 透過 horner_per_step gate 求值。每步約束 acc<sub>next</sub> &times; S + rem = acc &times; r + coeff — 係數 coeff 是電路常數（hardcoded），prover 無法更改。每步的截斷 rem 經 byte decomposition 驗證。因此 prover 被鎖定在正確的 Horner 求值路徑上，僅能偏離截斷的量化誤差（&le; 1 ULP / step，d=12 步累積 &le; 12 ULP）。</p>
-<p>exp 透過 exp_recon gate 約束 result = method_b_output &times; 2<sup>k</sup>，2<sup>k</sup> 查 pow2 table。method_b_output 是 witness，但它被鎖定：如果 method_b_output 偏離真值，最終 discount = S&sup2; / exp_full 和 delta = discount &times; &Phi; / S 都會偏離，使 &sigma; 驗證失敗（bs_price gate 的容差檢查）。</p>
+<p>exp 透過 exp_recon gate 約束 result = method_b_output &times; 2<sup>k</sup>，2<sup>k</sup> 查 pow2 table。<strong>目前狀態：</strong>method_b_output 為 witness，其 Method B 內部約束（byte 分解 &rarr; 6 次查表 &rarr; 5 次 fp_mul 鏈）<strong>尚未在電路中實作</strong>（計畫強化項目）。當前防線為 bs_price gate 的容差檢查：如果 exp 結果偏離真值，最終 BS price 不等於結算價，bs_price gate 拒絕。完整的 Method B 約束鏈實作後，exp 將與 ln/erf 同樣被算術閘鎖死。</p>
 
 <p><strong>Layer 3 — 合規判定不可繞。</strong></p>
-<p>route_accum 按符號分別累加到 pos_sum 和 neg_sum。compliance_range gate 約束 gap = &tau; + neg_sum &minus; pos_sum，gap 做 4-byte decomposition 強制 gap &ge; 0，等價於 &tau; &ge; pos_sum &minus; neg_sum。同理反向。因此 |pos_sum &minus; neg_sum| &le; &tau; 被強制。</p>
+<p>route_accum 按符號分別累加到 pos_sum 和 neg_sum。wide_range gate 約束 gap = &tau; + neg_sum &minus; pos_sum，gap 做 7-byte decomposition（56-bit）強制 gap &ge; 0，等價於 &tau; &ge; pos_sum &minus; neg_sum。同理反向。因此 |pos_sum &minus; neg_sum| &le; &tau; 被強制。（注：合規判定使用 wide_range 而非 compliance_range，因為 pp=48 下 &tau; 和加權 Delta 的規模超過 32-bit。）</p>
 
 <p>&tau; 來自 public input constrain_instance — prover 無法篡改。pos_sum 和 neg_sum 由前面的閘鏈唯一確定。因此條件 (e) 成立。&square;</p>
 
@@ -1047,7 +1047,7 @@
     <tr>
       <td>Range check overflow</td>
       <td>利用有限域 wrap-around 偽造正數</td>
-      <td>compliance_range 用 4-byte（32-bit）分解；wide_range 用 7-byte（56-bit）。任何超出範圍的值會使 byte lookup 失敗</td>
+      <td>合規判定使用 wide_range 7-byte（56-bit）分解，覆蓋 pp=48 規模。fp_mul/fp_div 也用 wide_range 驗證。任何超出範圍的值會使 byte lookup 失敗</td>
     </tr>
     <tr>
       <td>&sigma; 容差操縱（Deep OTM）</td>
@@ -1121,10 +1121,10 @@
 
   <p><span class="emphasis">Soundness 是核心。</span> 反方向：假設 verifier accept，推出 witness 必然滿足 relation。<span class="gesture">（指向 12.4）</span></p>
   <p>最關鍵的是 Layer 2：<span class="emphasis">超越函數能不能被繞過？</span>答案是不能。horner_per_step 的每一步都有約束 + byte decomposition — 係數是 hardcoded 常數，prover 改不了。truncation 被 byte table lookup 鎖定。prover 唯一能做的是提供滿足約束的正確值，偏差不超過截斷誤差。</p>
-  <p>exp 比較特殊 — Method B result 是 witness，理論上有自由度。但安全由<span class="emphasis">&sigma; 正向驗證</span>兜底：如果 exp 結果偏離，算出的 BS price 就不等於結算價，bs_price gate 會拒絕。這就是 Section 7 &sigma; 驗證的真正安全意義。</p>
+  <p>exp 比較特殊 — Method B result 目前是 witness，內部的 lookup+multiply 約束鏈是<strong>計畫強化項目</strong>。當前安全由<span class="emphasis">bs_price gate</span> 兜底：如果 exp 結果偏離，算出的 BS price 不等於結算價，gate 拒絕。完整的 Method B 約束實作後，exp 將跟 ln/erf 一樣被算術閘鎖死。</p>
   <span class="pause">— 停頓 —</span>
 
-  <p>Under-constrained 分析列出了<strong>十個</strong>潛在攻擊 — <span class="gesture">（指向表格）</span> — 包括偽造 &sigma;、偽造 Horner 結果、偽造符號、重複持倉、遺漏持倉，以及兩個新增的邊界分析：deep OTM &sigma; 容差操縱和 T&rarr;0 pin risk。每個都被具體的機制擋住或歸類為計畫強化項目。注意重複和遺漏是<strong>Proof #1 不防的</strong> — by design 交給 Proof #2。</p>
+  <p>Under-constrained 分析列出了<strong>十個</strong>潛在攻擊向量 — <span class="gesture">（指向表格）</span> — 包括偽造 &sigma;、偽造 Horner 結果、偽造符號、重複持倉、遺漏持倉等。我們額外驗證了兩個極端情境：deep OTM 的 &sigma; 操縱嘗試被 BS 模型的 Vanna-Vega 聯動<strong>天然防堵</strong>（大幅改 &sigma; 會讓 price 暴增過不了閘），T&rarr;0 pin risk 則歸類為金融面風險而非協議漏洞（proof 在 snapshot 時間點數學正確）。每個向量都被具體機制擋住或歸類為計畫強化項目。注意重複和遺漏是<strong>Proof #1 不防的</strong> — by design 交給 Proof #2。</p>
   <span class="pause">— 停頓 —</span>
 
   <p><span class="emphasis">Zero-knowledge</span> 直接 delegate 給 PLONK — Halo2 的 blinding factors 確保 KZG commitment 不洩漏 witness。Private witness 包含持倉明細、&sigma;、Merkle 路徑、所有中間值 — 全在 advice columns，受 blinding 保護。Public input 只有 4 個值。</p>
