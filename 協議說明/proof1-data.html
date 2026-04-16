@@ -466,7 +466,8 @@
 </table>
 
 <div class="problem-box">
-  <strong>Taylor 限制：</strong>ln 和 erf 的 Taylor 展開含有負係數（ln: c<sub>2</sub>=-1/2, c<sub>4</sub>=-1/4; erf: c<sub>3</sub>, c<sub>7</sub> 項為負），在 unsigned ZK 電路（BN254 質數域）中 Horner 中間值會溢位為巨大正數。因此 Taylor 無法用於 ZK 電路的 ln 和 erf 計算。exp 的 Taylor 係數全正（1/k!），理論上可用但精度遠不及 Minimax。
+  <strong>Taylor 的真正限制 — 精度，非係數符號。</strong>負係數本身不構成障礙：本系統的 Per-step Horner 使用 Euclidean 除法（<code>rem_euclid</code>）確保每步餘數 &isin; [0, S)，負係數透過 <code>p &minus; |c|</code> 映射至 BN254 質數域，域運算自動正確。實際上，我們的 Minimax 係數也含負值（如 ln pp=48 init = &minus;5.97&times;10<sup>12</sup>，addends 正負交替）。<br><br>
+  Taylor 不適用的根本原因是<strong>精度</strong>：Taylor 展開最小化展開點處的導數，而非整個區間的最大誤差。在定點量化下，Taylor 的 worst-case ULP 比 Minimax 高 2.6&times;10<sup>8</sup> 至 6.8&times;10<sup>10</sup> 倍（見上表）。此外，Taylor 在離開展開點後誤差快速發散，高次項的量化截斷進一步放大偏差。即使在 Taylor 收斂最好的 exp 函數（係數全正 1/k!），精度仍遠不及 Minimax。
 </div>
 
 <hr>
