@@ -523,7 +523,9 @@
   <span class="pause">— 翻到 Part A' —</span>
   <p>Part A' 結構類似但更重，處理市場數據（8 個欄位，4 次 Poseidon permutation，tree depth ~20）— 它會是整個電路中最大的部分。</p>
   <p>一個關鍵設計取捨：<span class="emphasis">為什麼市場數據不用 Halo2 lookup table？</span>因為 fixed column 是 setup 的一部分 — 市場數據每天變動，如果用 lookup 就要每天重新 setup。改用 Merkle tree，電路結構<strong>一次 setup 永久有效</strong>，只有 root 值每日更新。</p>
-  <p>兩棵樹之間透過 <strong>8 條 copy constraints</strong> 連結。前 4 條確保合約條款一致，後 4 條把市場參數直接綁定到 Delta 管線的輸入 — 用 PLONK 原生的 cell equality 機制，零額外成本。</p>
+  <p>兩棵樹之間透過 <strong>8 條 copy constraints</strong> 連結 &mdash; 這是防止資產錯配的核心機制。<span class="gesture">（指向表格）</span> 前 4 條強制 Position leaf 和 Market Data leaf 的合約條款完全一致：underlying_id、strike、expiry_date、asset_type &mdash; 這四個欄位合起來就是合約的<span class="emphasis">複合唯一鍵</span>。後 4 條把市場參數（S, K, r, q）直接綁定到 Delta 管線的輸入 cells。</p>
+  <p>舉個具體例子：prover 持有 AAPL 的選擇權，能不能拿 NVDA 的市場數據來騙？<span class="emphasis">不能。</span>Position leaf 的 underlying_id = AAPL 已經被 Poseidon hash 鎖進 state_root &mdash; 改了就重建不出 root。Market Data leaf 的 underlying_id = NVDA 同樣被 hash 鎖進 market_data_root。constrain_equal 強制兩邊的 underlying_id 相等 &mdash; AAPL &ne; NVDA，約束失敗，proof 根本產生不出來。同樣的道理，prover 也不能用同一標的的<strong>不同合約</strong>數據混用 &mdash; strike、expiry、type 三個欄位也同時被鎖死。</p>
+  <p>而且這全部用 PLONK 原生的 cell equality 機制實作，<span class="emphasis">零額外約束成本</span> &mdash; copy constraint 不消耗 gate，不佔用 row。</p>
 </div>
 
 <hr>
@@ -846,11 +848,24 @@
   <strong>Gate vs. Gadget：</strong>每個 gate 是 1 row 上的一組多項式約束。邏輯操作（gadget）跨多行啟用 gate：Poseidon permutation = 65 rows，Horner d=12 = 12 rows，Method B exp = 5 次 fp_mul + 6 lookup = 11 rows。31 個 gate 組成一條完整的端對端管線：Merkle 驗證（poseidon + merkle 4 gates）&rarr; 前處理（type_decomp, time_verify 2 gates）&rarr; Delta 計算（kernel 3 + delta 13 + gadgets 3 = 19 gates）&rarr; 合規判定（portfolio 累加 + range check 5 gates）。
 </div>
 
-<div class="script-block" data-label="講稿 — 11 自訂閘 + 總結（~2min）">
-  <p>最後看自訂閘的全貌。整個 Proof #1 電路共 <span class="emphasis">31 個 create_gate</span>，分布在 6 個模組中。</p>
-  <p>這裡要區分兩個層次。<span class="emphasis">Gate 是硬體層：1 gate = 1 row</span>，selector 啟用時該行的所有約束必須同時為零 — 例如 fp_mul 在一行上同時施加乘法正確性和餘數 byte 分解兩條約束。<span class="emphasis">Gadget 是邏輯層：1 操作 = 多 rows</span> — Poseidon permutation 需要 65 行（8 full + 57 partial rounds），Horner d=12 需要 12 行，Method B exp 需要 11 行（5 次 fp_mul + 6 lookup）。</p>
-  <p>模組分布反映了關注點分離：<span class="gesture">（指向清單）</span> poseidon.rs 2 個、merkle.rs 2 個處理資料驗證；kernel.rs 3 個是 Horner 核心；gadgets/ 3 個是共用工具（lead_bit 做 ln 的 range reduction、int_div 做 exp 的 range reduction、sign_extend 做符號分離）；delta.rs 13 個是 BS Delta 管線的算術；portfolio.rs 8 個處理多持倉管線和合規。</p>
-  <p>回顧整個設計：核心挑戰是在只有加法和乘法的算術電路中精確計算超越函數。結果是端對端精度 ~2&times;10<sup>&minus;14</sup>，Delta 管線僅佔電路的 13%。</p>
+<div class="script-block" data-label="講稿 — 11 自訂閘 + 總結（~4min）">
+  <p>最後看自訂閘的全貌。整個 Proof #1 電路共 <span class="emphasis">31 個 create_gate、66 條多項式約束</span>，分布在 6 個模組中。</p>
+
+  <p>先看<span class="emphasis">模組分布</span>。<span class="gesture">（指向清單）</span> delta.rs 最大，13 個 gate 佔 42%，是 BS Delta 17 步管線的核心算術。portfolio.rs 8 個 gate 佔 26%，處理多持倉路由和合規。其餘四個模組各 2&ndash;3 個 gate：poseidon.rs 2 個、merkle.rs 2 個、kernel.rs 3 個、gadgets/ 3 個。</p>
+
+  <p>這裡要區分兩個層次。<span class="emphasis">Gate 是硬體層：1 gate = 1 row</span>，selector 啟用時該行的所有約束必須同時為零 &mdash; 例如 fp_mul 在一行上同時施加乘法正確性和餘數 byte 分解兩條約束。<span class="emphasis">Gadget 是邏輯層：1 操作 = 多 rows</span> &mdash; Poseidon permutation 需要 65 行（8 full + 57 partial rounds），Horner d=12 需要 12 行，Method B exp 需要 11 行（5 次 fp_mul + 6 lookup）。</p>
+  <span class="pause">&mdash; 停頓 &mdash;</span>
+
+  <p>再看<span class="emphasis">按管線階段分類</span>的四層結構：<span class="gesture">（逐層指出）</span></p>
+  <p><strong>第一階段 &mdash; Merkle 驗證</strong>（4 gates、20 constraints）：poseidon_full_round 一個 gate 就有 9 條約束（3 元素 &times; S-box + MDS），是約束密度最高的 gate。poseidon_partial_round 5 條，sponge_absorb 和 merkle_swap 各 3 條。這 4 個 gate 佔全部約束的 <strong>30%</strong>。</p>
+  <p><strong>第二階段 &mdash; 前處理</strong>（2 gates、6 constraints）：type_decomp 做 asset_type 布林分解，time_verify 單閘 4 條約束（is_equity 布林 + t_days 計算 + T 換算 + rem 分解）是 portfolio.rs 中密度最高的。</p>
+  <p><strong>第三階段 &mdash; Delta 計算</strong>（19 gates、29 constraints）：這是主體，佔 gate 數的 <strong>61%</strong>。kernel.rs 3 個 gate 做 Horner 求值（horner_per_step 2 constraints + r/w_byte_decomp 各 1）。gadgets/ 3 個 gate 做 range reduction（lead_bit 3、int_div 2、sign_extend 2）。delta.rs 13 個 gate 進一步分為四小類：<strong>定點算術</strong> 5 個（fp_mul、fp_div、arith_add、arith_sub、arith_div2）、<strong>超越函數還原</strong> 3 個（exp_recon、ln_recon、erf_flip）、<strong>控制流</strong> 3 個（bool_check、mux、sqrt_verify）、<strong>帶符號處理</strong> 2 個（signed_num、phi_signed）。</p>
+  <p><strong>第四階段 &mdash; 合規判定</strong>（6 gates、11 constraints）：equity_mux 做 equity bypass，d2_sub 算 d<sub>2</sub>，bs_price 驗 &sigma;，route_accum 3 條約束做帶符號累加，compliance_range 和 wide_range 各 2 條約束做 range check。</p>
+  <span class="pause">&mdash; 停頓 &mdash;</span>
+
+  <p>Lookup 表使用也值得一提。<span class="emphasis">ByteTable</span> 是整個電路最核心的安全機制 &mdash; 幾乎每個涉及 range check 的 gate 都用它：fp_mul 的 6-byte rem、fp_div 的 8-byte gap、Horner 的 6-byte 截斷、wide_range 的 7-byte 分解。byte decomposition + ByteTable lookup 是鎖死 prover 的萬能工具。另一個是 <span class="emphasis">Pow2Table</span>，只用在 exp_recon 查 2<sup>k</sup>。</p>
+
+  <p>回顧整個設計：核心挑戰是在只有加法和乘法的算術電路中精確計算超越函數。結果是端對端精度 ~2&times;10<sup>&minus;14</sup>（57.6 ULP 理論上界，實測最差 6.04 ULP），Delta 管線僅佔電路的 13%。31 個 gate 中 <span class="emphasis">61% 服務於 Delta 計算</span>，但大部分行數被 Poseidon 佔據（每次 Merkle 路徑驗證 65 行 &times; 路徑深度）。</p>
   <p>接下來看 Proof #2 如何保證 State Tree 的完整性。</p>
 </div>
 
@@ -1110,26 +1125,41 @@
   <li><strong>&sigma; 來源：</strong>現行 &sigma; 為 prover witness，由 bs_price gate 正向驗證。終極設計方向為 &sigma; 由 Market Data Tree 直接提供，消除 prover 對 &sigma; 的 witness 自由度。</li>
 </ol>
 
-<div class="script-block" data-label="講稿 — 12 ZK Proof of Knowledge（~4min）">
-  <p>最後一個 section 是 ZK Proof of Knowledge — 把前面所有的電路設計串成一個<span class="emphasis">完整的安全論證</span>。</p>
-  <span class="pause">— 停頓 —</span>
+<div class="script-block" data-label="講稿 — 12 ZK Proof of Knowledge（~7min）">
+  <p>最後一個 section 是 ZK Proof of Knowledge &mdash; 把前面所有的電路設計串成一個<span class="emphasis">完整的安全論證</span>。整個結構是：<span class="emphasis">3 假設 &rarr; 5 條件 &rarr; 3 層 soundness &rarr; 10 攻擊向量全覆蓋</span>。</p>
+  <span class="pause">&mdash; 停頓 &mdash;</span>
 
-  <p>首先是<span class="emphasis">假設</span>。Proof #1 建立在三個假設上：(1) State Tree 完整且正確 — 這由 Proof #2 保證；(2) Poseidon 是 collision-resistant；(3) PLONK 在 AGM 下是 knowledge-sound。這三個都是標準密碼學假設。</p>
+  <p>首先是<span class="emphasis">三個假設</span>。(1) State Tree 完整且正確 &mdash; 由 Proof #2 保證，是<strong>跨 Proof 分工</strong>的核心；(2) Poseidon collision-resistant &mdash; 標準密碼學假設，128-bit 安全性；(3) PLONK 在 AGM 下 knowledge-sound &mdash; 也是標準假設，KZG commitment 在代數群模型下成立。注意 (1) 是系統特有的（依賴我們自己的 Proof #2），(2)(3) 是業界共用的密碼學基礎。</p>
 
-  <p><span class="emphasis">Completeness 是最簡單的部分</span> — 合法 witness 代入電路，31 個 gate 的約束方程都是等式，直接代入驗證即可。</p>
-  <span class="pause">— 停頓 —</span>
+  <p>接著定義 Relation R<sub>1</sub> &mdash; <strong>五個條件</strong>：<span class="gesture">（逐一指出）</span> (a) 每筆持倉在 State Tree、(b) 市場資料在 Market Data Tree、(c) &sigma; 滿足 BS price 驗證、(d) 時間 T 正確計算、(e) 加權 Delta 合規。<strong>五個條件對應電路的五個模組群</strong> &mdash; 這就是 completeness 和 soundness 的證明結構。</p>
+  <span class="pause">&mdash; 停頓 &mdash;</span>
 
-  <p><span class="emphasis">Soundness 是核心。</span> 反方向：假設 verifier accept，推出 witness 必然滿足 relation。<span class="gesture">（指向 12.4）</span></p>
-  <p>最關鍵的是 Layer 2：<span class="emphasis">超越函數能不能被繞過？</span>答案是不能。horner_per_step 的每一步都有約束 + byte decomposition — 係數是 hardcoded 常數，prover 改不了。truncation 被 byte table lookup 鎖定。prover 唯一能做的是提供滿足約束的正確值，偏差不超過截斷誤差。</p>
-  <p>exp 比較特殊 — Method B result 目前是 witness，內部的 lookup+multiply 約束鏈是<strong>計畫強化項目</strong>。當前安全由<span class="emphasis">bs_price gate</span> 兜底：如果 exp 結果偏離，算出的 BS price 不等於結算價，gate 拒絕。完整的 Method B 約束實作後，exp 將跟 ln/erf 一樣被算術閘鎖死。</p>
-  <span class="pause">— 停頓 —</span>
+  <p><span class="emphasis">Completeness 是最簡單的部分</span> &mdash; 合法 witness 代入電路，31 個 gate 的 66 條約束方程都是等式，直接代入驗證。五個模組群的映射：Poseidon+Merkle（4 gates、20 constraints）保證 (a)(b)，Type+Time（2 gates、6 constraints）保證 (d)，&sigma; 驗證（2 gates）保證 (c)，Kernel+Delta（19 gates、29 constraints）是 (e) 的前置計算，Portfolio 累加+range check（6 gates、11 constraints）完成 (e) 的合規判定。</p>
+  <span class="pause">&mdash; 停頓 &mdash;</span>
 
-  <p>Under-constrained 分析列出了<strong>十個</strong>潛在攻擊向量 — <span class="gesture">（指向表格）</span> — 包括偽造 &sigma;、偽造 Horner 結果、偽造符號、重複持倉、遺漏持倉等。我們額外驗證了兩個極端情境：deep OTM 的 &sigma; 操縱嘗試被 BS 模型的 Vanna-Vega 聯動<strong>天然防堵</strong>（大幅改 &sigma; 會讓 price 暴增過不了閘），T&rarr;0 pin risk 則歸類為金融面風險而非協議漏洞（proof 在 snapshot 時間點數學正確）。每個向量都被具體機制擋住或歸類為計畫強化項目。注意重複和遺漏是<strong>Proof #1 不防的</strong> — by design 交給 Proof #2。</p>
-  <span class="pause">— 停頓 —</span>
+  <p><span class="emphasis">Soundness 是核心。</span> 反方向：假設 verifier accept，推出 witness 必然滿足 relation。我們用<strong>三層結構</strong>論證：<span class="gesture">（指向 12.4）</span></p>
 
-  <p><span class="emphasis">Zero-knowledge</span> 直接 delegate 給 PLONK — Halo2 的 blinding factors 確保 KZG commitment 不洩漏 witness。Private witness 包含持倉明細、&sigma;、Merkle 路徑、所有中間值 — 全在 advice columns，受 blinding 保護。Public input 只有 4 個值。</p>
+  <p><strong>Layer 1 &mdash; 算術閘不可繞。</strong> fp_mul 的 a&times;b = w&times;S + rem，如果 w 偽造，rem 超出 [0, S)，byte decomposition 的 lookup 拒絕。這是<span class="emphasis">最基礎的安全機制</span>：byte decomp + ByteTable lookup，結構簡單到不可能繞過。delta.rs 的 13 個 gate 中有 5 個算術閘（fp_mul、fp_div、arith_add、arith_sub、arith_div2）全部用這個機制。</p>
 
-  <p>最後一個重點：<span class="emphasis">精度 vs soundness</span>。電路算的 &Delta; 和理想 BS &Delta; 有 &le; 57.6 ULP 的偏差。對 20 持倉的投組，累積偏差 &le; 4&times;10<sup>&minus;12</sup> — 比任何合理的 &tau;（通常 &ge; 0.01）小 10 個數量級。所以 soundness gap 在實務上可忽略。</p>
+  <p><strong>Layer 2 &mdash; 超越函數不可繞。</strong> horner_per_step 每一步都有約束 + byte decomposition &mdash; 係數是 hardcoded 常數，prover 改不了。d=12 的多項式 prover 需要 12 步全部通過，truncation 被 byte table lookup 鎖定。偏差上界：每步 &le; 1 ULP，12 步累積 &le; 12 ULP。<strong>ln 和 erf 都被這個機制鎖死。</strong></p>
+  <p>exp 比較特殊 &mdash; Method B result 目前是 witness，內部的 lookup+multiply 約束鏈是<strong>計畫強化項目</strong>。當前安全由<span class="emphasis">bs_price gate</span> 兜底：如果 exp 結果偏離，算出的 BS price 不等於結算價，gate 拒絕。完整的 Method B 約束實作後，exp 將跟 ln/erf 一樣被算術閘鎖死。三個超越函數的安全等級總結：<span class="emphasis">ln &check; 完全約束、erf &check; 完全約束、exp &Delta; 間接約束（bs_price 兜底）</span>。</p>
+  <span class="pause">&mdash; 停頓 &mdash;</span>
+
+  <p><strong>Layer 3 &mdash; 合規判定不可繞。</strong> route_accum 按符號分流，wide_range 做 7-byte 分解（56-bit）強制 gap &ge; 0。&tau; 來自 public input（constrain_instance），prover 無法篡改。</p>
+
+  <p>三層之間的邏輯鏈：Layer 1 保證<strong>每一步算術正確</strong> &rarr; Layer 2 保證<strong>超越函數求值正確</strong>（建立在 Layer 1 的 fp_mul 上）&rarr; Layer 3 保證<strong>合規判定正確</strong>（建立在 Layer 2 的 Delta 值上）。攻擊者必須從 Layer 1 開始破解 &mdash; 而 Layer 1 的 byte decomposition 是最堅固的防線。</p>
+  <span class="pause">&mdash; 停頓 &mdash;</span>
+
+  <p>Under-constrained 分析列出了<strong>十個</strong>潛在攻擊向量。<span class="gesture">（指向表格）</span> 按攻擊目標分四類：</p>
+  <p><strong>操縱輸入參數</strong>（3 個）：偽造 &sigma;、篡改 &tau;/today、deep OTM 的 &sigma; 容差操縱。<strong>操縱計算結果</strong>（3 個）：偽造 Horner 結果、偽造 exp、偽造符號。<strong>操縱投組組成</strong>（2 個）：重複計入、遺漏持倉 &mdash; 這兩個是<strong>Proof #1 不防的</strong>，by design 交給 Proof #2。<strong>利用數值弱點</strong>（2 個）：range check overflow、T&rarr;0 pin risk。</p>
+  <p>按防禦機制分：<span class="emphasis">Gate 約束直接擋住 5 個</span>（偽造 &sigma; &rarr; bs_price、偽造 Horner &rarr; horner_per_step、偽造符號 &rarr; sign_extend、篡改公開輸入 &rarr; constrain_instance、overflow &rarr; wide_range byte decomp）。<span class="emphasis">數學與經濟學天然防堵 2 個</span>（deep OTM 的 Vanna-Vega 聯動 &mdash; 大幅改 &sigma; 會讓 price 暴增過不了閘，T&rarr;0 pin risk 在 snapshot 時間點數學正確）。<span class="emphasis">跨 Proof 分工 2 個</span>（重複/遺漏 &rarr; Proof #2 的 State Tree 完整性保證）。<span class="emphasis">間接約束 + 計畫強化 1 個</span>（exp 的 bs_price 兜底 + Method B 約束鏈 TODO）。</p>
+  <span class="pause">&mdash; 停頓 &mdash;</span>
+
+  <p><span class="emphasis">Zero-knowledge</span> 直接 delegate 給 PLONK &mdash; Halo2 的 blinding factors 確保 KZG commitment 不洩漏 witness。Private witness 包含持倉明細、&sigma;、Merkle 路徑、所有中間值 &mdash; 全在 advice columns，受 blinding 保護。Public input 只有 <strong>4 個值</strong>（state_root, market_data_root, &tau;, today）。隱私保護範圍：<span class="emphasis">verifier 知道「投組合規」但不知道任何一筆持倉的內容</span>。</p>
+
+  <p>最後一個重點：<span class="emphasis">精度 vs soundness</span>。電路算的 &Delta; 和理想 BS &Delta; 有 &le; 57.6 ULP 的理論偏差上界（Section 5 區間算術證明），實測最差僅 6.04 ULP。對 20 持倉的投組，累積偏差 &le; 4&times;10<sup>&minus;12</sup> &mdash; 比任何合理的 &tau;（通常 &ge; 0.01）小 <strong>10 個數量級</strong>。soundness gap 在實務上完全可忽略。</p>
+
+  <p>總結整個安全論證：<span class="emphasis">3 假設 &rarr; 5 條件 &rarr; 3 層 soundness &rarr; 10 攻擊向量全覆蓋 &rarr; 精度 gap 可忽略</span>。Proof #1 構成一個完整的 ZK-POK &mdash; prover 知道一組合規的持倉，精度保證 &ge; 42 有效位元（理論 57.6 ULP）/ 45 有效位元（實測 6.04 ULP），verifier 學不到超出 4 個公開值的任何資訊。三個計畫強化方向（bs_price 混合容差、T<sub>min</sub> 下限、&sigma; 由 Market Data Tree 提供）屬於工程精進，不影響核心數學 soundness。</p>
 </div>
 
 <hr>
