@@ -681,7 +681,33 @@
   </div>
 </div>
 
+<h2>為什麼現有 ZK 技術做不到？</h2>
+
+<div style="background: #fff5f5; border-left: 4px solid #e53e3e; border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 16px 0;">
+  <p style="font-size: 15px; margin:0 0 10px 0;">零知識證明（ZK）理論上可以解決隱私合規 &mdash; 但<strong>實際上做不到金融級計算</strong>：</p>
+  <ul style="font-size: 14px; margin:0; padding-left: 20px; line-height: 2;">
+    <li><strong>電路限制</strong>：ZK 電路只有加法和乘法 &mdash; 不支援 <code>ln</code>、<code>exp</code>、<code>erf</code> 等超越函數</li>
+    <li><strong>精度鴻溝</strong>：現有 ZKML 框架（ezkl、Circom）處理整數或低精度定點數，達不到 Black-Scholes 模型要求的 32-bit 定點精度</li>
+    <li><strong>零先例</strong>：至今沒有任何研究在 ZK 電路內成功證明過真實金融定價模型</li>
+  </ul>
+</div>
+
+<h2>ZKMM：架構層面的解答</h2>
+
+<p style="font-size: 15px;">ZKMM 不是一個演算法技巧，而是一套<strong>完整的金融合規協議</strong>。它回答的問題是：如何讓對沖基金在不揭露任何持倉資訊的前提下，向驗證者（監管機構 / 投資人）數學化地證明自身合規？</p>
+
+<div style="background: var(--highlight); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
+  <p style="font-size: 14px; margin:0; line-height: 2;">
+    <strong>四棵 Merkle 樹</strong>捕捉全部狀態（持倉、交易、市場數據、公司事件）<br>
+    <strong>兩個獨立 ZK 證明</strong>分工覆蓋：Proof #1 驗證數學合規（Delta &le; 門檻），Proof #2 驗證狀態完整性（所有變更皆有授權）<br>
+    <strong>底層突破</strong>：透過 Minimax 多項式逼近 + Horner 求值法，在 halo2 電路中首次實現 32-bit 精度的 Black-Scholes 計算<br>
+    <span style="font-size: 13px; color: #718096;">（底層技術細節見 <a href="proof1.html" style="color: var(--accent);">Proof #1 技術</a> 與 <a href="proof1-data.html" style="color: var(--accent);">實驗數據</a>）</span>
+  </p>
+</div>
+
 <h2>合規公式</h2>
+
+<p style="font-size: 15px;">協議需要在 ZK 電路內驗證的核心陳述：</p>
 
 <div style="background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 16px 0; font-family: 'Times New Roman', serif; font-size: 17px; line-height: 2.2; text-align: center;">
   <strong style="font-size: 19px;">|&Sigma;<sub>i</sub> w<sub>i</sub> &times; &Delta;<sub>i</sub>| &le; &tau;</strong><br>
@@ -690,11 +716,7 @@
   </span>
 </div>
 
-<p style="font-size: 15px;">選擇權的 Delta 由 <strong>Black-Scholes 公式</strong>計算，涉及三個超越函數：
-<code>ln</code>（自然對數）、<code>erf</code>（誤差函數）、<code>exp</code>（指數函數）。
-這些函數在 ZK 電路中不存在 &mdash; 電路只有加法和乘法。
-本論文的核心貢獻是用 <strong>Minimax 多項式逼近 + Horner 求值法</strong> 在電路內重建這三個函數。
-完整公式見 <a href="proof1.html" style="color: var(--accent);">Proof #1 技術細節 &sect;0</a>。</p>
+<p style="font-size: 14px; color: #718096;">Delta 由 Black-Scholes 公式計算，涉及 <code>ln</code>、<code>erf</code>、<code>exp</code> 三個超越函數。這正是上述「精度鴻溝」的來源 &mdash; 也是本研究的核心工程挑戰。完整推導見 <a href="proof1.html" style="color: var(--accent);">Proof #1 &sect;0</a>。</p>
 
 <h2>協議的六大保證</h2>
 
@@ -731,12 +753,14 @@
   </div>
 </div>
 
-<div class="script-block" data-label="講稿 — 1 問題與動機（~3min）">
+<div class="script-block" data-label="講稿 — 1 問題與動機（~4min）">
   <p>我們先理解這個協議要解決的核心問題。</p>
   <p>對沖基金面臨一個根本矛盾：<span class="emphasis">透明度與競爭力不可兼得</span>。監管機構需要確認基金的風險在門檻之內，投資人需要確認自己的錢被合規管理 &mdash; 但傳統做法是完整披露持倉，這等於公開交易策略，對量化基金來說是致命的。</p>
-  <p>零知識證明打破這個僵局。基金在本地生成一個密碼學證明 &mdash; 這個 proof 的數學性質保證：<span class="emphasis">如果 proof 驗證通過，則合規陳述為真</span>。不需要信任基金，不需要看到持倉，不需要第三方。任何人 &mdash; 監管機構、投資人、甚至公眾 &mdash; 只要拿到 proof 和公開輸入，就能在毫秒內獨立驗證。</p>
+  <p>零知識證明理論上可以打破這個僵局 &mdash; 但<span class="emphasis">做不到</span>。為什麼？因為金融合規需要計算 Black-Scholes 這類定價模型，涉及自然對數、指數函數、誤差函數。而 ZK 電路只有加法和乘法，<span class="emphasis">沒有任何超越函數</span>。現有 ZKML 框架處理的是整數或低精度定點數，遠遠達不到金融級 32-bit 精度的要求。截至目前，沒有任何研究成功在 ZK 電路內證明過真實金融定價模型。</p>
+  <span class="pause">— 指向 ZKMM 架構框 —</span>
+  <p>ZKMM 就是為了解決這個問題而設計的。它不是一個演算法技巧，而是<span class="emphasis">一套完整的金融合規協議架構</span>。四棵 Merkle 樹捕捉所有狀態 &mdash; 持倉、交易、市場數據、公司事件。兩個獨立的 ZK 證明分工覆蓋：一個負責數學合規（Delta 門檻），一個負責狀態完整性（每筆變更都有授權）。底層透過 Minimax 多項式逼近在電路中首次實現了金融級精度的超越函數計算。</p>
   <span class="pause">— 指向合規公式 —</span>
-  <p>合規檢查的核心是這個公式：所有持倉的加權 Delta 總和的絕對值不超過門檻 &tau;。<span class="emphasis">Delta 來自 Black-Scholes 公式</span>，需要 ln、erf、exp 三個超越函數 &mdash; 這些在零知識電路中不存在，是本論文的核心工程挑戰。</p>
+  <p>具體來說，協議需要在電路內驗證這個公式：所有持倉的加權 Delta 總和的絕對值不超過門檻 &tau;。驗證者只需拿到 proof 和公開輸入，毫秒內獨立驗證 &mdash; 不需要信任基金，不需要看到任何持倉。</p>
   <p>接下來我會從架構全景開始，逐層展開整個協議的設計。</p>
 </div>
 
