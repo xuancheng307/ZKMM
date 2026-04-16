@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>金融領域對照表 — ZKMM Protocol</title>
+<style>
+  :root {
+    --primary: #1a365d;
+    --accent: #2b6cb0;
+    --light-bg: #f7fafc;
+    --border: #e2e8f0;
+    --highlight: #ebf8ff;
+    --warn-bg: #fffaf0;
+    --success-bg: #f0fff4;
+    --code-bg: #edf2f7;
+    --purple-bg: #faf5ff;
+    --proof1: #6366f1;
+    --proof2: #0891b2;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Noto Serif TC", "Times New Roman", Georgia, serif;
+    line-height: 1.8;
+    color: #2d3748;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    font-size: 17px;
+  }
+
+  h1 {
+    font-size: 28px;
+    color: var(--primary);
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 12px;
+    margin: 48px 0 24px 0;
+  }
+  h1:first-of-type { margin-top: 0; }
+  .section-num {
+    display: inline-block;
+    background: var(--accent);
+    color: white;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 32px;
+    font-size: 16px;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  h2 {
+    font-size: 22px;
+    color: var(--primary);
+    margin: 36px 0 16px 0;
+    padding-left: 12px;
+    border-left: 4px solid var(--accent);
+  }
+  h3 { font-size: 18px; color: #4a5568; margin: 24px 0 12px 0; }
+  p { margin: 12px 0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  th {
+    background: var(--primary);
+    color: white;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:hover { background: var(--light-bg); }
+  .num { font-family: "SF Mono", "Fira Code", monospace; text-align: center; }
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 13px;
+  }
+
+  .key-insight {
+    background: var(--highlight);
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 15px;
+  }
+  .warn-box {
+    background: var(--warn-bg);
+    border: 2px solid #ed8936;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 15px;
+  }
+  .success-box {
+    background: var(--success-bg);
+    border: 2px solid #48bb78;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 15px;
+  }
+  .purple-box {
+    background: var(--purple-bg);
+    border: 2px solid #9f7aea;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 15px;
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    vertical-align: middle;
+  }
+  .tag-done { background: #c6f6d5; color: #276749; }
+  .tag-wip { background: #fefcbf; color: #975a16; }
+  .tag-future { background: #fed7e2; color: #97266d; }
+  .tag-na { background: #e2e8f0; color: #4a5568; }
+  .tag-pf1 { background: #e0e7ff; color: #4338ca; }
+  .tag-pf2 { background: #cffafe; color: #0e7490; }
+
+  .emphasis { color: var(--accent); font-weight: 700; }
+
+  .site-nav {
+    display: flex; flex-wrap: wrap;
+    background: #1a365d; border-radius: 8px; overflow: hidden;
+    margin-bottom: 32px;
+    font-family: -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 14px;
+  }
+  .site-nav a {
+    color: #cbd5e0; text-decoration: none;
+    padding: 10px 18px; transition: background 0.2s;
+  }
+  .site-nav a:hover { background: #2b6cb0; color: #fff; }
+  .site-nav a.active { background: #2b6cb0; color: #fff; font-weight: 600; }
+
+  .footer-nav {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 2px solid var(--border);
+    text-align: center;
+    font-size: 14px;
+    color: #718096;
+  }
+  .footer-nav a { color: var(--accent); text-decoration: none; font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 12px; font-size: 15px; }
+    table { font-size: 12px; }
+    td, th { padding: 6px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="../index.html">ZKMM</a>
+  <a href="index.html">協議總覽</a>
+  <a href="proof1.html">Proof #1 技術</a>
+  <a href="proof1-data.html">Proof #1 實驗數據</a>
+  <a href="proof2.html">Proof #2 技術</a>
+  <a href="merkle.html">Merkle Tree</a>
+  <a href="financial-domain.html" class="active">金融對照表</a>
+</nav>
+
+<div style="text-align:center; margin-bottom:36px;">
+  <h1 style="border:none; margin:0; font-size:34px;">金融領域對照表</h1>
+  <p style="color:#718096; font-size:16px; margin-top:8px;">協議處理的所有金融概念、參數、動作、事件 &mdash; 完整對照</p>
+</div>
+<hr style="border:none; border-top:2px solid var(--border); margin-bottom:40px;">
+
+<!-- ===== 1. 資產類型 ===== -->
+<h1><span class="section-num">1</span>資產類型與參數</h1>
+
+<h2>1.1 股票 (Equity)</h2>
+<table>
+  <thead><tr><th>參數</th><th>說明</th><th>協議中的位置</th><th>來源</th></tr></thead>
+  <tbody>
+    <tr><td>Ticker / 標的 ID</td><td>資產唯一識別碼</td><td>Position leaf [4] <code>underlying_id</code></td><td>交易所分配</td></tr>
+    <tr><td>現貨價 S</td><td>股票當前市價</td><td>Market Data leaf [4] <code>spot</code></td><td>交易所收盤價</td></tr>
+    <tr><td>股息率 q</td><td>年化現金股利收益率</td><td>Market Data leaf [6] <code>q</code></td><td>公司公告 / 數據商</td></tr>
+    <tr><td>持倉數量 w</td><td>持有股數（正=多，負=空）</td><td>Position leaf [0] <code>w</code> (fp24)</td><td>交易紀錄</td></tr>
+    <tr><td><code>asset_type</code></td><td>固定為 2 (Equity)</td><td>Position leaf [3]</td><td>&mdash;</td></tr>
+    <tr><td><code>k</code></td><td>固定為 0（股票無履約價）</td><td>Position leaf [1]</td><td>&mdash;</td></tr>
+    <tr><td><code>expiry_date</code></td><td>固定為 0（股票無到期日）</td><td>Position leaf [2]</td><td>&mdash;</td></tr>
+  </tbody>
+</table>
+
+<h2>1.2 歐式期權 (European Option)</h2>
+<table>
+  <thead><tr><th>參數</th><th>說明</th><th>協議中的位置</th><th>來源</th></tr></thead>
+  <tbody>
+    <tr><td>標的 ID</td><td>期權對應的標的資產</td><td>Position leaf [4] <code>underlying_id</code></td><td>交易所</td></tr>
+    <tr><td>履約價 K</td><td>行權價格</td><td>Position leaf [1] <code>k</code> (fp24)</td><td>合約規格</td></tr>
+    <tr><td>到期日</td><td>合約到期日（epoch 天數）</td><td>Position leaf [2] <code>expiry_date</code></td><td>合約規格</td></tr>
+    <tr><td>類型</td><td>0 = 歐式 Call, 1 = 歐式 Put</td><td>Position leaf [3] <code>asset_type</code></td><td>合約規格</td></tr>
+    <tr><td>數量 w</td><td>持有合約數（正=多，負=空）</td><td>Position leaf [0] <code>w</code> (fp24)</td><td>交易紀錄</td></tr>
+    <tr><td>現貨價 S</td><td>標的股票當前市價</td><td>Market Data leaf [4] <code>spot</code></td><td>交易所收盤價</td></tr>
+    <tr><td>無風險利率 r</td><td>年化利率</td><td>Market Data leaf [5] <code>r</code> (fp24)</td><td>央行 / 國庫券</td></tr>
+    <tr><td>股息率 q</td><td>標的年化股利收益率</td><td>Market Data leaf [6] <code>q</code> (fp24)</td><td>公司公告</td></tr>
+    <tr><td>結算價</td><td>期權官方結算價格</td><td>Market Data leaf [7] <code>settle_price</code></td><td>交易所 / OCC</td></tr>
+    <tr><td>隱含波動率 &sigma;</td><td>從結算價反推的波動率</td><td>Proof #1 witness（計劃移入 MDT）</td><td>交易所 / 數據商</td></tr>
+  </tbody>
+</table>
+
+<div class="key-insight">
+  <strong>協議目前只支援歐式期權。</strong>美式期權的提前行權特性需要不同的定價模型（二項樹或 Longstaff-Schwartz），不在 Black-Scholes 框架內。擴展到美式期權是 Future Work。
+</div>
+
+<h2>1.3 Greeks（風險指標）</h2>
+<table>
+  <thead><tr><th>Greek</th><th>數學定義</th><th>協議用途</th><th>狀態</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Delta (&Delta;)</strong></td><td>&part;V/&part;S &mdash; 標的價格變動對期權價值的影響</td><td><span class="emphasis">核心合規指標</span>：|&Sigma; w<sub>i</sub>&middot;&Delta;<sub>i</sub>| &le; &tau;</td><td><span class="tag tag-done">PF1 實作</span></td></tr>
+    <tr><td>Gamma (&Gamma;)</td><td>&part;&sup2;V/&part;S&sup2; &mdash; Delta 對股價的敏感度</td><td>未使用（可作為第二層合規指標）</td><td><span class="tag tag-future">Future Work</span></td></tr>
+    <tr><td>Theta (&Theta;)</td><td>&part;V/&part;t &mdash; 時間衰減</td><td>未使用</td><td><span class="tag tag-na">不需要</span></td></tr>
+    <tr><td>Vega (&nu;)</td><td>&part;V/&part;&sigma; &mdash; 波動率敏感度</td><td>未使用</td><td><span class="tag tag-na">不需要</span></td></tr>
+    <tr><td>Rho (&rho;)</td><td>&part;V/&part;r &mdash; 利率敏感度</td><td>未使用</td><td><span class="tag tag-na">不需要</span></td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<!-- ===== 2. 兩棵數據樹 ===== -->
+<h1><span class="section-num">2</span>Merkle Tree 欄位定義</h1>
+
+<h2>2.1 Position State Tree（持倉狀態樹）</h2>
+<p>深度 7（最多 128 葉），每葉 5 個欄位。存放基金的所有持倉。</p>
+
+<table>
+  <thead><tr><th>Index</th><th>欄位名</th><th>型別</th><th>說明</th><th>被哪些 op 修改</th></tr></thead>
+  <tbody>
+    <tr><td class="num">0</td><td><code>w</code></td><td>fp24 (signed)</td><td>持倉數量（正=多頭，負=空頭）</td><td>TRADE, EXERCISE, CLOSE(&rarr;0), EXPIRY(&rarr;0), CORP_ACT(ratio)</td></tr>
+    <tr><td class="num">1</td><td><code>k</code></td><td>fp24</td><td>履約價（股票=0）</td><td>TRADE, CORP_ACT(ratio)</td></tr>
+    <tr><td class="num">2</td><td><code>expiry_date</code></td><td>integer</td><td>到期日 epoch 天數（股票=0）</td><td>TRADE, EXERCISE(&rarr;0)</td></tr>
+    <tr><td class="num">3</td><td><code>asset_type</code></td><td>enum</td><td>0=EU Call, 1=EU Put, 2=Equity</td><td>TRADE only</td></tr>
+    <tr><td class="num">4</td><td><code>underlying_id</code></td><td>integer</td><td>標的資產 ID</td><td>TRADE only</td></tr>
+  </tbody>
+</table>
+
+<p>Leaf hash：Poseidon sponge (t=3)，3 次吸收 &mdash; (w,k), (expiry,type), (id,0).</p>
+
+<h2>2.2 Market Data Tree（市場數據樹）</h2>
+<p>每葉 8 個欄位。存放公開市場數據，供 Proof #1 讀取。</p>
+
+<table>
+  <thead><tr><th>Index</th><th>欄位名</th><th>型別</th><th>說明</th><th>來源</th></tr></thead>
+  <tbody>
+    <tr><td class="num">0</td><td><code>underlying_id</code></td><td>integer</td><td>標的資產 ID（跨樹配對鍵）</td><td>交易所</td></tr>
+    <tr><td class="num">1</td><td><code>strike</code></td><td>fp24</td><td>履約價（跨樹配對鍵）</td><td>合約規格</td></tr>
+    <tr><td class="num">2</td><td><code>expiry_date</code></td><td>integer</td><td>到期日（跨樹配對鍵）</td><td>合約規格</td></tr>
+    <tr><td class="num">3</td><td><code>asset_type</code></td><td>enum</td><td>0/1/2（跨樹配對鍵）</td><td>合約規格</td></tr>
+    <tr><td class="num">4</td><td><code>spot</code></td><td>fp24</td><td>標的現貨價 S</td><td>交易所收盤價</td></tr>
+    <tr><td class="num">5</td><td><code>r</code></td><td>fp24</td><td>無風險利率</td><td>央行 / 國庫券</td></tr>
+    <tr><td class="num">6</td><td><code>q</code></td><td>fp24</td><td>股息率</td><td>公司公告</td></tr>
+    <tr><td class="num">7</td><td><code>settle_price</code></td><td>fp24</td><td>期權結算價</td><td>交易所 / OCC</td></tr>
+  </tbody>
+</table>
+
+<div class="key-insight">
+  <strong>跨樹配對：</strong>MDT 的前 4 個欄位（index 0-3）是配對鍵，與 Position leaf 的欄位 (4,1,2,3) 一一對應。Proof #1 在電路內強制這 4 個值相等，確保每個持倉讀取的是正確的市場數據。
+</div>
+
+<div class="warn-box">
+  <strong>待更新：</strong>隱含波動率 &sigma; 計劃從 Proof #1 witness 移入 MDT 作為第 9 個欄位。&sigma; 是公開可驗的（交易所和數據商都公布），放在 MDT 中可省去電路內的 Newton-Raphson 反推，安全性不變。此變更尚未實施。
+</div>
+
+<h2>2.3 Trade Action Tree（交易動作樹）</h2>
+<p>每葉存放一筆交易指令及其 EdDSA 簽名。Proof #2 在電路內驗證簽名真偽後套用到 State Tree。</p>
+
+<h2>2.4 Event Tree（公司行動樹）</h2>
+<p>深度 3（最多 8 葉/結算期），每葉 4 個欄位。存放非交易類的狀態變更授權。</p>
+
+<table>
+  <thead><tr><th>Index</th><th>欄位名</th><th>型別</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr><td class="num">0</td><td><code>underlying_id</code></td><td>integer</td><td>受影響的標的資產</td></tr>
+    <tr><td class="num">1</td><td><code>event_type</code></td><td>integer (0-9)</td><td>事件類型（見 Section 5）</td></tr>
+    <tr><td class="num">2</td><td><code>ratio</code></td><td>fp24</td><td>調整比率（e.g. 2:1 拆股 = 2.0）</td></tr>
+    <tr><td class="num">3</td><td><code>effective_date</code></td><td>integer</td><td>生效日期</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<!-- ===== 3. 交易動作 ===== -->
+<h1><span class="section-num">3</span>交易動作 (op_type)</h1>
+
+<p>Proof #2 使用 3-bit 編碼 (b<sub>0</sub>, b<sub>1</sub>, b<sub>2</sub>) 表示 8 個可能的操作碼，其中 6 個有效、2 個被電路拒絕。</p>
+
+<table>
+  <thead><tr><th>Code</th><th>Binary</th><th>名稱</th><th>觸發者</th><th>簽名方式</th><th>狀態</th></tr></thead>
+  <tbody>
+    <tr><td class="num">0</td><td class="num">000</td><td><strong>TRADE</strong></td><td>交易所</td><td>EdDSA</td><td><span class="tag tag-done">已實作</span></td></tr>
+    <tr><td class="num">1</td><td class="num">001</td><td><strong>EXERCISE</strong></td><td>持有人 / OCC</td><td>EdDSA</td><td><span class="tag tag-done">已實作</span></td></tr>
+    <tr><td class="num">2</td><td class="num">010</td><td><strong>CLOSE</strong></td><td>交易所</td><td>EdDSA</td><td><span class="tag tag-done">已實作</span></td></tr>
+    <tr><td class="num">3</td><td class="num">011</td><td><strong>EXPIRY</strong></td><td>時間到期（自動）</td><td>EdDSA</td><td><span class="tag tag-done">已實作</span></td></tr>
+    <tr><td class="num">4</td><td class="num">100</td><td><strong>CORPORATE_ACTION</strong></td><td>公司公告</td><td>Event Tree Merkle proof</td><td><span class="tag tag-wip">Phase 1</span></td></tr>
+    <tr><td class="num">5</td><td class="num">101</td><td colspan="4" style="color:#e53e3e; font-weight:600;">INVALID &mdash; 電路拒絕 (b<sub>2</sub> &middot; XOR(b<sub>0</sub>,b<sub>1</sub>) = 0 約束)</td></tr>
+    <tr><td class="num">6</td><td class="num">110</td><td colspan="4" style="color:#e53e3e; font-weight:600;">INVALID &mdash; 電路拒絕</td></tr>
+    <tr><td class="num">7</td><td class="num">111</td><td><strong>NOP</strong></td><td>&mdash;</td><td>&mdash;</td><td><span class="tag tag-done">已實作</span></td></tr>
+  </tbody>
+</table>
+
+<h2>3.1 每個 op_type 對 State Tree 的影響</h2>
+
+<table>
+  <thead><tr><th>欄位</th><th>TRADE</th><th>EXERCISE</th><th>CLOSE</th><th>EXPIRY</th><th>CORP_ACT</th><th>NOP</th></tr></thead>
+  <tbody>
+    <tr><td><code>w</code></td><td>自由</td><td>自由</td><td><strong>&rarr; 0</strong></td><td><strong>&rarr; 0</strong></td><td>ratio 約束</td><td>不變</td></tr>
+    <tr><td><code>k</code></td><td>自由</td><td>不變</td><td>不變</td><td>不變</td><td>ratio 約束</td><td>不變</td></tr>
+    <tr><td><code>expiry</code></td><td>自由</td><td><strong>&rarr; 0</strong></td><td>不變</td><td>不變</td><td>不變</td><td>不變</td></tr>
+    <tr><td><code>asset_type</code></td><td>自由</td><td>不變</td><td>不變</td><td>不變</td><td>不變</td><td>不變</td></tr>
+    <tr><td><code>underlying_id</code></td><td>自由</td><td>不變</td><td>不變</td><td>不變</td><td>不變</td><td>不變</td></tr>
+  </tbody>
+</table>
+
+<div class="purple-box">
+  <strong>TRADE 是萬用型：</strong>5 個欄位全部可自由修改，等同於「任意交易所授權的狀態變更」。安全性完全依賴 EdDSA 簽名 &mdash; 交易所不簽的變更就不會發生。<br>
+  <strong>CORPORATE_ACTION 的 ratio 約束：</strong><code>new_w = old_w &times; ratio</code>, <code>new_K &times; ratio = old_K</code>（Phase 1 實作中）。
+</div>
+
+<hr>
+
+<!-- ===== 4. 各 op_type 詳解 ===== -->
+<h1><span class="section-num">4</span>交易動作詳解</h1>
+
+<h2>4.1 TRADE (000) &mdash; 一般交易</h2>
+<p>涵蓋所有交易所授權的狀態變更：買入、賣出、部分平倉、換倉。交易所用 BabyJubjub EdDSA 簽名每筆交易指令。</p>
+<p><strong>典型場景：</strong>基金在交易所買入 100 股 AAPL，交易所簽名 &rarr; w 從 0 變成 +100。</p>
+
+<h2>4.2 EXERCISE (001) &mdash; 期權行權</h2>
+<p>持有人行使期權權利。行權後期權合約消滅（expiry &rarr; 0），可能產生標的股票的交割（由另一筆 TRADE 處理）。</p>
+<p><strong>典型場景：</strong>行使 10 張 AAPL Call &rarr; expiry 歸零，另外一筆 TRADE 記錄買入 1000 股 AAPL。</p>
+
+<h2>4.3 CLOSE (010) &mdash; 平倉 / 強制平倉</h2>
+<p>倉位完全關閉，w &rarr; 0。用於主動平倉、融資維持率不足強制平倉等場景。</p>
+
+<h2>4.4 EXPIRY (011) &mdash; 到期失效</h2>
+<p>價外期權到期自動失效，w &rarr; 0。電路可透過 <code>today &ge; expiry_date</code> 驗證到期事實。</p>
+<div class="warn-box">
+  <strong>設計待優化：</strong>目前 EXPIRY 仍需 EdDSA 簽名。理論上到期是客觀事實（電路可自行驗證），不應需要外部簽名。此為已知待改進項目。
+</div>
+
+<h2>4.5 CORPORATE_ACTION (100) &mdash; 公司行動</h2>
+<p>非交易所交易的狀態變更（拆股、股利等）。不使用 EdDSA，改由 Event Tree Merkle proof 授權。詳見 Section 5。</p>
+
+<h2>4.6 NOP (111) &mdash; 無操作</h2>
+<p>填充用。當一個結算期的交易數少於 batch size 時，用 NOP 填滿。所有欄位保持不變。</p>
+
+<hr>
+
+<!-- ===== 5. 公司行動 ===== -->
+<h1><span class="section-num">5</span>公司行動 (Corporate Actions)</h1>
+
+<p>公司行動是由上市公司或監管機構發起的事件，會影響持倉狀態但不經過交易所交易流程。協議使用 Event Tree 作為統一機制處理這類事件。</p>
+
+<h2>5.1 Group A：比率調整（Phase 1 實作中）</h2>
+<p>電路約束：<code>new_w = old_w &times; ratio</code>, <code>new_K &times; ratio = old_K</code></p>
+<p>電路是 event_type 無關的 &mdash; 四種事件使用完全相同的比率約束。</p>
+
+<table>
+  <thead><tr><th>Type</th><th>事件</th><th>Ratio 範例</th><th>對持倉的影響</th><th>狀態</th></tr></thead>
+  <tbody>
+    <tr><td class="num">0</td><td>正向拆股 (Forward Split)</td><td>2:1 &rarr; ratio=2</td><td>w&times;2, K&divide;2</td><td><span class="tag tag-wip">Phase 1</span></td></tr>
+    <tr><td class="num">1</td><td>特別現金股利 (Special Cash Div)</td><td>K 調整比率</td><td>K 按比率調整</td><td><span class="tag tag-wip">Phase 1</span></td></tr>
+    <tr><td class="num">2</td><td>反向拆股 (Reverse Split)</td><td>1:2 &rarr; ratio=0.5</td><td>w&times;0.5, K&times;2</td><td><span class="tag tag-wip">Phase 1</span></td></tr>
+    <tr><td class="num">3</td><td>股票股利 (Stock Dividend)</td><td>10% &rarr; ratio=1.1</td><td>w&times;1.1</td><td><span class="tag tag-wip">Phase 1</span></td></tr>
+  </tbody>
+</table>
+
+<h2>5.2 Group B：強制平倉（Phase 2 設計中）</h2>
+<p>預期約束：<code>new_w = 0</code>，其他欄位不變。</p>
+
+<table>
+  <thead><tr><th>Type</th><th>事件</th><th>說明</th><th>狀態</th></tr></thead>
+  <tbody>
+    <tr><td class="num">4</td><td>現金併購 (Merger Cash-out)</td><td>被收購公司以現金買斷，持倉強制關閉</td><td><span class="tag tag-future">Phase 2</span></td></tr>
+    <tr><td class="num">5</td><td>下市 (Delisting)</td><td>交易所移除上市資格</td><td><span class="tag tag-future">Phase 2</span></td></tr>
+    <tr><td class="num">6</td><td>破產 (Bankruptcy)</td><td>公司破產清算</td><td><span class="tag tag-future">Phase 2</span></td></tr>
+  </tbody>
+</table>
+
+<h2>5.3 Group C：新倉位創建（Phase 2 設計中）</h2>
+<p>需要架構變更 &mdash; 在 State Tree 空位插入新葉。</p>
+
+<table>
+  <thead><tr><th>Type</th><th>事件</th><th>說明</th><th>狀態</th></tr></thead>
+  <tbody>
+    <tr><td class="num">7</td><td>分拆上市 (Spin-off)</td><td>母公司拆出子公司，持有人獲得子公司股份（新倉位）+ 母公司比率調整</td><td><span class="tag tag-future">Phase 2</span></td></tr>
+    <tr><td class="num">8</td><td>認股權 / 權證分配 (Rights)</td><td>現有持有人獲得新的衍生工具倉位</td><td><span class="tag tag-future">Phase 2</span></td></tr>
+  </tbody>
+</table>
+
+<h2>5.4 Group D：身份突變（Phase 2 設計中）</h2>
+<p>需要修改 <code>underlying_id</code>，突破現有約束。</p>
+
+<table>
+  <thead><tr><th>Type</th><th>事件</th><th>說明</th><th>狀態</th></tr></thead>
+  <tbody>
+    <tr><td class="num">9</td><td>換股併購 (Stock-for-Stock Merger)</td><td>B 公司股份按比率轉換為 A 公司股份，underlying_id 改變</td><td><span class="tag tag-future">Phase 2</span></td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<!-- ===== 6. 不需要處理的事件 ===== -->
+<h1><span class="section-num">6</span>不影響持倉狀態的事件</h1>
+
+<p>以下金融事件<span class="emphasis">不改變 Position State Tree 的任何欄位</span>，因此協議不需要處理：</p>
+
+<table>
+  <thead><tr><th>事件</th><th>為什麼不影響持倉</th></tr></thead>
+  <tbody>
+    <tr><td>一般現金股利 (Regular Cash Dividend)</td><td>現金流入帳戶，不改變 w, K, expiry 或 underlying</td></tr>
+    <tr><td>成本基礎調整 (Cost Basis Adjustment)</td><td>稅務紀錄，不影響持倉狀態</td></tr>
+    <tr><td>帳戶轉移 (ACAT Transfer)</td><td>託管人變更，持倉不變</td></tr>
+    <tr><td>交易暫停 (Trading Halt)</td><td>暫時性，不改變任何持倉欄位</td></tr>
+    <tr><td>更名 / 換 Ticker (Name Change)</td><td>只是標籤變更，<code>underlying_id</code> 是數字 ID 不受影響</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<!-- ===== 7. 尚未覆蓋的事件 ===== -->
+<h1><span class="section-num">7</span>已知未覆蓋的事件</h1>
+
+<p>以下事件確實影響持倉狀態，但目前協議尚未處理（或由現有 op_type 近似覆蓋）：</p>
+
+<table>
+  <thead><tr><th>事件</th><th>影響</th><th>可能的處理方式</th></tr></thead>
+  <tbody>
+    <tr><td>公開收購 (Tender Offer)</td><td>部分持倉以溢價賣出</td><td>部分 CLOSE 或新 event_type</td></tr>
+    <tr><td>荷蘭式拍賣回購</td><td>同上的變體</td><td>同上</td></tr>
+    <tr><td>資本返還 / 特殊分配</td><td>可能降低 K</td><td>類似 Special Cash Dividend (type 1)</td></tr>
+    <tr><td>附認股權債券分離</td><td>產生新衍生工具倉位</td><td>類似 Rights (type 8)</td></tr>
+    <tr><td>SPAC 單位分拆</td><td>複合事件（拆股 + 新倉位）</td><td>多步驟 Event 組合</td></tr>
+    <tr><td>實物分配 (In-kind Distribution)</td><td>獲得不同公司股份</td><td>類似 Spin-off (type 7)</td></tr>
+    <tr><td>強制收購 / 擠出 (Squeeze-out)</td><td>強制賣出</td><td>類似 Cash Merger (type 4)</td></tr>
+    <tr><td>法院重整 (Scheme of Arrangement)</td><td>多種可能</td><td>Case-by-case</td></tr>
+    <tr><td>ADR 比率變更</td><td>類似拆股</td><td>Forward/Reverse Split (type 0/2)</td></tr>
+    <tr><td>幣別重新計價</td><td>影響名目金額</td><td>需新機制</td></tr>
+    <tr><td>可轉債轉換 (Conversion)</td><td>債券轉為股票</td><td>EXERCISE 變體</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<!-- ===== 8. 覆蓋範圍總結 ===== -->
+<h1><span class="section-num">8</span>覆蓋範圍總結</h1>
+
+<h2>8.1 Biconditional Property</h2>
+<div class="purple-box" style="font-size:16px; text-align:center;">
+  State(T) &ne; State(T-1) &nbsp; &hArr; &nbsp; &exist; valid Trade &cup; Event &cup; Expiry 授權每一處差異
+</div>
+<p>協議追求的核心性質：<strong>狀態有變化，若且唯若有合法的交易、事件或到期授權了該變化。</strong></p>
+
+<h2>8.2 覆蓋完整性</h2>
+
+<table>
+  <thead><tr><th>狀態變更類型</th><th>授權來源</th><th>驗證機制</th><th>狀態</th></tr></thead>
+  <tbody>
+    <tr><td>交易所授權的交易</td><td>EdDSA 簽名</td><td>Proof #2 電路內驗證</td><td><span class="tag tag-done">完成</span></td></tr>
+    <tr><td>期權行權</td><td>EdDSA 簽名（OCC）</td><td>Proof #2 + expiry&rarr;0</td><td><span class="tag tag-done">完成</span></td></tr>
+    <tr><td>平倉</td><td>EdDSA 簽名</td><td>Proof #2 + w&rarr;0</td><td><span class="tag tag-done">完成</span></td></tr>
+    <tr><td>價外到期</td><td>時間事實</td><td>Proof #2 + w&rarr;0</td><td><span class="tag tag-done">完成</span></td></tr>
+    <tr><td>拆股 / 股利（比率調整）</td><td>公開資訊（Event Tree）</td><td>Proof #2 + ratio 約束</td><td><span class="tag tag-wip">Phase 1</span></td></tr>
+    <tr><td>強制平倉（併購/下市/破產）</td><td>公開資訊（Event Tree）</td><td>Proof #2 + w&rarr;0</td><td><span class="tag tag-future">Phase 2</span></td></tr>
+    <tr><td>新倉位創建（分拆/權證）</td><td>公開資訊（Event Tree）</td><td>需新架構</td><td><span class="tag tag-future">Phase 2</span></td></tr>
+    <tr><td>身份突變（換股併購）</td><td>公開資訊（Event Tree）</td><td>需新架構</td><td><span class="tag tag-future">Phase 2</span></td></tr>
+    <tr><td>Delta 合規計算</td><td>市場公開數據（MDT）</td><td>Proof #1 BS Delta</td><td><span class="tag tag-done">完成</span></td></tr>
+  </tbody>
+</table>
+
+<div class="success-box">
+  <strong>結論：</strong>所有可能的持倉狀態變更都有對應的授權機制。Phase 1 完成後，日常營運中最常見的場景（交易、行權、到期、拆股、股利）全部覆蓋。Phase 2 處理較罕見的極端事件。
+</div>
+
+<div class="footer-nav">
+  <a href="index.html">&larr; 協議總覽</a>
+  &emsp;|&emsp;
+  <a href="proof1.html">Proof #1 技術 &rarr;</a>
+  <br><br>
+  ZKMM Protocol &mdash; Financial Compliance via Zero-Knowledge Proofs
+</div>
+
+</body>
+</html>
