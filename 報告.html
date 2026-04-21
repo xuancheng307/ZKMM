@@ -297,7 +297,7 @@ figure.fig figcaption strong{color:var(--text)}
     <li>ZK 能提供什麼 (高階三性質)，本論文 PF1 的 scope 是什麼</li>
     <li>為什麼 BS Delta 的 ln / erf / exp 是 ZK 電路裡的硬骨頭</li>
   </ul>
-  <p style="color:var(--text-dim);margin-top:1rem;font-size:.95rem">本報告共 8 Part、86 slides，約 90 分鐘。每個 Part 的重大概念會先用 Groth16 / R1CS 作為對照，右上「術語」按鈕可隨時呼叫對照表。</p>
+  <p style="color:var(--text-dim);margin-top:1rem;font-size:.95rem">本報告共 8 Part、87 slides，約 90 分鐘。每個 Part 的重大概念會先用 Groth16 / R1CS 作為對照，右上「術語」按鈕可隨時呼叫對照表。</p>
 </section>
 
 <section class="slide" data-part="I" data-slide="3">
@@ -1465,6 +1465,39 @@ meta.create_gate("horner_per_step", |meta| {
       <tr><td>exp 逼近</td><td>Method B chunk lookup (11 rows)</td><td>大查表 (50M entries)</td><td>工具鏈不支持</td></tr>
     </tbody>
   </table>
+  <figure class="fig" style="margin-top:.8rem">
+    <svg viewBox="0 0 820 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cost gap log scale">
+      <text x="410" y="16" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif" fill="#4f46e5">量化成本差 — log₁₀ 軸（越右越大）</text>
+      <!-- axis 200→780, log 0..11 -->
+      <line x1="200" y1="128" x2="780" y2="128" stroke="#c7c9d3" stroke-width="1"/>
+      <!-- ticks at 1, 10, 100, 10^5, 10^8, 10^10, 10^11 -->
+      <g style="font:10px 'Inter',monospace;fill:#55596b">
+        <line x1="200" y1="128" x2="200" y2="132" stroke="#c7c9d3"/><text x="200" y="144" text-anchor="middle">1×</text>
+        <line x1="252" y1="128" x2="252" y2="132" stroke="#c7c9d3"/><text x="252" y="144" text-anchor="middle">10×</text>
+        <line x1="305" y1="128" x2="305" y2="132" stroke="#c7c9d3"/><text x="305" y="144" text-anchor="middle">100×</text>
+        <line x1="463" y1="128" x2="463" y2="132" stroke="#c7c9d3"/><text x="463" y="144" text-anchor="middle">10⁵</text>
+        <line x1="621" y1="128" x2="621" y2="132" stroke="#c7c9d3"/><text x="621" y="144" text-anchor="middle">10⁸</text>
+        <line x1="726" y1="128" x2="726" y2="132" stroke="#c7c9d3"/><text x="726" y="144" text-anchor="middle">10¹⁰</text>
+      </g>
+      <!-- Signature ~5x: log10(5)=0.699, +52.6 per decade, x=200+52.6*0.699=236.8 -->
+      <text x="195" y="42" text-anchor="end" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">Signature (EdDSA vs ECDSA)</text>
+      <rect x="200" y="30" width="37" height="16" fill="#10b981"/>
+      <text x="243" y="42" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">~5×</text>
+      <!-- Hash 100x: log10(100)=2, x=200+52.6*2=305 -->
+      <text x="195" y="68" text-anchor="end" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">Hash (Poseidon vs SHA-256)</text>
+      <rect x="200" y="56" width="105" height="16" fill="#4f46e5"/>
+      <text x="312" y="68" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">~100×</text>
+      <!-- ln 6.8e10: log10=10.833, x=200+52.6*10.833=770 -->
+      <text x="195" y="94" text-anchor="end" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">ln 逼近 (Remez vs Taylor)</text>
+      <rect x="200" y="82" width="570" height="16" fill="#d97706"/>
+      <text x="777" y="94" text-anchor="end" style="font:700 11px 'Inter',monospace" fill="#ffffff">6.8 × 10¹⁰</text>
+      <!-- erf 2.6e8: log10=8.415, x=200+52.6*8.415=643 -->
+      <text x="195" y="120" text-anchor="end" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">erf 逼近 (Remez vs Taylor)</text>
+      <rect x="200" y="108" width="443" height="16" fill="#dc2626"/>
+      <text x="650" y="120" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">2.6 × 10⁸</text>
+    </svg>
+    <figcaption>圖：四個可量化的成本差（對數軸）— Signature 5× 與 Hash 100× 是工程級優化，但 ln / erf 的 Minimax 比 Taylor 準 8–10 個數量級 — 是「做不出來」和「做得出來」的差距。</figcaption>
+  </figure>
 </section>
 
 <section class="slide" data-part="VI" data-slide="69">
@@ -1494,6 +1527,40 @@ meta.create_gate("horner_per_step", |meta| {
   </table>
   <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">Linear in N（每 position 獨立），Merkle depth log(N) — 整體 ~N·(const + log N)。</p>
   <p style="color:var(--text-dim);margin-top:.3rem;font-size:.92rem">不足 N_max 填 dummy leaf（隱藏真實持倉數量，隱私保護）。</p>
+  <figure class="fig" style="margin-top:.6rem">
+    <svg viewBox="0 0 820 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="N-position scaling">
+      <text x="410" y="16" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif" fill="#4f46e5">Total rows vs N — 近似線性成長（k 僅對數增長）</text>
+      <!-- axis x=100..780, y=148..30 -->
+      <line x1="100" y1="148" x2="780" y2="148" stroke="#c7c9d3" stroke-width="1"/>
+      <line x1="100" y1="30" x2="100" y2="148" stroke="#c7c9d3" stroke-width="1"/>
+      <!-- y-axis ticks 0, 100K, 200K, 300K -->
+      <g style="font:10px 'Inter',monospace;fill:#55596b">
+        <text x="94" y="152" text-anchor="end">0</text>
+        <line x1="96" y1="109" x2="100" y2="109" stroke="#c7c9d3"/><text x="94" y="113" text-anchor="end">100K</text>
+        <line x1="96" y1="70" x2="100" y2="70" stroke="#c7c9d3"/><text x="94" y="74" text-anchor="end">200K</text>
+        <line x1="96" y1="31" x2="100" y2="31" stroke="#c7c9d3"/><text x="94" y="35" text-anchor="end">300K</text>
+      </g>
+      <!-- bars (total rows) scale: 300K = 118px height -->
+      <!-- N=8 → 18K rows: h = 18/300*118 = 7.08, y = 148-7 = 141 -->
+      <rect x="180" y="141" width="100" height="7" fill="#a5b4fc"/>
+      <text x="230" y="135" text-anchor="middle" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">18K</text>
+      <text x="230" y="163" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">N=8 · depth 3 · k≈15</text>
+      <!-- N=32 → 72K rows: h = 72/300*118 = 28.3, y = 148-28 = 120 -->
+      <rect x="360" y="120" width="100" height="28" fill="#6366f1"/>
+      <text x="410" y="114" text-anchor="middle" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">72K</text>
+      <text x="410" y="163" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">N=32 · depth 5 · k≈17</text>
+      <!-- N=128 → 289K rows: h = 289/300*118 = 113.6, y = 148-114 = 34 -->
+      <rect x="540" y="34" width="100" height="114" fill="#4f46e5"/>
+      <text x="590" y="28" text-anchor="middle" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">289K</text>
+      <text x="590" y="163" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">N=128 · depth 7 · k≈19</text>
+      <!-- annotation: linear growth arrow -->
+      <path d="M280,141 Q420,90 540,50" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3 2" fill="none"/>
+      <text x="680" y="60" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#dc2626">rows ≈ N×2,257</text>
+      <text x="680" y="74" style="font:10px 'Inter','Noto Sans TC',sans-serif" fill="#dc2626">16× N → 16× rows</text>
+      <text x="680" y="90" style="font:10px 'Inter','Noto Sans TC',sans-serif" fill="#dc2626">但 k 僅 +4（log₂ N）</text>
+    </svg>
+    <figcaption>圖：rows 對 N 近似線性（每持倉 ~2,257 rows 獨立計算），但 k 只隨 log₂N 上升 — 這是 SNARK 對大 portfolio 友善的原因。Merkle depth = ⌈log₂N⌉。</figcaption>
+  </figure>
 </section>
 
 <section class="slide" data-part="VI" data-slide="71">
@@ -1620,22 +1687,36 @@ meta.create_gate("horner_per_step", |meta| {
 <section class="slide" data-part="VIII" data-slide="82">
   <div class="slide-meta"><span class="part-label">Concept Tree</span><span class="slide-num">82 / 87</span></div>
   <h2>全景概念樹</h2>
-  <p>你剛才學到的依賴鏈：</p>
-  <pre>早期 ZK: R1CS + QAP + per-circuit ceremony
-          ↓
-Halo2: Plonkish + Universal SRS + Lookup + High-degree gates
-          ↓
-PF1 架構: 5 parts (Merkle × 2 / σ verify / Delta / compliance)
-          ↓
-Delta 核心: pp=48 定點 + 17 step pipeline
-          ↓
-Per-step Horner + Remez minimax + Piecewise dispatch
-          ↓
-A2 segment-selector gate  (soundness 封閉)
-          ↓
-Method B exp (byte-decompose + chunk lookup)
-          ↓
-31 gates / 66 constraints / 3-layer ZK-POK</pre>
+  <p>你剛才學到的依賴鏈 — 每一層都是下一層的前提：</p>
+  <figure class="fig" style="margin-top:.4rem">
+    <div class="mermaid">
+%%{init: {'flowchart':{'nodeSpacing':30,'rankSpacing':45,'curve':'basis'}, 'themeVariables':{'fontSize':'12px'}}}%%
+flowchart LR
+  A["早期 ZK<br/>R1CS+QAP<br/>per-circuit ceremony"]:::era1
+  B["Halo2<br/>Plonkish + SRS<br/>Lookup + hi-deg"]:::era2
+  C["PF1 架構<br/>5 parts<br/>Merkle×2/σ/Δ/C"]:::arch
+  D["Delta 核心<br/>pp=48 定點<br/>17 step pipeline"]:::core
+  E1["Horner<br/>kernel"]:::tech
+  E2["Remez<br/>minimax"]:::tech
+  E3["Piecewise<br/>ln 4 / erf 12"]:::tech
+  F["A2 gate<br/>soundness<br/>封閉"]:::sound
+  G["Method B exp<br/>byte + lookup"]:::sound
+  H(["<b>31 gates / 66 constraints</b><br/><b>3-layer ZK-POK</b>"]):::final
+  A --> B --> C --> D
+  D --> E1 --> F
+  D --> E2 --> F
+  D --> E3 --> F
+  F --> G --> H
+  classDef era1 fill:#f1f5f9,stroke:#64748b,color:#1a1a1f,stroke-width:1.5px;
+  classDef era2 fill:#eef2ff,stroke:#4f46e5,color:#1a1a1f,stroke-width:1.5px;
+  classDef arch fill:#fef3c7,stroke:#d97706,color:#1a1a1f,stroke-width:1.5px;
+  classDef core fill:#dbeafe,stroke:#2563eb,color:#1a1a1f,stroke-width:1.5px;
+  classDef tech fill:#ede9fe,stroke:#7c3aed,color:#1a1a1f,stroke-width:1.5px;
+  classDef sound fill:#fee2e2,stroke:#dc2626,color:#1a1a1f,stroke-width:1.5px;
+  classDef final fill:#d1fae5,stroke:#059669,color:#064e3b,stroke-width:2px;
+    </div>
+    <figcaption>圖：概念依賴樹（左 → 右）— 灰（早期 ZK）→ 藍（Halo2）→ 琥珀（PF1 架構）→ 深藍（Delta 核心）→ 紫（三個逼近技術並行）→ 紅（soundness gate）→ 綠（最終 ZK-POK）。每條箭頭 = 「沒有上層就做不出下層」。</figcaption>
+  </figure>
 </section>
 
 <section class="slide" data-part="VIII" data-slide="83">
