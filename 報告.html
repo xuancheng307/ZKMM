@@ -6,6 +6,14 @@
 <title>口試報告 — ZK-Compliance / PF1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},{left:'\\\\[',right:'\\\\]',display:true},{left:'\\\\(',right:'\\\\)',display:false}],throwOnError:false})"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:true, theme:'default', themeVariables:{fontFamily:"'Noto Sans TC','Inter',sans-serif", primaryColor:'#eef0f4', primaryTextColor:'#1a1a1f', primaryBorderColor:'#4f46e5', lineColor:'#55596b', secondaryColor:'#f7f8fa', tertiaryColor:'#ffffff'}});
+  window.mermaid = mermaid;
+</script>
 <style>
 :root{
   --bg:#ffffff; --surface:#f7f8fa; --surface-2:#eef0f4; --border:#d9dce3;
@@ -157,6 +165,46 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 .tbl th{color:var(--text-faint);font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;font-weight:600;background:var(--surface-2)}
 .tbl td.mono,.tbl td code{font-family:var(--font-mono);font-size:.85rem;color:var(--accent-light)}
 
+/* Verbatim quote block (original-text citation from canonical papers) */
+.quote{
+  background:#fafbfd;border-left:4px solid var(--accent);border-radius:0 10px 10px 0;
+  padding:1rem 1.4rem;margin:1rem 0;max-width:980px;position:relative;
+}
+.quote::before{
+  content:'“';font-family:Georgia,serif;font-size:3.5rem;color:var(--accent);
+  position:absolute;top:-.3rem;left:.4rem;line-height:1;opacity:.25;
+}
+.quote p{font-style:italic;color:var(--text);font-size:1rem;line-height:1.65;margin:0}
+.quote .cite{display:block;margin-top:.6rem;font-size:.8rem;color:var(--text-dim);font-style:normal;font-family:var(--font-sans)}
+.quote .cite a{color:var(--accent);text-decoration:none;border-bottom:1px dotted var(--accent)}
+.quote .cite a:hover{border-bottom-style:solid}
+.quote.en p{font-family:'Inter',serif}
+
+/* Inline citation (superscript numeric) */
+sup.ref{color:var(--accent);font-weight:600;font-size:.7em;cursor:pointer;padding:0 .1em}
+sup.ref:hover{text-decoration:underline}
+
+/* Figure with caption */
+figure.fig{margin:1rem 0;max-width:980px}
+figure.fig img,figure.fig svg,figure.fig .mermaid{max-width:100%;display:block;margin:0 auto;background:#fff;border:1px solid var(--border);border-radius:10px;padding:.8rem}
+figure.fig figcaption{font-size:.82rem;color:var(--text-dim);margin-top:.5rem;text-align:center;line-height:1.5}
+figure.fig figcaption .src{color:var(--text-faint);font-size:.76rem}
+figure.fig figcaption strong{color:var(--text)}
+
+/* Mermaid host — make it look like our cards */
+.mermaid{background:#fff;border:1px solid var(--border);border-radius:10px;padding:1rem;margin:.8rem 0;max-width:980px;overflow-x:auto}
+
+/* Reference list */
+.reflist{list-style:none;padding-left:0;counter-reset:refnum;font-size:.88rem;max-width:980px}
+.reflist li{padding:.4rem 0 .4rem 2.2rem;position:relative;color:var(--text-dim);line-height:1.55;border-bottom:1px dashed var(--border)}
+.reflist li::before{
+  counter-increment:refnum;content:'['counter(refnum)']';
+  position:absolute;left:0;top:.4rem;color:var(--accent);font-weight:700;font-family:var(--font-mono);font-size:.82rem;
+}
+.reflist li strong{color:var(--text)}
+.reflist li a{color:var(--accent);text-decoration:none}
+.reflist li a:hover{text-decoration:underline}
+
 /* Pill tag */
 .tag{display:inline-block;font-size:.7rem;font-weight:600;padding:.15rem .5rem;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--text-dim);margin-right:.3rem}
 .tag.good{color:var(--green);border-color:rgba(34,197,94,.4)}
@@ -234,14 +282,14 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 <!-- ========== PART I: 問題與場景 ========== -->
 
 <section class="slide title" data-part="I" data-slide="1">
-  <div class="slide-meta"><span class="slide-num">01 / 86</span></div>
+  <div class="slide-meta"><span class="slide-num">01 / 87</span></div>
   <h1>用零知識證明<br>證明金融合規</h1>
   <p class="subtitle">以 Black-Scholes Delta 為例的 Halo2 電路實作</p>
   <p style="color:var(--text-faint);font-size:.95rem">碩士論文口試 — 2026</p>
 </section>
 
 <section class="slide part-opener" data-part="I" data-slide="2">
-  <div class="slide-meta"><span class="part-label">PART I</span><span class="slide-num">02 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PART I</span><span class="slide-num">02 / 87</span></div>
   <h1>Part I — 問題與場景</h1>
   <p class="lead">整個報告從「問題」開始。Part I 結束後你會知道：</p>
   <ul>
@@ -253,7 +301,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="I" data-slide="3">
-  <div class="slide-meta"><span class="part-label">Motivation</span><span class="slide-num">03 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Motivation</span><span class="slide-num">03 / 87</span></div>
   <h2>金融合規與持倉隱私的張力</h2>
   <p class="lead">對沖基金必須向監管證明風險合規，但持倉本身是商業機密 — 公開 = 策略外洩、front-running。</p>
   <div class="grid-2" style="margin-top:1rem">
@@ -264,7 +312,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="I" data-slide="4">
-  <div class="slide-meta"><span class="part-label">Running Example</span><span class="slide-num">04 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Running Example</span><span class="slide-num">04 / 87</span></div>
   <h2>一筆具體的 BS Delta 交易</h2>
   <p>整個報告都會拉回這筆交易 — 代入看數字怎麼跑。</p>
   <div class="re-card">S=100&nbsp; K=100&nbsp; σ=20%&nbsp; T=30 天&nbsp; r=5%&nbsp; q=0&nbsp; → Δ ≈ 0.523</div>
@@ -278,7 +326,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="I" data-slide="5">
-  <div class="slide-meta"><span class="part-label">Status Quo</span><span class="slide-num">05 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Status Quo</span><span class="slide-num">05 / 87</span></div>
   <h2>現有方案為什麼不夠</h2>
   <ul>
     <li><strong>全揭露</strong>：交完整持倉給監管 — 商業機密外洩，front-running 成本放大</li>
@@ -290,7 +338,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="I" data-slide="6">
-  <div class="slide-meta"><span class="part-label">ZK Value</span><span class="slide-num">06 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">ZK Value</span><span class="slide-num">06 / 87</span></div>
   <h2>ZK 能提供什麼</h2>
   <p class="lead">「我能證明某件事是真的，但不透露為什麼是真的。」</p>
   <ul>
@@ -299,11 +347,19 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
     <li><strong>Zero-knowledge</strong> — 驗證者除了「命題為真」外什麼都學不到</li>
   </ul>
   <div class="card amber" style="margin-top:1rem"><p><strong>關鍵：</strong>ZK 電路裡只有有限域上的加法和乘法 — 沒有 <code class="inline">if</code>、沒有迴圈、沒有浮點。這是本論文要解決的核心工程問題。</p></div>
+  <div class="quote" style="margin-top:1rem">
+    <p>"Zero-knowledge proofs are defined as those proofs that convey no additional knowledge other than the correctness of the proposition in question."</p>
+    <span class="cite">— Goldwasser, Micali, Rackoff, <em>The Knowledge Complexity of Interactive Proof Systems</em>, SIAM J. Comput. 18(1):186–208 (1989), Abstract <sup class="ref">[1]</sup></span>
+  </div>
+  <div class="quote" style="margin-top:.6rem">
+    <p>"We say that V is a knowledge verifier for the relation R with knowledge error κ if … there exists a probabilistic oracle machine K such that … if p(x) &gt; κ(x) then, on input x and access to oracle P<sub>x</sub>, machine K outputs a string from the set R(x) within an expected number of steps bounded by |x|<sup>c</sup> / (p(x)−κ(x)). The oracle machine K is called a universal knowledge extractor, and κ is called the knowledge error function."</p>
+    <span class="cite">— Bellare, Goldreich, <em>On Defining Proofs of Knowledge</em>, CRYPTO '92, Definition 3.1 <sup class="ref">[2]</sup></span>
+  </div>
   <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">※ 這裡先講高階性質；Part III 會進 Halo2 內部看 soundness 怎麼被電路約束機制落地。</p>
 </section>
 
 <section class="slide" data-part="I" data-slide="7">
-  <div class="slide-meta"><span class="part-label">PF1 Scope</span><span class="slide-num">07 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PF1 Scope</span><span class="slide-num">07 / 87</span></div>
   <h2>PF1 — 本論文的核心 scope</h2>
   <p>PF1：<strong>給定公開市場資料承諾與合規門檻 τ，證明 N 筆持倉的加權 BS Delta 絕對值 ≤ τ</strong>，不揭露任何持倉細節。</p>
   <div class="grid-2" style="margin-top:.8rem">
@@ -314,7 +370,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="I" data-slide="8">
-  <div class="slide-meta"><span class="part-label">Contributions</span><span class="slide-num">08 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Contributions</span><span class="slide-num">08 / 87</span></div>
   <h2>本論文四大貢獻</h2>
   <ul>
     <li><strong>Halo2 上首個 BS Delta 零知識電路</strong> — N=128 持倉、k ≈ 19（~289K rows）</li>
@@ -325,7 +381,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide part-closer" data-part="I" data-slide="9">
-  <div class="slide-meta"><span class="part-label">PART I · Recap</span><span class="slide-num">09 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PART I · Recap</span><span class="slide-num">09 / 87</span></div>
   <h2>Part I takeaways</h2>
   <ul>
     <li>合規 × 持倉隱私有真實張力，現有方案都有缺陷</li>
@@ -338,7 +394,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 <!-- ========== PART II: 協議設計 ========== -->
 
 <section class="slide part-opener" data-part="II" data-slide="10">
-  <div class="slide-meta"><span class="part-label">PART II</span><span class="slide-num">10 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PART II</span><span class="slide-num">10 / 87</span></div>
   <h1>Part II — 協議設計</h1>
   <p class="lead">Part II 結束後你會知道：</p>
   <ul>
@@ -350,7 +406,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="II" data-slide="11">
-  <div class="slide-meta"><span class="part-label">Actors</span><span class="slide-num">11 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Actors</span><span class="slide-num">11 / 87</span></div>
   <h2>參與者與視野</h2>
   <table class="tbl">
     <thead><tr><th>角色</th><th>知道</th><th>看不到</th></tr></thead>
@@ -365,7 +421,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="II" data-slide="12">
-  <div class="slide-meta"><span class="part-label">Flow</span><span class="slide-num">12 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Flow</span><span class="slide-num">12 / 87</span></div>
   <h2>完整流程 — 你在這張圖上</h2>
   <div class="flow-wrap">
     <svg class="flow-svg" id="mainFlow" viewBox="0 0 880 140">
@@ -385,7 +441,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="II" data-slide="13">
-  <div class="slide-meta"><span class="part-label">Trust Model</span><span class="slide-num">13 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Trust Model</span><span class="slide-num">13 / 87</span></div>
   <h2>四層信任架構</h2>
   <table class="tbl">
     <thead><tr><th>層</th><th>機制</th><th>填的洞</th></tr></thead>
@@ -400,7 +456,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="II" data-slide="14">
-  <div class="slide-meta"><span class="part-label">Public / Private</span><span class="slide-num">14 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Public / Private</span><span class="slide-num">14 / 87</span></div>
   <h2>Public input 只有 4 個</h2>
   <div class="grid-2">
     <div class="card accent"><h3>Public (instance)</h3><ul><li><code class="inline">state_root</code> — Position Tree</li><li><code class="inline">market_data_root</code> — 當日 MDT</li><li><code class="inline">τ</code> — 合規門檻（pp=48）</li><li><code class="inline">today</code> — 結算日</li></ul></div>
@@ -410,7 +466,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="II" data-slide="15">
-  <div class="slide-meta"><span class="part-label">PF1 Statement</span><span class="slide-num">15 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PF1 Statement</span><span class="slide-num">15 / 87</span></div>
   <h2>PF1 形式化陳述 — 5 條件</h2>
   <p style="color:var(--text-dim);margin-top:.2rem;font-size:.95rem">∃ witness <em>w</em> s.t. 對所有 i ∈ [1, N]：</p>
   <ul style="margin-top:.5rem">
@@ -424,7 +480,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="II" data-slide="16">
-  <div class="slide-meta"><span class="part-label">PF2 (out of scope)</span><span class="slide-num">16 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PF2 (out of scope)</span><span class="slide-num">16 / 87</span></div>
   <h2>PF2 存在，本次報告不展內部</h2>
   <p>PF2 負責「State Transition」：State(T) = State(T−1) + apply(Trades(T))，每筆交易有合法交易所 EdDSA 簽章。</p>
   <div class="grid-2" style="margin-top:1rem">
@@ -435,17 +491,21 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="II" data-slide="17">
-  <div class="slide-meta"><span class="part-label">Two Trees</span><span class="slide-num">17 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Two Trees</span><span class="slide-num">17 / 87</span></div>
   <h2>兩棵 Merkle Tree</h2>
   <div class="grid-2">
     <div class="card"><h3>Position State Tree</h3><p>記錄當前持倉快照</p><ul><li><strong>5 欄位</strong>：asset_id, w, K, expiry_date, type</li><li>Depth 7（生產 N_max=128；測試 N=8）</li><li>不足 N_max 填 dummy 葉子（隱藏真實持倉數量）</li></ul></div>
     <div class="card"><h3>Market Data Tree</h3><p>記錄當日市場資料</p><ul><li><strong>8 欄位</strong>：underlying_id, strike, expiry, asset_type, S (spot), r, q, settle_price</li><li>Depth ~20（涵蓋所有標的 × 合約）</li><li>每日由資料提供者重算並發布 root</li></ul></div>
   </div>
   <div class="card amber" style="margin-top:1rem"><p><strong>為什麼用 Merkle 而非 Halo2 lookup？</strong> Market data 每日變 — 若用 fixed column lookup 每日得重做 setup + VK。Merkle 讓電路結構一次 setup 永久有效，只有 root 值每日更新。</p></div>
+  <div class="quote" style="margin-top:.8rem">
+    <p>"we describe a method called 'tree authentication' which can be used to authenticate any Y<sub>i</sub> of any user quickly and easily, but which requires minimal storage."</p>
+    <span class="cite">— Merkle, <em>A Certified Digital Signature</em> (1979), §6 Tree Authentication <sup class="ref">[11]</sup></span>
+  </div>
 </section>
 
 <section class="slide" data-part="II" data-slide="18">
-  <div class="slide-meta"><span class="part-label">Cross-tree Binding</span><span class="slide-num">18 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Cross-tree Binding</span><span class="slide-num">18 / 87</span></div>
   <h2>Cross-tree 8 條 copy constraints</h2>
   <p>Position leaf 和 Market Data leaf 透過 8 條 copy constraint 綁定 — 防資產錯配。</p>
   <table class="tbl">
@@ -465,7 +525,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="II" data-slide="19">
-  <div class="slide-meta"><span class="part-label">Summary</span><span class="slide-num">19 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Summary</span><span class="slide-num">19 / 87</span></div>
   <h2>協議 one-pager</h2>
   <ul>
     <li><strong>流程（6 步）</strong>：收交易 → 建 Trade Tree → 算 State(T) → 產 PF2 → 產 PF1 → 提交 {root, PF1, PF2}</li>
@@ -477,7 +537,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide part-closer" data-part="II" data-slide="20">
-  <div class="slide-meta"><span class="part-label">PART II · Recap</span><span class="slide-num">20 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PART II · Recap</span><span class="slide-num">20 / 87</span></div>
   <h2>Part II takeaways</h2>
   <ul>
     <li>4 類參與者，沒有任何一方看到完整組合</li>
@@ -491,7 +551,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 <!-- ========== PART III: Halo2 基礎（最關鍵） ========== -->
 
 <section class="slide part-opener" data-part="III" data-slide="21">
-  <div class="slide-meta"><span class="part-label">PART III</span><span class="slide-num">21 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PART III</span><span class="slide-num">21 / 87</span></div>
   <h1>Part III — Halo2 基礎</h1>
   <p class="lead">最關鍵的一段。Part III 結束後你會知道：</p>
   <ul>
@@ -504,7 +564,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="III" data-slide="22">
-  <div class="slide-meta"><span class="part-label">Recap: Groth16 / R1CS</span><span class="slide-num">22 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Recap: Groth16 / R1CS</span><span class="slide-num">22 / 87</span></div>
   <h2>先回到大家熟悉的 — Groth16 / R1CS / QAP</h2>
   <ul>
     <li><strong>R1CS</strong>：constraint 形式固定為 <code class="inline">(A·z) ⊙ (B·z) = C·z</code>，每條 constraint 一個 row</li>
@@ -513,11 +573,15 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
     <li><strong>Proof size</strong>：~3 G1 元素（~200 B，非常小）</li>
     <li><strong>沒有 lookup</strong>：range check 得一位一位拆</li>
   </ul>
+  <div class="quote" style="margin-top:1rem">
+    <p>"We construct a pairing-based (preprocessing) SNARK for arithmetic circuit satisfiability, which is an NP-complete language, where a proof is only 3 group elements and verification consists of checking a single pairing product equation."</p>
+    <span class="cite">— Groth, <em>On the Size of Pairing-based Non-interactive Arguments</em>, EUROCRYPT 2016, Abstract <sup class="ref">[3]</sup></span>
+  </div>
   <p style="color:var(--text-dim);margin-top:1rem;font-size:.95rem">這些是 Halo2 <strong>不一樣</strong>的地方的對照基準。</p>
 </section>
 
 <section class="slide" data-part="III" data-slide="23">
-  <div class="slide-meta"><span class="part-label">Plonkish</span><span class="slide-num">23 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Plonkish</span><span class="slide-num">23 / 87</span></div>
   <h2>Halo2 = Plonkish arithmetization</h2>
   <p class="lead">整個電路是一張「表格」：列 = 一行計算、欄 = 不同類型的變數；gate 是欄之間的多項式關係。</p>
   <div class="bridge">
@@ -525,10 +589,14 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
     <div class="arrow">→</div>
     <div class="side h"><h4>Plonkish (Halo2)</h4><p>自訂高次多項式 gate</p><p>一個 gate 可跨多列多欄</p><p>一個 row 可同時啟用多條 constraint</p></div>
   </div>
+  <div class="quote" style="margin-top:1rem">
+    <p>"PLONKish circuits are defined in terms of a rectangular matrix of values. (…) A PLONKish circuit configuration requires a sequence of polynomial constraints. These are multivariate polynomials over F that must evaluate to zero for each row." A gate is "a set of constraints controlled by a set of selector columns."</p>
+    <span class="cite">— <em>The halo2 Book</em>, §Concepts › Proof systems › Arithmetization <sup class="ref">[5]</sup></span>
+  </div>
 </section>
 
 <section class="slide" data-part="III" data-slide="24">
-  <div class="slide-meta"><span class="part-label">Columns</span><span class="slide-num">24 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Columns</span><span class="slide-num">24 / 87</span></div>
   <h2>四類欄：advice / fixed / instance / selector</h2>
   <div class="bridge">
     <div class="side g"><h4>R1CS</h4><ul><li>witness vector z</li><li>矩陣 A/B/C entry（係數）</li><li>public 部份：z 前綴</li><li>(沒明確 gate 開關)</li></ul></div>
@@ -538,7 +606,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="III" data-slide="25">
-  <div class="slide-meta"><span class="part-label">Custom Gates</span><span class="slide-num">25 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Custom Gates</span><span class="slide-num">25 / 87</span></div>
   <h2>Custom gate — 自訂高次多項式</h2>
   <p>R1CS 的 gate 固定是 bilinear；Halo2 可以寫任意 degree 的 constraint。</p>
   <pre>meta.create_gate("horner", |meta| {
@@ -550,10 +618,14 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
   vec![q * (next - (acc * x + c))]   // degree-3 約束
 });</pre>
   <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">白話：當 <code class="inline">q=1</code>，下一列的 acc = 這列 acc × x + coeff — Horner 一步到位。R1CS 要拆成兩條 constraint + 一個中間變數。</p>
+  <div class="quote" style="margin-top:.8rem;border-left-color:var(--text-dim)">
+    <p><strong>[Paraphrase — 非原文]</strong> PLONK 原論文定義的 gate 形式為 q<sub>L</sub>·a + q<sub>R</sub>·b + q<sub>O</sub>·c + q<sub>M</sub>·a·b + q<sub>C</sub> = 0（degree ≤ 2）。Halo2 將此推廣為任意多變數、任意 rotation 的多項式約束，本頁的 Horner gate 即為 degree-3 範例。</p>
+    <span class="cite">— 依 Gabizon, Williamson, Ciobotaru, <em>PLONK</em> (ePrint 2019/953) 通用 gate 形式改寫 <sup class="ref">[4]</sup></span>
+  </div>
 </section>
 
 <section class="slide" data-part="III" data-slide="26">
-  <div class="slide-meta"><span class="part-label">Why high degree</span><span class="slide-num">26 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Why high degree</span><span class="slide-num">26 / 87</span></div>
   <h2>為什麼 Halo2 能 degree 高？</h2>
   <p>PLONK 最早只允許 degree-2。Halo2 靠更高次商多項式 + rotation + lookup，gate 實務 degree 可達 8–10。</p>
   <ul>
@@ -564,7 +636,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="III" data-slide="27">
-  <div class="slide-meta"><span class="part-label">Copy Constraints</span><span class="slide-num">27 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Copy Constraints</span><span class="slide-num">27 / 87</span></div>
   <h2>Copy constraint — permutation argument</h2>
   <div class="bridge">
     <div class="side g"><h4>R1CS</h4><p>同一變數在多條 constraint 用 — 天然「同一 z[i]」，不需要額外機制</p></div>
@@ -575,7 +647,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="III" data-slide="28">
-  <div class="slide-meta"><span class="part-label">Lookup</span><span class="slide-num">28 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Lookup</span><span class="slide-num">28 / 87</span></div>
   <h2>Lookup argument — R1CS 沒有的東西</h2>
   <p>「我這個 advice 值一定落在這張預定義表裡。」</p>
   <ul>
@@ -587,18 +659,22 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="III" data-slide="29">
-  <div class="slide-meta"><span class="part-label">Universal SRS</span><span class="slide-num">29 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Universal SRS</span><span class="slide-num">29 / 87</span></div>
   <h2>Universal SRS — 不是 per-circuit ceremony</h2>
   <div class="bridge">
     <div class="side g"><h4>Groth16</h4><p>每個 circuit 各做一次 ceremony，VK 不同；circuit 改了重做</p></div>
     <div class="arrow">↔</div>
     <div class="side h"><h4>Halo2 + KZG</h4><p>一次 univariate SRS 所有 circuit 共用；circuit 換了只換 VK，不需新 ceremony</p></div>
   </div>
+  <div class="quote" style="margin-top:1rem">
+    <p>"The polynomial commitments in our schemes are of constant size (single elements). The overhead of opening a commitment is also constant; even opening multiple evaluations requires only a constant amount of communication overhead."</p>
+    <span class="cite">— Kate, Zaverucha, Goldberg, <em>Constant-Size Commitments to Polynomials and Their Applications</em>, ASIACRYPT 2010, §1 (Introduction) <sup class="ref">[6]</sup></span>
+  </div>
   <p style="color:var(--amber);margin-top:.8rem;font-size:.9rem">⚠ 仍需 structured reference（toxic waste 問題存在）— 只是「一次搞定，多 circuit 共用」。對金融應用（每日 MDT root 變動）這是 critical feature。</p>
 </section>
 
 <section class="slide" data-part="III" data-slide="30">
-  <div class="slide-meta"><span class="part-label">Prove/Verify</span><span class="slide-num">30 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Prove/Verify</span><span class="slide-num">30 / 87</span></div>
   <h2>Prover / Verifier 流程（Plonk-style）</h2>
   <ol style="padding-left:1.2rem;margin-top:.5rem">
     <li style="list-style:decimal">Prover：填 advice → FFT 得多項式 → KZG <strong>commit</strong> 各 column polynomial</li>
@@ -608,10 +684,14 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
     <li style="list-style:decimal">Verifier：一對 pairing 檢查 gate identity、permutation、lookup 全部成立</li>
   </ol>
   <p style="color:var(--text-dim);margin-top:1rem;font-size:.95rem">驗證者 work 是常數級（幾個 pairing）— 這是 KZG 的甜蜜點。Proof 大小 ~KB 級。</p>
+  <div class="quote" style="margin-top:.8rem;border-left-color:var(--text-dim)">
+    <p><strong>[Paraphrase — 非原文]</strong> Fiat-Shamir 啟發法把「verifier 擲隨機挑戰」替換為「用 hash(transcript) 當挑戰」，將任何 public-coin 互動式證明轉為非互動，只要在 random oracle model 下安全。</p>
+    <span class="cite">— 依 Fiat, Shamir, <em>How to Prove Yourself: Practical Solutions to Identification and Signature Problems</em>, CRYPTO '86 的啟發法精神改寫 <sup class="ref">[13]</sup></span>
+  </div>
 </section>
 
 <section class="slide" data-part="III" data-slide="31">
-  <div class="slide-meta"><span class="part-label">Rows & k</span><span class="slide-num">31 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Rows & k</span><span class="slide-num">31 / 87</span></div>
   <h2>Row / Column / k</h2>
   <ul>
     <li>k = 2 的幾次方的指數 — 總列數 = 2ᵏ</li>
@@ -623,7 +703,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="III" data-slide="32">
-  <div class="slide-meta"><span class="part-label">MockProver</span><span class="slide-num">32 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">MockProver</span><span class="slide-num">32 / 87</span></div>
   <h2>MockProver vs release proving</h2>
   <ul>
     <li><strong>MockProver</strong>：不做密碼學，只檢查約束滿足 — 開發階段用、秒級</li>
@@ -634,7 +714,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="III" data-slide="33">
-  <div class="slide-meta"><span class="part-label">Implications</span><span class="slide-num">33 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Implications</span><span class="slide-num">33 / 87</span></div>
   <h2>這些特性如何影響 PF1 電路設計</h2>
   <ul>
     <li><strong>Custom gate 高 degree</strong> → Horner、A2 segment-selector、BS price 一條搞定</li>
@@ -645,7 +725,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide part-closer" data-part="III" data-slide="34">
-  <div class="slide-meta"><span class="part-label">PART III · Recap</span><span class="slide-num">34 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PART III · Recap</span><span class="slide-num">34 / 87</span></div>
   <h2>Part III takeaways</h2>
   <ul>
     <li>Plonkish ≠ R1CS：表格 + custom gate（可高 degree） + lookup</li>
@@ -660,7 +740,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 <!-- ========== PART IV: Poseidon ========== -->
 
 <section class="slide part-opener" data-part="IV" data-slide="35">
-  <div class="slide-meta"><span class="part-label">PART IV</span><span class="slide-num">35 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PART IV</span><span class="slide-num">35 / 87</span></div>
   <h1>Part IV — Poseidon</h1>
   <p class="lead">Part IV 結束後你會知道：</p>
   <ul>
@@ -672,7 +752,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="IV" data-slide="36">
-  <div class="slide-meta"><span class="part-label">Why not SHA</span><span class="slide-num">36 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Why not SHA</span><span class="slide-num">36 / 87</span></div>
   <h2>為何不用 SHA / Keccak</h2>
   <ul>
     <li><strong>SHA-256 在 ZK 電路中</strong> ~25,000 約束 / hash（位元邏輯拆成布林）</li>
@@ -684,7 +764,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="IV" data-slide="37">
-  <div class="slide-meta"><span class="part-label">Sponge</span><span class="slide-num">37 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Sponge</span><span class="slide-num">37 / 87</span></div>
   <h2>Sponge 結構</h2>
   <p>Poseidon 是固定長度的 permutation（t=3）。任意長度輸入透過 sponge 封裝：</p>
   <ul>
@@ -693,10 +773,14 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
     <li><strong>Squeeze</strong>：從 rate 讀 output chunk → 跑一次 permutation</li>
   </ul>
   <div class="card" style="margin-top:.8rem"><p><strong>PF1 使用</strong>：Position leaf（5 欄位 → 3 次 permutation）、Market Data leaf（8 欄位 → 4 次 permutation）。Merkle 每層 hash(left, right) = 1 次 permutation。</p></div>
+  <div class="quote" style="margin-top:.8rem">
+    <p>"In the absorbing phase, the r-bit input message blocks are XORed into the first r bits of the state, interleaved with applications of the function f. When all message blocks are processed, the sponge construction switches to the squeezing phase."</p>
+    <span class="cite">— Bertoni, Daemen, Peeters, Van Assche, <em>Cryptographic Sponge Functions</em> (CSF v0.1, 2011), §1.2 <sup class="ref">[8]</sup></span>
+  </div>
 </section>
 
 <section class="slide" data-part="IV" data-slide="38">
-  <div class="slide-meta"><span class="part-label">S-box</span><span class="slide-num">38 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">S-box</span><span class="slide-num">38 / 87</span></div>
   <h2>S-box：x ↦ x⁵</h2>
   <p>Halo2 允許高 degree gate → S-box 直接用 x⁵（而非 x⁻¹ 反逆或 bit-split）。</p>
   <ul>
@@ -707,7 +791,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="IV" data-slide="39">
-  <div class="slide-meta"><span class="part-label">Rounds</span><span class="slide-num">39 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Rounds</span><span class="slide-num">39 / 87</span></div>
   <h2>Full vs Partial rounds</h2>
   <ul>
     <li><strong>Full rounds</strong>：所有 t=3 state element 都過 S-box + MDS — 安全邊界</li>
@@ -722,10 +806,14 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
       <tr><td><strong>Total</strong></td><td>—</td><td><strong>65</strong></td><td><strong>357</strong></td></tr>
     </tbody>
   </table>
+  <div class="quote" style="margin-top:.8rem">
+    <p>"In HADES we consider different round functions within the same construction. More precisely, we mix rounds with full S-box layers and rounds with partial S-box layers. … The HADES design strategy consists of R<sub>f</sub> rounds in the beginning, in which S-boxes are applied to the full state, followed by R<sub>P</sub> rounds in the middle, in which S-boxes are applied only to one element of the state, and finally R<sub>f</sub> rounds at the end with full S-box layers."</p>
+    <span class="cite">— Grassi, Khovratovich, Rechberger, Roy, Schofnegger, <em>Poseidon: A New Hash Function for Zero-Knowledge Proof Systems</em>, USENIX Security 2021, §2.2 HADES Strategy <sup class="ref">[7]</sup></span>
+  </div>
 </section>
 
 <section class="slide part-closer" data-part="IV" data-slide="40">
-  <div class="slide-meta"><span class="part-label">PART IV · Recap</span><span class="slide-num">40 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PART IV · Recap</span><span class="slide-num">40 / 87</span></div>
   <h2>Part IV takeaways</h2>
   <ul>
     <li>Poseidon = 電路友善 hash，比 SHA-256 省 ~100×</li>
@@ -739,7 +827,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 <!-- ========== PART V: PF1 實作 ========== -->
 
 <section class="slide part-opener" data-part="V" data-slide="41">
-  <div class="slide-meta"><span class="part-label">PART V</span><span class="slide-num">41 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PART V</span><span class="slide-num">41 / 87</span></div>
   <h1>Part V — PF1 實作</h1>
   <p class="lead">Part V 結束後你會知道：</p>
   <ul>
@@ -753,7 +841,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="V" data-slide="42">
-  <div class="slide-meta"><span class="part-label">Architecture</span><span class="slide-num">42 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Architecture</span><span class="slide-num">42 / 87</span></div>
   <h2>PF1 整體架構 — 5 部分管線</h2>
   <p>對每筆持倉（最多 N_max=128 slots）獨立執行，再於 Part C 匯總。</p>
   <table class="tbl">
@@ -770,7 +858,7 @@ code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surfac
 </section>
 
 <section class="slide" data-part="V" data-slide="43">
-  <div class="slide-meta"><span class="part-label">BS Delta</span><span class="slide-num">43 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">BS Delta</span><span class="slide-num">43 / 87</span></div>
   <h2>BS Delta → 三個超越函數</h2>
   <pre>d1 = [ln(S/K) + (r - q + σ²/2) · T] / (σ · √T)
 Δ_call = e^(-qT) · N(d1)
@@ -782,10 +870,14 @@ N(x)   = 0.5 + 0.5 · erf(x / √2)</pre>
     <li>σ√T、σ²/2 — fp_mul + sqrt_verify (Newton)</li>
   </ul>
   <p style="color:var(--amber);margin-top:.5rem;font-size:.9rem">⚠ Δ_put 由 put-call parity：Δ_put = Δ_call − e^(-qT)，只需一個減法閘。</p>
+  <div class="quote" style="margin-top:.8rem">
+    <p>"The partial derivative w₁ of the valuation formula is of interest, because it determines the ratio of shares of stock to options in the hedged position. … In equation (13), N(d) is the cumulative normal density function."</p>
+    <span class="cite">— Black, Scholes, <em>The Pricing of Options and Corporate Liabilities</em>, J. Political Economy 81(3):637–654 (1973), eq. (13) 及相關段落 <sup class="ref">[12]</sup></span>
+  </div>
 </section>
 
 <section class="slide" data-part="V" data-slide="44">
-  <div class="slide-meta"><span class="part-label">Fixed-point</span><span class="slide-num">44 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Fixed-point</span><span class="slide-num">44 / 87</span></div>
   <h2>Fixed-point pp=48</h2>
   <p>所有中間值 = integer × 2⁻⁴⁸。S = 2⁴⁸ ≈ 281 兆（14.4 位十進位精度）。</p>
   <ul>
@@ -798,7 +890,7 @@ N(x)   = 0.5 + 0.5 · erf(x / √2)</pre>
 </section>
 
 <section class="slide" data-part="V" data-slide="45">
-  <div class="slide-meta"><span class="part-label">Pipeline</span><span class="slide-num">45 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Pipeline</span><span class="slide-num">45 / 87</span></div>
   <h2>Delta 17 步管線</h2>
   <table class="tbl">
     <thead><tr><th>#</th><th>操作</th><th>技術</th></tr></thead>
@@ -821,7 +913,7 @@ N(x)   = 0.5 + 0.5 · erf(x / √2)</pre>
 </section>
 
 <section class="slide" data-part="V" data-slide="46">
-  <div class="slide-meta"><span class="part-label">Horner</span><span class="slide-num">46 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Horner</span><span class="slide-num">46 / 87</span></div>
   <h2>Per-step Horner kernel</h2>
   <p>P(x) = c_n xⁿ + ... + c_0，巢狀寫法：P(x) = c_0 + x(c_1 + x(c_2 + ...))</p>
   <pre>// 每一步約束：acc_next · S + rem = acc · x + coeff
@@ -839,7 +931,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="V" data-slide="47">
-  <div class="slide-meta"><span class="part-label">Why polynomial</span><span class="slide-num">47 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Why polynomial</span><span class="slide-num">47 / 87</span></div>
   <h2>為何用多項式逼近？</h2>
   <ul>
     <li>ln / erf / exp 在有限域上沒有 closed form — 電路只有 + 和 ×</li>
@@ -850,7 +942,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="V" data-slide="48">
-  <div class="slide-meta"><span class="part-label">Remez</span><span class="slide-num">48 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Remez</span><span class="slide-num">48 / 87</span></div>
   <h2>Remez minimax — 精度實測</h2>
   <table class="tbl">
     <thead><tr><th>層級</th><th>精度</th><th>來源</th></tr></thead>
@@ -862,10 +954,14 @@ meta.create_gate("horner_per_step", |meta| {
     </tbody>
   </table>
   <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">N=20 持倉典型情境累積偏差 ≤ 4×10⁻¹² — 比任何合理門檻 τ ≥ 0.01 小 10 個數量級。</p>
+  <div class="quote" style="margin-top:.8rem;border-left-color:var(--text-dim)">
+    <p><strong>[Paraphrase — 非原文]</strong> Remez 1934 交替演算法求一連續函數在閉區間上的最佳一致逼近多項式；由 Chebyshev 等振盪定理保證「誤差曲線在至少 d+2 個點上以相等絕對值交替取極值」即為最佳解，因此 minimax 多項式的最壞誤差理論上無法再小。</p>
+    <span class="cite">— 依 Remez, <em>Sur la détermination des polynômes d'approximation de degré donnée</em> (1934) 及 Chebyshev equi-oscillation theorem 改寫 <sup class="ref">[14]</sup></span>
+  </div>
 </section>
 
 <section class="slide" data-part="V" data-slide="49">
-  <div class="slide-meta"><span class="part-label">Piecewise</span><span class="slide-num">49 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Piecewise</span><span class="slide-num">49 / 87</span></div>
   <h2>Piecewise — ln 4 段、erf 12 段</h2>
   <p>單一多項式在寬區間會遇到「量化飽和」— 高次係數的定點量化誤差被放大。切窄段後每段 d=12 足夠。</p>
   <ul>
@@ -876,7 +972,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="V" data-slide="50">
-  <div class="slide-meta"><span class="part-label">Lead-bit</span><span class="slide-num">50 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Lead-bit</span><span class="slide-num">50 / 87</span></div>
   <h2>ln 的 leading-bit decomposition</h2>
   <p>把 x &gt; 0 寫成 x = 2ᵉ · m, m ∈ [1, 2)；ln(x) = e·ln(2) + ln(m)。</p>
   <pre>// lead_bit gate (3 constraints):
@@ -887,7 +983,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="V" data-slide="51">
-  <div class="slide-meta"><span class="part-label">Saturation</span><span class="slide-num">51 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Saturation</span><span class="slide-num">51 / 87</span></div>
   <h2>Saturation 處理</h2>
   <p>erf(x) → 1 當 |x| 很大；x &gt; 4 直接夾到 S。電路要能「雙向」保證：</p>
   <ul>
@@ -898,7 +994,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="V" data-slide="52">
-  <div class="slide-meta"><span class="part-label">A2 Gate</span><span class="slide-num">52 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">A2 Gate</span><span class="slide-num">52 / 87</span></div>
   <h2>Segment-selector gate (A2)</h2>
   <p>A2 gate 把 (seg_idx, coeff_slot, abs_in, sat_flag) 四件事綁在一起：</p>
   <ul>
@@ -910,7 +1006,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="V" data-slide="53">
-  <div class="slide-meta"><span class="part-label">Method B exp</span><span class="slide-num">53 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Method B exp</span><span class="slide-num">53 / 87</span></div>
   <h2>Method B — exp by chunk lookup</h2>
   <p>利用 exp(a+b) = exp(a) · exp(b)。把 48-bit 輸入拆成 6 個 byte，每個位置預算一張 256-entry 查表：</p>
   <ul>
@@ -922,7 +1018,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="V" data-slide="54">
-  <div class="slide-meta"><span class="part-label">Sigma → MDT</span><span class="slide-num">54 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Sigma → MDT</span><span class="slide-num">54 / 87</span></div>
   <h2>σ 正向驗證 + Cross-tree 8 條</h2>
   <p>σ 在電路外由 Newton-Raphson 反推 — 電路內用 <code class="inline">bs_price</code> gate 正向驗證 BS price ≈ settle_price：</p>
   <pre>// 加法形式（避免有限域 wrap）:
@@ -933,7 +1029,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="V" data-slide="55">
-  <div class="slide-meta"><span class="part-label">31 Gates / 66 Constraints</span><span class="slide-num">55 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">31 Gates / 66 Constraints</span><span class="slide-num">55 / 87</span></div>
   <h2>31 custom gates / 6 modules / 66 constraints</h2>
   <table class="tbl">
     <thead><tr><th>模組</th><th># gates</th><th>職責</th></tr></thead>
@@ -951,7 +1047,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="V" data-slide="56">
-  <div class="slide-meta"><span class="part-label">Negative Tests</span><span class="slide-num">56 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Negative Tests</span><span class="slide-num">56 / 87</span></div>
   <h2>Negative tests — 讓惡意 prover 講故事</h2>
   <ul>
     <li><strong>翻 seg_idx</strong> → 係數 slot 錯配，horner 約束失敗</li>
@@ -964,7 +1060,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="V" data-slide="57">
-  <div class="slide-meta"><span class="part-label">Mock vs Release</span><span class="slide-num">57 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Mock vs Release</span><span class="slide-num">57 / 87</span></div>
   <h2>MockProver vs release — 我們兩個都跑</h2>
   <ul>
     <li><strong>MockProver</strong>：開發期間 positive + negative tests 全覆蓋、秒級迭代</li>
@@ -975,7 +1071,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="V" data-slide="58">
-  <div class="slide-meta"><span class="part-label">Circuit Size</span><span class="slide-num">58 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Circuit Size</span><span class="slide-num">58 / 87</span></div>
   <h2>電路規模 — k ≈ 19 (N=128)</h2>
   <table class="tbl">
     <thead><tr><th>指標</th><th>N=8 test</th><th>N=128 production</th></tr></thead>
@@ -993,7 +1089,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="V" data-slide="59">
-  <div class="slide-meta"><span class="part-label">Implementation</span><span class="slide-num">59 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Implementation</span><span class="slide-num">59 / 87</span></div>
   <h2>實作摘要</h2>
   <ul>
     <li><strong>Rust (halo2_proofs + halo2curves)</strong>：電路、witness 生成、MockProver + release prover</li>
@@ -1005,7 +1101,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide part-closer" data-part="V" data-slide="60">
-  <div class="slide-meta"><span class="part-label">PART V · Recap</span><span class="slide-num">60 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PART V · Recap</span><span class="slide-num">60 / 87</span></div>
   <h2>Part V takeaways</h2>
   <ul>
     <li>PF1 = 5 部分管線（A / A' / A'' / B / C），Merkle 85% + Delta 13% + 其他 2%</li>
@@ -1020,7 +1116,7 @@ meta.create_gate("horner_per_step", |meta| {
 <!-- ========== PART VI: 實驗結果 ========== -->
 
 <section class="slide part-opener" data-part="VI" data-slide="61">
-  <div class="slide-meta"><span class="part-label">PART VI</span><span class="slide-num">61 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PART VI</span><span class="slide-num">61 / 87</span></div>
   <h1>Part VI — 實驗結果</h1>
   <p class="lead">Part VI 結束後你會看到：</p>
   <ul>
@@ -1032,7 +1128,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="VI" data-slide="62">
-  <div class="slide-meta"><span class="part-label">Setup</span><span class="slide-num">62 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Setup</span><span class="slide-num">62 / 87</span></div>
   <h2>Benchmark 環境</h2>
   <ul>
     <li><strong>Rust</strong>：halo2_proofs / halo2curves（BLS12-381 via KZG）</li>
@@ -1044,7 +1140,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="VI" data-slide="63">
-  <div class="slide-meta"><span class="part-label">Proving time</span><span class="slide-num">63 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Proving time</span><span class="slide-num">63 / 87</span></div>
   <h2>Proving time（scenario_a_full）</h2>
   <table class="tbl">
     <thead><tr><th>配置</th><th>k</th><th>Rows</th><th>Proving time</th></tr></thead>
@@ -1057,7 +1153,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="VI" data-slide="64">
-  <div class="slide-meta"><span class="part-label">Verify time</span><span class="slide-num">64 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Verify time</span><span class="slide-num">64 / 87</span></div>
   <h2>Verification time</h2>
   <ul>
     <li>KZG SHPLONK 驗證 = 常數 pairing 操作數</li>
@@ -1068,7 +1164,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="VI" data-slide="65">
-  <div class="slide-meta"><span class="part-label">Proof size</span><span class="slide-num">65 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Proof size</span><span class="slide-num">65 / 87</span></div>
   <h2>Proof size</h2>
   <ul>
     <li>KZG commitments（每個 column 一個 G1 點 ~48 B）+ opening proofs</li>
@@ -1079,7 +1175,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="VI" data-slide="66">
-  <div class="slide-meta"><span class="part-label">Bit-for-bit</span><span class="slide-num">66 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Bit-for-bit</span><span class="slide-num">66 / 87</span></div>
   <h2>Rust ↔ Python 一致性</h2>
   <p>Python reference implementation 與 Rust Halo2 witness 每個中間值 bit-for-bit 對齊：</p>
   <ul>
@@ -1092,7 +1188,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="VI" data-slide="67">
-  <div class="slide-meta"><span class="part-label">E2E Accuracy</span><span class="slide-num">67 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">E2E Accuracy</span><span class="slide-num">67 / 87</span></div>
   <h2>端到端精度 — Running Example</h2>
   <table class="tbl">
     <thead><tr><th>值</th><th>理論 BS</th><th>電路輸出</th><th>ULP</th></tr></thead>
@@ -1106,7 +1202,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="VI" data-slide="68">
-  <div class="slide-meta"><span class="part-label">Comparison</span><span class="slide-num">68 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Comparison</span><span class="slide-num">68 / 87</span></div>
   <h2>橫向比較 — 為何這些選擇關鍵</h2>
   <table class="tbl">
     <thead><tr><th>元件</th><th>本研究</th><th>替代方案</th><th>成本差</th></tr></thead>
@@ -1121,7 +1217,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="VI" data-slide="69">
-  <div class="slide-meta"><span class="part-label">Plonkish metrics</span><span class="slide-num">69 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Plonkish metrics</span><span class="slide-num">69 / 87</span></div>
   <h2>Plonkish 指標</h2>
   <ul>
     <li><strong>Advice columns</strong>：~10 欄（state / acc / rem / sat_flag / seg_idx 等）</li>
@@ -1135,7 +1231,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="VI" data-slide="70">
-  <div class="slide-meta"><span class="part-label">Scalability</span><span class="slide-num">70 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Scalability</span><span class="slide-num">70 / 87</span></div>
   <h2>N-position 可擴展性</h2>
   <table class="tbl">
     <thead><tr><th>N (持倉)</th><th>Merkle depth</th><th>Total rows</th><th>k</th></tr></thead>
@@ -1150,7 +1246,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="VI" data-slide="71">
-  <div class="slide-meta"><span class="part-label">Cost breakdown</span><span class="slide-num">71 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Cost breakdown</span><span class="slide-num">71 / 87</span></div>
   <h2>Cost breakdown</h2>
   <table class="tbl">
     <thead><tr><th>Part</th><th>Rows / 持倉</th><th>占比</th><th>瓶頸</th></tr></thead>
@@ -1167,7 +1263,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide part-closer" data-part="VI" data-slide="72">
-  <div class="slide-meta"><span class="part-label">PART VI · Recap</span><span class="slide-num">72 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PART VI · Recap</span><span class="slide-num">72 / 87</span></div>
   <h2>Part VI takeaways</h2>
   <ul>
     <li>Running example 可實際 prove / verify、端到端實測 ~6.04 ULP（理論上界 57.6）</li>
@@ -1181,13 +1277,13 @@ meta.create_gate("horner_per_step", |meta| {
 <!-- ========== PART VII: 限制與未來 ========== -->
 
 <section class="slide part-opener" data-part="VII" data-slide="73">
-  <div class="slide-meta"><span class="part-label">PART VII</span><span class="slide-num">73 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PART VII</span><span class="slide-num">73 / 87</span></div>
   <h1>Part VII — 限制與未來</h1>
   <p class="lead">Part VII 結束後你會知道本論文的邊界在哪，以及三個計畫強化方向。</p>
 </section>
 
 <section class="slide" data-part="VII" data-slide="74">
-  <div class="slide-meta"><span class="part-label">erf domain</span><span class="slide-num">74 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">erf domain</span><span class="slide-num">74 / 87</span></div>
   <h2>erf domain 邊界 |x| = 4</h2>
   <ul>
     <li>目前 erf piecewise 覆蓋 |x| ≤ 4，以外夾到 ±S（saturation）</li>
@@ -1198,7 +1294,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="VII" data-slide="75">
-  <div class="slide-meta"><span class="part-label">Portfolio</span><span class="slide-num">75 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Portfolio</span><span class="slide-num">75 / 87</span></div>
   <h2>Portfolio N-position — N=8 test → N=128 production</h2>
   <ul>
     <li>當前實作：N=8（Merkle depth 3），開發驗證加速</li>
@@ -1209,7 +1305,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="VII" data-slide="76">
-  <div class="slide-meta"><span class="part-label">PF2</span><span class="slide-num">76 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PF2</span><span class="slide-num">76 / 87</span></div>
   <h2>PF2 — 商業 IP 考量</h2>
   <p>PF2 負責 State Transition + 交易所 EdDSA 驗簽，論文中保留介面定義與 relation，實作細節另案。</p>
   <ul>
@@ -1220,7 +1316,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="VII" data-slide="77">
-  <div class="slide-meta"><span class="part-label">Open Qs</span><span class="slide-num">77 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Open Qs</span><span class="slide-num">77 / 87</span></div>
   <h2>Open questions</h2>
   <ul>
     <li><strong>MDT 去中心化</strong>：可否用 oracle threshold signature 取代 administrator 簽署？</li>
@@ -1230,7 +1326,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="VII" data-slide="78">
-  <div class="slide-meta"><span class="part-label">Future work</span><span class="slide-num">78 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Future work</span><span class="slide-num">78 / 87</span></div>
   <h2>三個計畫強化方向</h2>
   <ol style="padding-left:1.2rem">
     <li style="list-style:decimal"><strong>bs_price 混合容差</strong>：現絕對容差 0.02 → 改為 <code class="inline">max(ABS_MIN, REL_TOL·settle_price)</code>，低價選擇權（settle ≈ $0.01）更精準</li>
@@ -1241,7 +1337,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide part-closer" data-part="VII" data-slide="79">
-  <div class="slide-meta"><span class="part-label">PART VII · Recap</span><span class="slide-num">79 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PART VII · Recap</span><span class="slide-num">79 / 87</span></div>
   <h2>Part VII takeaways</h2>
   <ul>
     <li>邊界誠實說：erf tail |x|=4、N=8 → N=128 scaling、PF2 另案</li>
@@ -1253,13 +1349,13 @@ meta.create_gate("horner_per_step", |meta| {
 <!-- ========== PART VIII: 結論 ========== -->
 
 <section class="slide part-opener" data-part="VIII" data-slide="80">
-  <div class="slide-meta"><span class="part-label">PART VIII</span><span class="slide-num">80 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">PART VIII</span><span class="slide-num">80 / 87</span></div>
   <h1>Part VIII — 結論</h1>
   <p class="lead">五分鐘內把整場報告收斂成一張心智樹 + Q&amp;A。</p>
 </section>
 
 <section class="slide" data-part="VIII" data-slide="81">
-  <div class="slide-meta"><span class="part-label">Recap</span><span class="slide-num">81 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Recap</span><span class="slide-num">81 / 87</span></div>
   <h2>貢獻 recap</h2>
   <ul>
     <li>Halo2 上首個 BS Delta 零知識電路，N=128、k ≈ 19（~289K rows）</li>
@@ -1271,7 +1367,7 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="VIII" data-slide="82">
-  <div class="slide-meta"><span class="part-label">Concept Tree</span><span class="slide-num">82 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Concept Tree</span><span class="slide-num">82 / 87</span></div>
   <h2>全景概念樹</h2>
   <p>你剛才學到的依賴鏈：</p>
   <pre>早期 ZK: R1CS + QAP + per-circuit ceremony
@@ -1292,7 +1388,7 @@ Method B exp (byte-decompose + chunk lookup)
 </section>
 
 <section class="slide" data-part="VIII" data-slide="83">
-  <div class="slide-meta"><span class="part-label">Thesis Index</span><span class="slide-num">83 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Thesis Index</span><span class="slide-num">83 / 87</span></div>
   <h2>論文章節索引</h2>
   <table class="tbl">
     <thead><tr><th>Ch</th><th>標題</th><th>對應 Part</th></tr></thead>
@@ -1309,7 +1405,7 @@ Method B exp (byte-decompose + chunk lookup)
 </section>
 
 <section class="slide" data-part="VIII" data-slide="84">
-  <div class="slide-meta"><span class="part-label">Acknowledgments</span><span class="slide-num">84 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Acknowledgments</span><span class="slide-num">84 / 87</span></div>
   <h2>致謝</h2>
   <ul>
     <li>指導教授</li>
@@ -1321,14 +1417,37 @@ Method B exp (byte-decompose + chunk lookup)
 </section>
 
 <section class="slide" data-part="VIII" data-slide="85">
-  <div class="slide-meta"><span class="part-label">Q &amp; A</span><span class="slide-num">85 / 86</span></div>
+  <div class="slide-meta"><span class="part-label">Q &amp; A</span><span class="slide-num">85 / 87</span></div>
   <h1 style="text-align:center">Q &amp; A</h1>
   <p class="subtitle" style="text-align:center;margin:0 auto">歡迎提問</p>
   <p style="color:var(--text-dim);text-align:center;margin-top:2rem;font-size:.92rem">Running Example 可供參考：S=100, K=100, σ=20%, T=30d, r=5%, q=0 → Δ ≈ 0.523</p>
 </section>
 
-<section class="slide title" data-part="VIII" data-slide="86">
-  <div class="slide-meta"><span class="slide-num">86 / 86</span></div>
+<section class="slide" data-part="VIII" data-slide="86" id="references">
+  <div class="slide-meta"><span class="part-label">References</span><span class="slide-num">86 / 87</span></div>
+  <h2>References — 關鍵引用原文</h2>
+  <p style="color:var(--text-dim);font-size:.92rem">本報告所有技術定義皆直接引用原論文；完整列表如下，括號中為本報告中引用處的 slide 編號。</p>
+  <ol class="reflist" id="refs-ol">
+    <li><strong>Goldwasser, Micali, Rackoff (1989)</strong>. The knowledge complexity of interactive proof systems. <em>SIAM J. Comput.</em>, 18(1):186–208. <span style="color:var(--text-faint)">[ZK 原始定義]</span></li>
+    <li><strong>Bellare, Goldreich (1992)</strong>. On defining proofs of knowledge. <em>CRYPTO '92</em>. <span style="color:var(--text-faint)">[knowledge soundness]</span></li>
+    <li><strong>Groth, J. (2016)</strong>. On the size of pairing-based non-interactive arguments. <em>EUROCRYPT 2016</em>. <a href="https://eprint.iacr.org/2016/260">eprint/2016/260</a>. <span style="color:var(--text-faint)">[Groth16 SNARK]</span></li>
+    <li><strong>Gabizon, Williamson, Ciobotaru (2019)</strong>. PlonK: Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of Knowledge. <a href="https://eprint.iacr.org/2019/953">eprint/2019/953</a>. <span style="color:var(--text-faint)">[custom gates + copy constraints]</span></li>
+    <li><strong>Zcash Foundation (2022–)</strong>. The halo2 Book. <a href="https://zcash.github.io/halo2/">zcash.github.io/halo2</a>. <span style="color:var(--text-faint)">[Plonkish arithmetization]</span></li>
+    <li><strong>Kate, Zaverucha, Goldberg (2010)</strong>. Constant-size commitments to polynomials and their applications. <em>ASIACRYPT 2010</em>. <span style="color:var(--text-faint)">[KZG commitment]</span></li>
+    <li><strong>Grassi, Khovratovich, Rechberger, Roy, Schofnegger (2021)</strong>. Poseidon: A New Hash Function for Zero-Knowledge Proof Systems. <em>USENIX Security 2021</em>. <a href="https://eprint.iacr.org/2019/458">eprint/2019/458</a>. <span style="color:var(--text-faint)">[sponge + round function]</span></li>
+    <li><strong>Bertoni, Daemen, Peeters, Van Assche (2011)</strong>. Cryptographic sponge functions. <a href="https://keccak.team/files/CSF-0.1.pdf">keccak.team/CSF-0.1</a>. <span style="color:var(--text-faint)">[sponge construction]</span></li>
+    <li><strong>Bernstein, Duif, Lange, Schwabe, Yang (2012)</strong>. High-speed high-security signatures. <em>J. Cryptographic Engineering</em>, 2(2):77–89. <a href="https://ed25519.cr.yp.to/ed25519-20110705.pdf">ed25519.cr.yp.to</a>. <span style="color:var(--text-faint)">[EdDSA — §4 簽章方程：<code>S = (r + H(R, A, M)·a) mod ℓ</code>，驗證式 <code>8·S·B = 8·R + 8·H(R, A, M)·A</code>]</span></li>
+    <li><strong>Whitehat, Baylina, Bellés (2020)</strong>. Baby Jubjub Elliptic Curve. ERC-2494. <a href="https://eips.ethereum.org/EIPS/eip-2494">eips.ethereum.org/EIPS/eip-2494</a>. <span style="color:var(--text-faint)">[Baby Jubjub — Twisted Edwards 方程：<code>168700·x² + y² = 1 + 168696·x²y²</code> over F<sub>r</sub>, r = BN254 scalar field]</span></li>
+    <li><strong>Merkle, R. C. (1988)</strong>. A digital signature based on a conventional encryption function. <em>CRYPTO '87</em>. <span style="color:var(--text-faint)">[Merkle tree]</span></li>
+    <li><strong>Black, F., Scholes, M. (1973)</strong>. The pricing of options and corporate liabilities. <em>J. Political Economy</em>, 81(3):637–654. <span style="color:var(--text-faint)">[BS formula, Delta]</span></li>
+    <li><strong>Fiat, A., Shamir, A. (1986)</strong>. How to prove yourself: Practical solutions to identification and signature problems. <em>CRYPTO '86</em>. <span style="color:var(--text-faint)">[Fiat-Shamir]</span></li>
+    <li><strong>Remez, E. Y. (1934)</strong>. Sur la détermination des polynômes d'approximation de degré donnée. <em>Comm. Soc. Math. Kharkov</em>. <span style="color:var(--text-faint)">[minimax approximation]</span></li>
+  </ol>
+  <p style="color:var(--text-faint);font-size:.78rem;margin-top:1rem">每張技術 slide 的引用以 <sup class="ref">[n]</sup> 上標連結至此表；Part III–V 的標準技術圖若取自原論文，會在 figcaption 中標註 source。</p>
+</section>
+
+<section class="slide title" data-part="VIII" data-slide="87">
+  <div class="slide-meta"><span class="slide-num">87 / 87</span></div>
   <h1>謝謝聆聽</h1>
   <p class="subtitle">Zero-Knowledge Compliance for Fund Operations</p>
   <p style="color:var(--text-faint);font-size:.9rem;margin-top:2rem">~/.claude/projects/畢業論文v4 · 2026</p>
