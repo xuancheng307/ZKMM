@@ -1597,7 +1597,7 @@ meta.create_gate("horner_per_step", |meta| {
 <section class="slide part-opener" data-part="VII" data-slide="73">
   <div class="slide-meta"><span class="part-label">PART VII</span><span class="slide-num">73 / 87</span></div>
   <h1>Part VII — 限制與未來</h1>
-  <p class="lead">Part VII 結束後你會知道本論文的邊界在哪，以及三個計畫強化方向。</p>
+  <p class="lead">Part VII 結束後你會知道本論文的邊界在哪，以及三項已落地的工程強化。</p>
 </section>
 
 <section class="slide" data-part="VII" data-slide="74">
@@ -1645,13 +1645,13 @@ meta.create_gate("horner_per_step", |meta| {
 
 <section class="slide" data-part="VII" data-slide="78">
   <div class="slide-meta"><span class="part-label">Future work</span><span class="slide-num">78 / 87</span></div>
-  <h2>三個計畫強化方向</h2>
-  <ol style="padding-left:1.2rem">
-    <li style="list-style:decimal"><strong>bs_price 混合容差</strong>：現絕對容差 0.02 → 改為 <code class="inline">max(ABS_MIN, REL_TOL·settle_price)</code>，低價選擇權（settle ≈ $0.01）更精準</li>
-    <li style="list-style:decimal"><strong>T_min 下限排除 pin risk</strong>：T &lt; 1 day 的 ATM 部位 Gamma 劇烈 → 強制全額備兌或排除</li>
-    <li style="list-style:decimal"><strong>σ 由 MDT 直接提供</strong>：消除 prover 對 σ 的 witness 自由度，bs_price 可退役為完整性檢查而非 σ 驗證</li>
+  <h2>三項工程強化（✅ 已於 2026-04-17 實作）</h2>
+  <ol style="padding-left:1.2rem;font-size:.95rem">
+    <li style="list-style:decimal;margin-bottom:.35rem"><strong>bs_price 雙重容差（AND）</strong>：同時要求 <code class="inline">|bs−settle| ≤ ABS_TOL</code>（0.02）<em>且</em> <code class="inline">|bs−settle| ≤ REL_TOL·settle/S</code>（0.5%）— 兩 gate 同時成立才通過，低價與高價選擇權皆有下限保護</li>
+    <li style="list-style:decimal;margin-bottom:.35rem"><strong>T_min 7 日硬下限</strong>：非股票部位強制 <code class="inline">t_days − 7 ≥ 0</code>（2-byte 分解 + byte lookup），排除短期 pin risk 與流動性陷阱</li>
+    <li style="list-style:decimal;margin-bottom:.35rem"><strong>σ 由 MDT 直接提供</strong>：Market Data leaf 由 8 → 9 欄位（新增 σ 於 index 8），Poseidon 吸收 3 次；<em>bs_price 未退役</em>，仍做 settle 價格 cross-check 作為完整性證明</li>
   </ol>
-  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.92rem">以上皆為工程精進，<strong>不影響</strong>核心 ZK-POK 數學 soundness。</p>
+  <p style="color:var(--text-dim);margin-top:.4rem;font-size:.88rem">Commits <code class="inline">9cf6f45</code> / <code class="inline">bf6bf8d</code>（容差）、<code class="inline">bbc9eaa</code>（T_min）、<code class="inline">43310f6</code>（σ）；以上皆為工程精進，<strong>不影響</strong>核心 ZK-POK 數學 soundness。</p>
 </section>
 
 <section class="slide part-closer" data-part="VII" data-slide="79">
@@ -1660,7 +1660,7 @@ meta.create_gate("horner_per_step", |meta| {
   <ul>
     <li>邊界誠實說：erf tail |x|=4、N=8 → N=128 scaling、PF2 另案</li>
     <li>研究方向：去中心化 MDT、IVC 增量、Greeks 集合</li>
-    <li>三個計畫強化：混合容差、T_min 下限、σ 由 MDT 提供 — 不影響核心 soundness</li>
+    <li>三項已落地工程強化：雙重容差 AND、T_min 7 日硬下限、σ 由 MDT 直供 — 不影響核心 soundness</li>
   </ul>
 </section>
 
