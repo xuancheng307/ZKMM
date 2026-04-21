@@ -502,6 +502,77 @@ figure.fig figcaption strong{color:var(--text)}
     <p>"we describe a method called 'tree authentication' which can be used to authenticate any Y<sub>i</sub> of any user quickly and easily, but which requires minimal storage."</p>
     <span class="cite">— Merkle, <em>A Certified Digital Signature</em> (1979), §6 Tree Authentication <sup class="ref">[11]</sup></span>
   </div>
+  <figure class="fig" style="margin-top:1rem">
+    <svg viewBox="0 0 900 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two Merkle trees">
+      <defs>
+        <style>
+          .t{font:600 12px 'Inter','Noto Sans TC',sans-serif;fill:#1a1a1f}
+          .sm{font:11px 'Inter',monospace;fill:#55596b}
+          .tl{font:600 13px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5}
+          .r{fill:#eef2ff;stroke:#4f46e5;stroke-width:1.5}
+          .p{fill:#e0e7ff;stroke:#4f46e5;stroke-width:1.2}
+          .l{fill:#fff;stroke:#55596b;stroke-width:1}
+          .m{fill:#fef3c7;stroke:#d97706;stroke-width:1.2}
+          .ml{fill:#fff;stroke:#d97706;stroke-width:1}
+          .bind{stroke:#dc2626;stroke-width:1.5;stroke-dasharray:4 3;fill:none}
+          .e{stroke:#55596b;stroke-width:1;fill:none}
+        </style>
+      </defs>
+
+      <!-- Position Tree (left) -->
+      <text x="110" y="22" class="tl">Position State Tree (depth 7)</text>
+      <rect x="150" y="35" width="120" height="28" rx="6" class="r"/>
+      <text x="210" y="54" text-anchor="middle" class="t">state_root</text>
+
+      <rect x="80"  y="80" width="80" height="24" rx="5" class="p"/><text x="120" y="96" text-anchor="middle" class="sm">h(L,R)</text>
+      <rect x="260" y="80" width="80" height="24" rx="5" class="p"/><text x="300" y="96" text-anchor="middle" class="sm">h(L,R)</text>
+
+      <rect x="40"  y="120" width="60" height="22" rx="5" class="p"/><text x="70"  y="136" text-anchor="middle" class="sm">…</text>
+      <rect x="140" y="120" width="60" height="22" rx="5" class="p"/><text x="170" y="136" text-anchor="middle" class="sm">…</text>
+      <rect x="220" y="120" width="60" height="22" rx="5" class="p"/><text x="250" y="136" text-anchor="middle" class="sm">…</text>
+      <rect x="320" y="120" width="60" height="22" rx="5" class="p"/><text x="350" y="136" text-anchor="middle" class="sm">…</text>
+
+      <rect x="40"  y="165" width="60" height="42" rx="5" class="l"/><text x="70"  y="181" text-anchor="middle" class="sm">pos leaf</text><text x="70" y="196" text-anchor="middle" class="sm">(5 fields)</text>
+      <rect x="140" y="165" width="60" height="42" rx="5" class="l"/><text x="170" y="181" text-anchor="middle" class="sm">pos leaf</text><text x="170" y="196" text-anchor="middle" class="sm">hi-lighted</text>
+      <rect x="220" y="165" width="60" height="42" rx="5" class="l"/><text x="250" y="181" text-anchor="middle" class="sm">dummy</text><text x="250" y="196" text-anchor="middle" class="sm">(padding)</text>
+      <rect x="320" y="165" width="60" height="42" rx="5" class="l"/><text x="350" y="181" text-anchor="middle" class="sm">dummy</text>
+
+      <path class="e" d="M210,63 L120,80"/><path class="e" d="M210,63 L300,80"/>
+      <path class="e" d="M120,104 L70,120"/><path class="e" d="M120,104 L170,120"/>
+      <path class="e" d="M300,104 L250,120"/><path class="e" d="M300,104 L350,120"/>
+      <path class="e" d="M70,142 L70,165"/><path class="e" d="M170,142 L170,165"/>
+      <path class="e" d="M250,142 L250,165"/><path class="e" d="M350,142 L350,165"/>
+
+      <!-- Market Data Tree (right) -->
+      <text x="530" y="22" class="tl">Market Data Tree (depth ~20)</text>
+      <rect x="620" y="35" width="140" height="28" rx="6" class="m"/>
+      <text x="690" y="54" text-anchor="middle" class="t">market_data_root</text>
+
+      <rect x="560" y="80" width="80" height="24" rx="5" class="m"/><text x="600" y="96" text-anchor="middle" class="sm">h(L,R)</text>
+      <rect x="740" y="80" width="80" height="24" rx="5" class="m"/><text x="780" y="96" text-anchor="middle" class="sm">h(L,R)</text>
+
+      <rect x="520" y="120" width="60" height="22" rx="5" class="m"/><text x="550" y="136" text-anchor="middle" class="sm">…</text>
+      <rect x="620" y="120" width="60" height="22" rx="5" class="m"/><text x="650" y="136" text-anchor="middle" class="sm">…</text>
+      <rect x="700" y="120" width="60" height="22" rx="5" class="m"/><text x="730" y="136" text-anchor="middle" class="sm">…</text>
+      <rect x="800" y="120" width="60" height="22" rx="5" class="m"/><text x="830" y="136" text-anchor="middle" class="sm">…</text>
+
+      <rect x="520" y="165" width="60" height="42" rx="5" class="ml"/><text x="550" y="181" text-anchor="middle" class="sm">md leaf</text><text x="550" y="196" text-anchor="middle" class="sm">(8 fields)</text>
+      <rect x="620" y="165" width="60" height="42" rx="5" class="ml"/><text x="650" y="181" text-anchor="middle" class="sm">md leaf</text><text x="650" y="196" text-anchor="middle" class="sm">matched</text>
+      <rect x="700" y="165" width="60" height="42" rx="5" class="ml"/><text x="730" y="181" text-anchor="middle" class="sm">md leaf</text>
+      <rect x="800" y="165" width="60" height="42" rx="5" class="ml"/><text x="830" y="181" text-anchor="middle" class="sm">md leaf</text>
+
+      <path class="e" d="M690,63 L600,80"/><path class="e" d="M690,63 L780,80"/>
+      <path class="e" d="M600,104 L550,120"/><path class="e" d="M600,104 L650,120"/>
+      <path class="e" d="M780,104 L730,120"/><path class="e" d="M780,104 L830,120"/>
+      <path class="e" d="M550,142 L550,165"/><path class="e" d="M650,142 L650,165"/>
+      <path class="e" d="M730,142 L730,165"/><path class="e" d="M830,142 L830,165"/>
+
+      <!-- cross-tree binding -->
+      <path class="bind" d="M200,186 C 350,220 500,220 620,186"/>
+      <text x="410" y="220" text-anchor="middle" class="t" fill="#dc2626">8 條 copy constraint</text>
+    </svg>
+    <figcaption>圖：兩棵 Merkle Tree — 藍樹（Position State，depth 7）+ 琥珀樹（Market Data，depth ~20）；紅虛線 = 8 條 cross-tree copy constraint（見 slide 18）</figcaption>
+  </figure>
 </section>
 
 <section class="slide" data-part="II" data-slide="18">
@@ -777,6 +848,82 @@ figure.fig figcaption strong{color:var(--text)}
     <p>"In the absorbing phase, the r-bit input message blocks are XORed into the first r bits of the state, interleaved with applications of the function f. When all message blocks are processed, the sponge construction switches to the squeezing phase."</p>
     <span class="cite">— Bertoni, Daemen, Peeters, Van Assche, <em>Cryptographic Sponge Functions</em> (CSF v0.1, 2011), §1.2 <sup class="ref">[8]</sup></span>
   </div>
+  <figure class="fig" style="margin-top:1rem">
+    <svg viewBox="0 0 880 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Poseidon sponge diagram">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#4f46e5"/>
+        </marker>
+        <style>
+          .lbl{font:600 13px 'Inter','Noto Sans TC',sans-serif;fill:#1a1a1f}
+          .sm{font:12px 'Inter','Noto Sans TC',sans-serif;fill:#55596b}
+          .sml{font:11px 'Inter',monospace;fill:#55596b}
+          .tag{font:600 11px 'Inter',sans-serif;fill:#4f46e5}
+          .r{fill:#eef2ff;stroke:#4f46e5;stroke-width:1.5}
+          .c{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}
+          .f{fill:#fff;stroke:#1a1a1f;stroke-width:1.5}
+          .in{fill:#d1fae5;stroke:#059669;stroke-width:1.5}
+          .out{fill:#fee2e2;stroke:#dc2626;stroke-width:1.5}
+          .arr{stroke:#4f46e5;stroke-width:1.8;fill:none;marker-end:url(#arr)}
+        </style>
+      </defs>
+
+      <text x="40" y="22" class="lbl">Absorb</text>
+      <text x="560" y="22" class="lbl">Squeeze</text>
+
+      <!-- inputs -->
+      <rect x="20"  y="40" width="70" height="36" rx="6" class="in"/><text x="55"  y="63" text-anchor="middle" class="sm">m₁ (rate)</text>
+      <rect x="170" y="40" width="70" height="36" rx="6" class="in"/><text x="205" y="63" text-anchor="middle" class="sm">m₂ (rate)</text>
+
+      <!-- XOR + state blocks (rate) -->
+      <circle cx="140" cy="98" r="14" class="f"/><text x="140" y="103" text-anchor="middle" class="lbl">⊕</text>
+      <circle cx="290" cy="98" r="14" class="f"/><text x="290" y="103" text-anchor="middle" class="lbl">⊕</text>
+
+      <rect x="100" y="130" width="80" height="32" rx="6" class="r"/><text x="140" y="151" text-anchor="middle" class="sm">r-bit (2)</text>
+      <rect x="250" y="130" width="80" height="32" rx="6" class="r"/><text x="290" y="151" text-anchor="middle" class="sm">r-bit (2)</text>
+
+      <!-- capacity blocks -->
+      <rect x="100" y="170" width="80" height="28" rx="6" class="c"/><text x="140" y="189" text-anchor="middle" class="sml">c (cap=1)</text>
+      <rect x="250" y="170" width="80" height="28" rx="6" class="c"/><text x="290" y="189" text-anchor="middle" class="sml">c (cap=1)</text>
+
+      <!-- f permutations -->
+      <rect x="200" y="120" width="50" height="70" rx="6" class="f"/><text x="225" y="160" text-anchor="middle" class="lbl">f</text>
+      <text x="225" y="178" text-anchor="middle" class="tag">65 rows</text>
+      <rect x="350" y="120" width="50" height="70" rx="6" class="f"/><text x="375" y="160" text-anchor="middle" class="lbl">f</text>
+      <rect x="500" y="120" width="50" height="70" rx="6" class="f"/><text x="525" y="160" text-anchor="middle" class="lbl">f</text>
+
+      <!-- state blocks squeeze phase -->
+      <rect x="420" y="130" width="80" height="32" rx="6" class="r"/><text x="460" y="151" text-anchor="middle" class="sm">r-bit</text>
+      <rect x="420" y="170" width="80" height="28" rx="6" class="c"/><text x="460" y="189" text-anchor="middle" class="sml">c</text>
+
+      <rect x="570" y="130" width="80" height="32" rx="6" class="r"/><text x="610" y="151" text-anchor="middle" class="sm">r-bit</text>
+      <rect x="570" y="170" width="80" height="28" rx="6" class="c"/><text x="610" y="189" text-anchor="middle" class="sml">c</text>
+
+      <!-- outputs -->
+      <rect x="690" y="130" width="70" height="36" rx="6" class="out"/><text x="725" y="153" text-anchor="middle" class="sm">z₁</text>
+      <rect x="780" y="130" width="70" height="36" rx="6" class="out"/><text x="815" y="153" text-anchor="middle" class="sm">z₂</text>
+
+      <!-- arrows -->
+      <path class="arr" d="M55,76 L 140,92"/>
+      <path class="arr" d="M205,76 L 290,92"/>
+      <path class="arr" d="M140,112 L 140,128"/>
+      <path class="arr" d="M180,145 L 198,145"/>
+      <path class="arr" d="M180,184 L 198,184"/>
+      <path class="arr" d="M250,145 L 270,98 L 276,96"/>
+      <path class="arr" d="M250,184 L 270,184"/>
+      <path class="arr" d="M290,112 L 290,128"/>
+      <path class="arr" d="M330,145 L 348,145"/>
+      <path class="arr" d="M330,184 L 348,184"/>
+      <path class="arr" d="M400,145 L 418,145"/>
+      <path class="arr" d="M400,184 L 418,184"/>
+      <path class="arr" d="M500,145 L 498,145"/>
+      <path class="arr" d="M550,145 L 568,145"/>
+      <path class="arr" d="M550,184 L 568,184"/>
+      <path class="arr" d="M460,130 L 460,115 L 725,115 L 725,128"/>
+      <path class="arr" d="M610,130 L 610,100 L 815,100 L 815,128"/>
+    </svg>
+    <figcaption>圖：Sponge 結構 — 藍（rate r=2）吸收 m₁, m₂ 後 squeeze 輸出 z₁, z₂；每個 f = Poseidon permutation (t=3)，在 PF1 中佔 65 rows / 357 constraints</figcaption>
+  </figure>
 </section>
 
 <section class="slide" data-part="IV" data-slide="38">
@@ -910,6 +1057,35 @@ N(x)   = 0.5 + 0.5 · erf(x / √2)</pre>
       <tr><td>17</td><td>Δ = e^(−qT) × N(d₁)</td><td>fp_mul</td></tr>
     </tbody>
   </table>
+  <figure class="fig" style="margin-top:1rem">
+    <div class="mermaid">
+flowchart LR
+  S([S]):::in --> div1["① S/K<br/>fp_div"]
+  K([K]):::in --> div1
+  div1 --> rr1["② lead_bit<br/>→ r∈[1,2)"]
+  rr1 --> ln1["③-④ ln(r)<br/>Remez×4"]
+  ln1 --> ln2["⑤ ln(S/K)<br/>= ln(r)+e·ln2"]
+  sig([σ]):::in --> num["⑥-⑦ d₁ 分子/分母"]
+  r([r]):::in --> num
+  q([q]):::in --> num
+  T([T]):::in --> num
+  ln2 --> num
+  num --> d1["⑧ d₁ = 分子/分母"]
+  d1 --> rr2["⑨ |d₁/√2|<br/>sign_extend"]
+  rr2 --> erf["⑩-⑪ erf<br/>Remez×12"]
+  erf --> n["⑫ N(d₁)<br/>=0.5+0.5·erf"]
+  q --> qT["⑬ qT"]
+  T --> qT
+  qT --> exprr["⑭ qT÷ln2"]
+  exprr --> expc["⑮-⑯ exp(−qT)<br/>Method B"]
+  n --> out["⑰ Δ = e^{−qT}·N(d₁)"]
+  expc --> out
+  out --> final([Δ]):::out
+  classDef in fill:#eef2ff,stroke:#4f46e5,color:#1a1a1f;
+  classDef out fill:#d1fae5,stroke:#059669,color:#064e3b;
+    </div>
+    <figcaption>圖：Delta pipeline 17 步 DAG — 綠色節點為輸出 Δ，藍色節點為 public/witness 輸入</figcaption>
+  </figure>
 </section>
 
 <section class="slide" data-part="V" data-slide="46">
