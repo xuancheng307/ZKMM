@@ -1002,6 +1002,36 @@ figure.fig figcaption strong{color:var(--text)}
     </tbody>
   </table>
   <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">總計：~2,257 rows/持倉 × 128 ≈ <strong>289,000 rows, k ≈ 19</strong>。Merkle 占 ~85% — 本研究讓 Δ 成為可能且高效，而不是讓整體變小。</p>
+  <figure class="fig" style="margin-top:1rem">
+    <svg viewBox="0 0 960 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PF1 cost breakdown">
+      <!-- A: 528 rows 23% -->
+      <rect x="0"     y="25" width="221" height="40" fill="#4f46e5"/>
+      <text x="110" y="43" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif" fill="#ffffff">A: State Merkle</text>
+      <text x="110" y="58" text-anchor="middle" style="font:10px 'Inter',monospace" fill="#ffffff" fill-opacity="0.9">528 rows · 23%</text>
+      <!-- A': 1386 rows 61% -->
+      <rect x="221"   y="25" width="586" height="40" fill="#6366f1"/>
+      <text x="514" y="43" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif" fill="#ffffff">A': Market Data Merkle</text>
+      <text x="514" y="58" text-anchor="middle" style="font:10px 'Inter',monospace" fill="#ffffff" fill-opacity="0.9">1,386 rows · 61%</text>
+      <!-- A'': 32 rows 1% -->
+      <rect x="807"   y="25" width="13"  height="40" fill="#a5b4fc"/>
+      <!-- B: 298 rows 13% -->
+      <rect x="820"   y="25" width="127" height="40" fill="#10b981"/>
+      <text x="883" y="43" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif" fill="#ffffff">B: Δ pipeline</text>
+      <text x="883" y="58" text-anchor="middle" style="font:10px 'Inter',monospace" fill="#ffffff" fill-opacity="0.9">298 · 13%</text>
+      <!-- C: 5 rows -->
+      <rect x="947"   y="25" width="13"  height="40" fill="#64748b"/>
+
+      <text x="0"   y="18" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">Merkle verification (A + A' + A'') = 85%</text>
+      <text x="820" y="18" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">Δ pipeline (B) = 13%</text>
+
+      <!-- footer callouts -->
+      <line x1="813" y1="65" x2="813" y2="78" stroke="#55596b" stroke-width="1"/>
+      <text x="813" y="90" text-anchor="middle" style="font:9px 'Inter',sans-serif" fill="#55596b">A'' σ 驗證 1%</text>
+      <line x1="954" y1="65" x2="954" y2="78" stroke="#55596b" stroke-width="1"/>
+      <text x="954" y="90" text-anchor="end"    style="font:9px 'Inter',sans-serif" fill="#55596b">C 累加 &lt;1%</text>
+    </svg>
+    <figcaption>圖：PF1 每持倉 2,257 rows 成本占比 — Merkle 驗證（A + A' + A''）佔 85%，本論文核心 Δ 管線（B）僅 13%。本研究的價值不在縮減整體大小，而在讓 Δ 變得<strong>可行</strong>。</figcaption>
+  </figure>
 </section>
 
 <section class="slide" data-part="V" data-slide="43">
@@ -1130,6 +1160,51 @@ meta.create_gate("horner_per_step", |meta| {
     </tbody>
   </table>
   <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">N=20 持倉典型情境累積偏差 ≤ 4×10⁻¹² — 比任何合理門檻 τ ≥ 0.01 小 10 個數量級。</p>
+  <figure class="fig" style="margin-top:.8rem">
+    <svg viewBox="0 0 820 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ULP comparison">
+      <defs>
+        <style>
+          .ax{stroke:#c7c9d3;stroke-width:1}
+          .tk{font:10px 'Inter',monospace;fill:#55596b}
+          .lbl{font:600 12px 'Inter','Noto Sans TC',sans-serif;fill:#1a1a1f}
+          .val{font:700 12px 'Inter',monospace;fill:#1a1a1f}
+          .ttl{font:600 12px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5}
+        </style>
+      </defs>
+      <text x="200" y="18" class="ttl">Delta pipeline ULP 誤差（對數比較）</text>
+      <!-- axis -->
+      <line class="ax" x1="200" y1="155" x2="680" y2="155"/>
+      <!-- log scale: 1 → x=200, 100 → x=680; pixel per log10 = 240 -->
+      <!-- ticks at 1, 10, 100 -->
+      <line class="ax" x1="200" y1="155" x2="200" y2="160"/><text x="200" y="172" text-anchor="middle" class="tk">1</text>
+      <line class="ax" x1="440" y1="155" x2="440" y2="160"/><text x="440" y="172" text-anchor="middle" class="tk">10</text>
+      <line class="ax" x1="680" y1="155" x2="680" y2="160"/><text x="680" y="172" text-anchor="middle" class="tk">100</text>
+      <text x="440" y="150" text-anchor="middle" class="tk" style="font-size:9px">ULP</text>
+
+      <!-- bars: log(x) pixels, log10(1.2)≈0.079 -->
+      <!-- Kernel 1.2 ULP -->
+      <text x="195" y="50" text-anchor="end" class="lbl">Kernel per-segment</text>
+      <rect x="200" y="38" width="19"  height="20" fill="#10b981"/>
+      <text x="225" y="53" class="val">1.2</text>
+
+      <!-- Measured 6.04 ULP, log10(6.04)≈0.781 -->
+      <text x="195" y="82" text-anchor="end" class="lbl">端到端 實測最差</text>
+      <rect x="200" y="70" width="187" height="20" fill="#4f46e5"/>
+      <text x="393" y="85" class="val">6.04</text>
+
+      <!-- Worst-case 57.6 ULP, log10(57.6)≈1.760 -->
+      <text x="195" y="114" text-anchor="end" class="lbl">端到端 理論上界</text>
+      <rect x="200" y="102" width="422" height="20" fill="#f59e0b"/>
+      <text x="628" y="117" class="val">57.6</text>
+
+      <!-- τ line at 100 -->
+      <line x1="680" y1="30" x2="680" y2="150" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3 2"/>
+      <text x="683" y="40" class="tk" fill="#dc2626">金融門檻</text>
+      <text x="683" y="52" class="tk" fill="#dc2626">τ ≥ 0.01</text>
+      <text x="683" y="64" class="tk" fill="#dc2626">≈ 10¹² ULP</text>
+    </svg>
+    <figcaption>圖：pp=48 定點下 Δ 計算的 ULP 誤差（對數軸）— 實測（6.04）遠低於理論上界（57.6），而任何合理合規門檻 τ ≥ 0.01 換算後高達 ~10¹² ULP，還有 10 個數量級的安全餘裕。</figcaption>
+  </figure>
   <div class="quote" style="margin-top:.8rem;border-left-color:var(--text-dim)">
     <p><strong>[Paraphrase — 非原文]</strong> Remez 1934 交替演算法求一連續函數在閉區間上的最佳一致逼近多項式；由 Chebyshev 等振盪定理保證「誤差曲線在至少 d+2 個點上以相等絕對值交替取極值」即為最佳解，因此 minimax 多項式的最壞誤差理論上無法再小。</p>
     <span class="cite">— 依 Remez, <em>Sur la détermination des polynômes d'approximation de degré donnée</em> (1934) 及 Chebyshev equi-oscillation theorem 改寫 <sup class="ref">[14]</sup></span>
