@@ -215,13 +215,6 @@
     .entry-card.accent-blue .card-en { color: var(--blue); }
     .entry-card.accent-blue .card-arrow { color: var(--blue); }
 
-    .entry-card.accent-purple:hover {
-      border-color: #a78bfa;
-      box-shadow: 0 8px 32px rgba(167, 139, 250, 0.12);
-    }
-    .entry-card.accent-purple .card-en { color: #a78bfa; }
-    .entry-card.accent-purple .card-arrow { color: #a78bfa; }
-
     /* ---- Tag chips ---- */
     .tags {
       display: flex;
@@ -332,12 +325,32 @@
   <!-- Main Content -->
   <div class="container">
 
+    <!-- Oral Defense Slide Deck (prominent) -->
+    <div class="section-title">口試報告</div>
+    <div class="cards">
+      <a href="報告.html" class="entry-card accent-blue" style="display:block">
+        <div class="card-icon">&#x1F3AF;</div>
+        <h2>口試簡報 — 90 分鐘報告</h2>
+        <div class="card-en">Oral Defense Slide Deck (86 slides, scroll-snap)</div>
+        <div class="card-desc">
+          獨立的完整簡報頁：動機 → 協議 → Halo2 → Poseidon → PF1 實作 → 實驗結果 → 限制 → 結論。滑動翻頁、鍵盤快捷鍵、Groth16 ↔ Halo2 術語抽屜。
+        </div>
+        <div class="tags">
+          <span class="tag">86 slides</span>
+          <span class="tag">90 min</span>
+          <span class="tag">scroll-snap</span>
+          <span class="tag">Groth16 ↔ Halo2</span>
+        </div>
+        <div class="card-arrow">開始報告 &rarr;</div>
+      </a>
+    </div>
+
     <!-- Primary Entries -->
     <div class="section-title">核心內容</div>
     <div class="cards two-col">
 
       <!-- Proposal Report -->
-      <a href="提案報告/index.html" class="entry-card accent-blue">
+      <a href="../提案報告/index.html" class="entry-card accent-blue">
         <div class="card-icon">&#x1F4D1;</div>
         <h2>提案報告</h2>
         <div class="card-en">Thesis Proposal Report</div>
@@ -354,7 +367,7 @@
       </a>
 
       <!-- ZK Handbook -->
-      <a href="背景知識/index.html" class="entry-card accent-green">
+      <a href="../背景知識/index.html" class="entry-card accent-green">
         <div class="card-icon">&#x1F4DA;</div>
         <h2>ZK Proof Systems Handbook</h2>
         <div class="card-en">Zero-Knowledge 證明系統手冊</div>
@@ -373,12 +386,34 @@
 
     </div>
 
-    <!-- Protocol Technical Documents -->
+    <!-- Scenario Showcases -->
+    <div class="section-title">應用場景</div>
+    <div class="cards">
+      <a href="scenario-a.html" class="entry-card accent-green">
+        <div class="card-icon">&#x1F3E6;</div>
+        <h2>場景 A：Black-Scholes Delta 對沖合規</h2>
+        <div class="card-en">Scenario A: Privacy-Preserving Delta Hedging Compliance</div>
+        <div class="card-desc">
+          完整的隱私合規架構：四層信任模型、雙 Merkle 樹、雙 ZK 證明、交易所簽名機制。
+          從監管簽署的 Genesis 到每日結算的端到端流程，讓基金在永久保密下證明合規。
+        </div>
+        <div class="tags">
+          <span class="tag">4-Layer Trust</span>
+          <span class="tag">Poseidon</span>
+          <span class="tag">EdDSA</span>
+          <span class="tag">pp=24</span>
+          <span class="tag">1 ULP</span>
+        </div>
+        <div class="card-arrow">查看完整架構 &rarr;</div>
+      </a>
+    </div>
+
+    <!-- Protocol Documentation -->
     <div class="section-title">協議技術文件</div>
     <div class="sub-cards">
       <a href="協議說明/index.html" class="sub-card">
         <h3>協議總覽</h3>
-        <p>Delta Compliance 完整協議</p>
+        <p>完整隱私合規協議說明</p>
       </a>
       <a href="協議說明/proof1.html" class="sub-card">
         <h3>Proof #1 技術</h3>
@@ -386,7 +421,7 @@
       </a>
       <a href="協議說明/proof2.html" class="sub-card">
         <h3>Proof #2 技術</h3>
-        <p>State Transition 簽章驗證</p>
+        <p>State Transition 電路細節</p>
       </a>
       <a href="協議說明/merkle.html" class="sub-card">
         <h3>Merkle Tree</h3>
@@ -396,44 +431,24 @@
 
     <hr class="divider">
 
-    <!-- Experimental Showcase -->
-    <div class="section-title">實驗成果</div>
-    <div class="cards two-col">
-      <a href="showcase/index.html" class="entry-card accent-purple">
-        <div class="card-icon">&#x1F4CA;</div>
-        <h2>Experimental Showcase</h2>
-        <div class="card-en">實驗結果展示</div>
-        <div class="card-desc">
-          Scenario A (Black-Scholes Delta) 與 Scenario C (Merton 結構模型) 的完整端到端實驗數據：精度、證明大小、效能基準與場景比較。
-        </div>
-        <div class="tags">
-          <span class="tag">KZG Proofs</span>
-          <span class="tag">Ablation</span>
-          <span class="tag">Benchmarks</span>
-          <span class="tag">2 Scenarios</span>
-        </div>
-        <div class="card-arrow">查看結果 &rarr;</div>
-      </a>
-    </div>
-
     <!-- Report Sub-pages -->
     <div class="section-title">提案報告子頁面</div>
     <div class="sub-cards">
-      <a href="提案報告/index.html" class="sub-card">
+      <a href="../提案報告/index.html" class="sub-card">
         <h3>總報告</h3>
         <p>完整提案內容</p>
       </a>
-      <a href="提案報告/research-background.html" class="sub-card">
+      <a href="../提案報告/research-background.html" class="sub-card">
         <h3>研究背景</h3>
-        <p>ZK 超越函數背景</p>
+        <p>ZKML 與多項式近似</p>
       </a>
-      <a href="提案報告/contribution-comparison.html" class="sub-card">
+      <a href="../提案報告/contribution-comparison.html" class="sub-card">
         <h3>差異比較</h3>
         <p>Minimax vs Taylor</p>
       </a>
-      <a href="提案報告/what-we-did.html" class="sub-card">
+      <a href="../提案報告/what-we-did.html" class="sub-card">
         <h3>技術說明</h3>
-        <p>證明架構詳述</p>
+        <p>設計方法論詳述</p>
       </a>
     </div>
 
@@ -442,47 +457,47 @@
     <!-- Handbook Chapters -->
     <div class="section-title">ZK Handbook 章節總覽</div>
     <div class="sub-cards">
-      <a href="背景知識/foundations.html" class="sub-card">
+      <a href="../背景知識/foundations.html" class="sub-card">
         <h3>Ch 1. 數學基礎</h3>
         <p>有限域、橢圓曲線、配對</p>
       </a>
-      <a href="背景知識/zkp-basics.html" class="sub-card">
+      <a href="../背景知識/zkp-basics.html" class="sub-card">
         <h3>Ch 2. ZKP 基礎</h3>
         <p>完備性、健全性、零知識</p>
       </a>
-      <a href="背景知識/polynomial-commitments.html" class="sub-card">
+      <a href="../背景知識/polynomial-commitments.html" class="sub-card">
         <h3>Ch 3. 多項式承諾</h3>
         <p>KZG、IPA、FRI</p>
       </a>
-      <a href="背景知識/arithmetization.html" class="sub-card">
+      <a href="../背景知識/arithmetization.html" class="sub-card">
         <h3>Ch 4. 算術化</h3>
         <p>R1CS、QAP、PLONKish</p>
       </a>
-      <a href="背景知識/fft-domains.html" class="sub-card">
+      <a href="../背景知識/fft-domains.html" class="sub-card">
         <h3>Ch 5. FFT 與求值域</h3>
         <p>單位根、NTT、Coset</p>
       </a>
-      <a href="背景知識/groth16.html" class="sub-card">
+      <a href="../背景知識/groth16.html" class="sub-card">
         <h3>Ch 6. Groth16</h3>
         <p>電路特定可信設置</p>
       </a>
-      <a href="背景知識/plonk.html" class="sub-card">
+      <a href="../背景知識/plonk.html" class="sub-card">
         <h3>Ch 7. PLONK</h3>
         <p>通用 SRS、置換論證</p>
       </a>
-      <a href="背景知識/halo2.html" class="sub-card">
+      <a href="../背景知識/halo2.html" class="sub-card">
         <h3>Ch 8. Halo2</h3>
         <p>PLONKish、KZG/IPA</p>
       </a>
-      <a href="背景知識/lookup-arguments.html" class="sub-card">
+      <a href="../背景知識/lookup-arguments.html" class="sub-card">
         <h3>Ch 9. Lookup 論證</h3>
         <p>Plookup、LogUp</p>
       </a>
-      <a href="背景知識/polynomial-method.html" class="sub-card">
+      <a href="../背景知識/polynomial-method.html" class="sub-card">
         <h3>Ch 10. 多項式方法</h3>
         <p>ByteTable、函數無關電路</p>
       </a>
-      <a href="背景知識/security-proofs.html" class="sub-card">
+      <a href="../背景知識/security-proofs.html" class="sub-card">
         <h3>Ch 11. 安全性證明</h3>
         <p>完備性、健全性形式化</p>
       </a>
@@ -493,23 +508,23 @@
     <!-- Thesis Methodology Chapters -->
     <div class="section-title">論文證明架構</div>
     <div class="sub-cards">
-      <a href="背景知識/fixed-point.html" class="sub-card">
+      <a href="../背景知識/fixed-point.html" class="sub-card">
         <h3>Ch 12. 有限域定點運算</h3>
         <p>定點表示、截斷、ULP</p>
       </a>
-      <a href="背景知識/approximation-theory.html" class="sub-card">
+      <a href="../背景知識/approximation-theory.html" class="sub-card">
         <h3>Ch 13. 多項式逼近理論</h3>
         <p>Minimax、Remez、等振盪</p>
       </a>
-      <a href="背景知識/horner-evaluation.html" class="sub-card">
+      <a href="../背景知識/horner-evaluation.html" class="sub-card">
         <h3>Ch 14. Horner 求值</h3>
         <p>延遲截斷、Overflow 分析</p>
       </a>
-      <a href="背景知識/design-choices.html" class="sub-card">
+      <a href="../背景知識/design-choices.html" class="sub-card">
         <h3>Ch 15. 設計選擇總覽</h3>
         <p>10 層技術選擇與層間依賴</p>
       </a>
-      <a href="背景知識/financial-models.html" class="sub-card">
+      <a href="../背景知識/financial-models.html" class="sub-card">
         <h3>Ch 16. 金融模型背景</h3>
         <p>Black-Scholes、Merton、CDS</p>
       </a>
