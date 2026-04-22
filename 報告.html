@@ -375,7 +375,7 @@ figure.fig figcaption strong{color:var(--text)}
   <ul>
     <li><strong>Halo2 上首個 BS Delta 零知識電路</strong> — N=128 持倉、k ≈ 19（~289K rows）</li>
     <li><strong>pp=48 + Remez minimax + Per-step Horner 的 ln/erf/exp 管線</strong> — 端到端實測 ~6.04 ULP（~2×10⁻¹⁴），理論上界 57.6 ULP</li>
-    <li><strong>Method B 指數查表 + A2 segment-selector gate</strong> — 封閉 saturation / segment 的 soundness 漏洞</li>
+    <li><strong>統一 Horner kernel（ln/erf/exp）+ A2 segment-selector gate</strong> — 封閉 saturation / segment 的 soundness 漏洞</li>
     <li><strong>Rust ↔ Python bit-for-bit 雙實作驗證</strong> + 31 custom gates / 6 modules / 66 polynomial constraints 的形式化 ZK-POK 論證</li>
   </ul>
 </section>
@@ -1043,7 +1043,7 @@ N(x)   = 0.5 + 0.5 · erf(x / √2)</pre>
   <ul style="margin-top:.5rem">
     <li><strong>ln(S/K)</strong> — piecewise Remez 4 segments × width 0.25</li>
     <li><strong>erf(d1/√2)</strong> → N(d1) — piecewise Remez 12 segments × width 0.5 + saturation</li>
-    <li><strong>exp(−qT)</strong> — Method B byte-decompose + lookup (11 rows)</li>
+    <li><strong>exp(−qT)</strong> — range reduction + Remez d=12 Horner on [0, ln2)（與 ln/erf 共用 kernel）</li>
     <li>σ√T、σ²/2 — fp_mul + sqrt_verify (Newton)</li>
   </ul>
   <p style="color:var(--amber);margin-top:.5rem;font-size:.9rem">⚠ Δ_put 由 put-call parity：Δ_put = Δ_call − e^(-qT)，只需一個減法閘。</p>
@@ -1082,8 +1082,8 @@ N(x)   = 0.5 + 0.5 · erf(x / √2)</pre>
       <tr><td>10-11</td><td>erf(x) piecewise Remez (12 seg)</td><td>Per-step Horner</td></tr>
       <tr><td>12</td><td>N(d₁) = 0.5 + 0.5 · erf</td><td>arith_add + erf_flip</td></tr>
       <tr><td>13</td><td>qT = q × T</td><td>fp_mul</td></tr>
-      <tr><td>14</td><td>exp(−qT) range reduction</td><td>int_div (qT ÷ ln2)</td></tr>
-      <tr><td>15-16</td><td>exp by Method B</td><td>6 lookup + 5 fp_mul</td></tr>
+      <tr><td>14</td><td>exp(−qT) range reduction</td><td>int_div (qT ÷ ln2) → (k, r)</td></tr>
+      <tr><td>15-16</td><td>Horner exp(r)−1 on [0, ln2) d=12<br/>→ 2^k × (w + S) = exp(qT)</td><td>Per-step Horner + q_exp_recon</td></tr>
       <tr><td>17</td><td>Δ = e^(−qT) × N(d₁)</td><td>fp_mul</td></tr>
     </tbody>
   </table>
@@ -1107,7 +1107,7 @@ flowchart LR
   q --> qT["⑬ qT"]
   T --> qT
   qT --> exprr["⑭ qT÷ln2"]
-  exprr --> expc["⑮-⑯ exp(−qT)<br/>Method B"]
+  exprr --> expc["⑮-⑯ Horner exp(r)−1<br/>d=12 on [0,ln2)"]
   n --> out["⑰ Δ = e^{−qT}·N(d₁)"]
   expc --> out
   out --> final([Δ]):::out
@@ -1230,7 +1230,7 @@ meta.create_gate("horner_per_step", |meta| {
 //   v = (S + r) · 2^e + low       // v = (S+r)·2^e + low
 //   low 做 3-byte decomposition   // 確保 low &lt; 2^e
 //   gap 做 3-byte decomposition   // 確保 r+S 在 [S, 2S)</pre>
-  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">exp 用類似結構的 int_div gate：qT ÷ ln(2) → (k, r)，r ∈ [0, ln2)，之後 exp 由 2ᵏ × exp(r) 組合。</p>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">exp 用類似結構的 int_div gate：qT ÷ ln(2) → (k, r)，r ∈ [0, ln2)；Horner 算 w = exp(r) − 1（單段 Remez d=12，max 2.81 ULP），重建 exp(qT) = 2ᵏ × (w + S)，S = 2⁴⁸。與 ln/erf 共用 kernel。</p>
 </section>
 
 <section class="slide" data-part="V" data-slide="51">
@@ -1257,15 +1257,20 @@ meta.create_gate("horner_per_step", |meta| {
 </section>
 
 <section class="slide" data-part="V" data-slide="53">
-  <div class="slide-meta"><span class="part-label">Method B exp</span><span class="slide-num">53 / 87</span></div>
-  <h2>Method B — exp by chunk lookup</h2>
-  <p>利用 exp(a+b) = exp(a) · exp(b)。把 48-bit 輸入拆成 6 個 byte，每個位置預算一張 256-entry 查表：</p>
-  <ul>
-    <li><strong>6 張查表</strong> × 256 entries = 1,536 總 entries</li>
-    <li><strong>6 次 lookup</strong>（一個 byte 一次）+ <strong>5 次 fp_mul</strong> 連乘 = <strong>11 rows</strong></li>
-    <li>比 d=12 Horner 的 12 rows 更緊湊，精度 ~8 ULP（可接受）</li>
+  <div class="slide-meta"><span class="part-label">Unified exp kernel</span><span class="slide-num">53 / 87</span></div>
+  <h2>exp 統一 Horner kernel（Method B 已退役）</h2>
+  <p>exp(−qT) 不再走 byte chunk lookup，改以 <strong>range reduction + 單段 Remez d=12 Horner</strong>，與 ln/erf 共用同一個 <code class="inline">kernel::PSCoeffSet</code> + <code class="inline">assign_horner</code>：</p>
+  <pre>// 步驟：
+// ① int_div:  qT ÷ ln(2) → (k, r)     where r ∈ [0, ln2)
+// ② Horner:   w = exp(r) − 1          (Remez d=12, 單段, max 2.81 ULP)
+// ③ q_exp_recon:  exp(qT) = 2^k × (w + S),  S = 2^48
+// ④ discount: exp(−qT) = S² / exp(qT)  (fp_div)</pre>
+  <ul style="margin-top:.4rem">
+    <li><strong>單段 Remez</strong>（非 piecewise）—— r ∈ [0, ln2) 窄區間，1 段已夠；<code class="inline">EXP_PP48_HORNER</code> in <code class="inline">coefficients/exp_pp48.rs</code></li>
+    <li><strong>Horner 算 </strong><code class="inline">exp(r) − 1</code>（非直接 exp(r)）：fp48 表示下 w 已 ≪ S，加 S 還原為 fp48；避免域極值處的截斷誤差放大</li>
+    <li><strong>全電路 ln/erf/exp 共用 kernel</strong> — 31 gates 中沒有 exp 專屬 gate；Method B 原 <code class="inline">src/method_b.rs</code> 已 dead code（commit <code class="inline">53b3cdd</code>, 2026-04-19）</li>
   </ul>
-  <p style="color:var(--amber);margin-top:.5rem;font-size:.9rem">⚠ Method B 內部 lookup 鏈在當前實作為 witness + bs_price 兜底（Section 12.4 Layer 2 已記載為計畫強化）。</p>
+  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.88rem">好處：（1）soundness 跟 ln/erf 同一套形式化論證即可覆蓋；（2）無函數專用查表，複雜度降；（3）`53b3cdd` 同時修了 3 處 copy constraint gap（B14→B15、B15→exp_recon、B15→B16）。</p>
 </section>
 
 <section class="slide" data-part="V" data-slide="54">
@@ -1296,7 +1301,7 @@ meta.create_gate("horner_per_step", |meta| {
       <tr><td><strong>Total</strong></td><td><strong>31</strong></td><td>66 polynomial constraints</td></tr>
     </tbody>
   </table>
-  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.92rem">Gate = 1 row 的多項式約束；Gadget = 多 row 的邏輯操作（Poseidon 65 rows, Horner d=12 12 rows, Method B 11 rows）。</p>
+  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.92rem">Gate = 1 row 的多項式約束；Gadget = 多 row 的邏輯操作（Poseidon 65 rows, Horner d=12 per function 12 rows，ln/erf/exp 共用）。</p>
 </section>
 
 <section class="slide" data-part="V" data-slide="56">
@@ -1358,7 +1363,7 @@ meta.create_gate("horner_per_step", |meta| {
   <h2>Part V takeaways</h2>
   <ul>
     <li>PF1 = 5 部分管線（A / A' / A'' / B / C），Merkle 85% + Delta 13% + 其他 2%</li>
-    <li>17 步 pipeline，全程 pp=48 定點；Horner kernel + Remez + Method B exp</li>
+    <li>17 步 pipeline，全程 pp=48 定點；ln/erf/exp 共用 Remez + Per-step Horner kernel</li>
     <li>A2 segment-selector gate 封閉 saturation + segment 的 soundness</li>
     <li>31 custom gates / 66 constraints / 6 modules — 形式化 ZK-POK 三層論證</li>
     <li>實測 ~6.04 ULP，理論上界 57.6 ULP — 比任何合理 τ 小 10 個數量級</li>
@@ -1464,7 +1469,7 @@ meta.create_gate("horner_per_step", |meta| {
       <tr><td>SNARK</td><td>Halo2 + KZG (universal SRS)</td><td>Groth16 (per-circuit ceremony)</td><td>MDT 每日更新可行性</td></tr>
       <tr><td>Signature (PF2)</td><td>EdDSA Babyjubjub (~6K)</td><td>ECDSA (~30K)</td><td>~5×</td></tr>
       <tr><td>ln/erf 逼近</td><td>Remez minimax d=12</td><td>Taylor d=14</td><td>準 2.6×10⁸ – 6.8×10¹⁰ 倍</td></tr>
-      <tr><td>exp 逼近</td><td>Method B chunk lookup (11 rows)</td><td>大查表 (50M entries)</td><td>工具鏈不支持</td></tr>
+      <tr><td>exp 逼近</td><td>Range reduction + 單段 Remez d=12 Horner（與 ln/erf 共用 kernel, max 2.81 ULP）</td><td>大查表 (50M entries) 或 byte-chunk lookup (11 rows but 函數專用表)</td><td>工具鏈／設計簡化</td></tr>
     </tbody>
   </table>
   <figure class="fig" style="margin-top:.8rem">
@@ -1574,7 +1579,7 @@ meta.create_gate("horner_per_step", |meta| {
       <tr><td>Part A  (State Merkle)</td><td>~528</td><td>23%</td><td>7 層 Poseidon permutation</td></tr>
       <tr><td>Part A' (Market Data Merkle)</td><td>~1,444</td><td><strong>62%</strong></td><td>9 欄位 hash（5 perm）+ depth ~20</td></tr>
       <tr><td>Part A'' (σ 驗證)</td><td>~32</td><td>1%</td><td>BS price 加法形式</td></tr>
-      <tr><td>Part B  (Delta 管線)</td><td>~298</td><td>13%</td><td>本論文核心 — d=12 Horner + Method B</td></tr>
+      <tr><td>Part B  (Delta 管線)</td><td>~298</td><td>13%</td><td>本論文核心 — ln/erf/exp 共用 d=12 Horner kernel</td></tr>
       <tr><td>Part C  (累加 + range)</td><td>~5</td><td>&lt;1%</td><td>帶符號分流 + 7-byte range check</td></tr>
       <tr><td>其他 (type, time verify, MUX)</td><td>~8</td><td>&lt;1%</td><td>—</td></tr>
     </tbody>
@@ -1680,7 +1685,7 @@ meta.create_gate("horner_per_step", |meta| {
   <ul>
     <li>Halo2 上首個 BS Delta 零知識電路，N=128、k ≈ 19（~289K rows）</li>
     <li>pp=48 + Remez minimax d=12 + Per-step Horner，實測 ~6.04 ULP（理論上界 57.6）</li>
-    <li>A2 segment-selector gate + Method B exp 封閉 saturation 與 segment soundness</li>
+    <li>A2 segment-selector gate + 統一 Horner kernel（ln/erf/exp 共用）封閉 saturation 與 segment soundness</li>
     <li>31 custom gates / 6 modules / 66 constraints，ZK-POK 三層論證 + 10 攻擊向量全覆蓋</li>
     <li>Rust ↔ Python bit-for-bit 雙實作</li>
   </ul>
@@ -1698,17 +1703,16 @@ flowchart LR
   B["Halo2<br/>Plonkish + SRS<br/>Lookup + hi-deg"]:::era2
   C["PF1 架構<br/>5 parts<br/>Merkle×2/σ/Δ/C"]:::arch
   D["Delta 核心<br/>pp=48 定點<br/>17 step pipeline"]:::core
-  E1["Horner<br/>kernel"]:::tech
-  E2["Remez<br/>minimax"]:::tech
-  E3["Piecewise<br/>ln 4 / erf 12"]:::tech
+  E1["Per-step<br/>Horner kernel<br/>ln/erf/exp 共用"]:::tech
+  E2["Remez<br/>minimax d=12"]:::tech
+  E3["Piecewise<br/>ln 4 / erf 12<br/>+ exp 單段"]:::tech
   F["A2 gate<br/>soundness<br/>封閉"]:::sound
-  G["Method B exp<br/>byte + lookup"]:::sound
   H(["<b>31 gates / 66 constraints</b><br/><b>3-layer ZK-POK</b>"]):::final
   A --> B --> C --> D
   D --> E1 --> F
   D --> E2 --> F
   D --> E3 --> F
-  F --> G --> H
+  F --> H
   classDef era1 fill:#f1f5f9,stroke:#64748b,color:#1a1a1f,stroke-width:1.5px;
   classDef era2 fill:#eef2ff,stroke:#4f46e5,color:#1a1a1f,stroke-width:1.5px;
   classDef arch fill:#fef3c7,stroke:#d97706,color:#1a1a1f,stroke-width:1.5px;
@@ -1730,7 +1734,7 @@ flowchart LR
       <tr><td>1</td><td>Introduction — 合規 × 隱私動機</td><td>Part I</td></tr>
       <tr><td>2</td><td>Background — ZK / Halo2 / Poseidon</td><td>Part III, IV</td></tr>
       <tr><td>3</td><td>Protocol — 四層信任、雙 Merkle、cross-tree 綁定</td><td>Part II</td></tr>
-      <tr><td>4</td><td>Delta Pipeline — pp=48, Remez, Horner, Method B</td><td>Part V §1-4</td></tr>
+      <tr><td>4</td><td>Delta Pipeline — pp=48, Remez, Per-step Horner（ln/erf/exp 共用）</td><td>Part V §1-4</td></tr>
       <tr><td>5</td><td>Soundness — A2 gate, 31 gates/66 constraints, 10 attacks</td><td>Part V §5-6</td></tr>
       <tr><td>6</td><td>Experiments — bit-for-bit, accuracy, benchmarks</td><td>Part VI</td></tr>
       <tr><td>7</td><td>Discussion & Future Work</td><td>Part VII</td></tr>
