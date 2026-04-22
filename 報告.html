@@ -1001,17 +1001,17 @@ figure.fig figcaption strong{color:var(--text)}
       <tr><td><strong>C</strong></td><td>帶符號累加 + 雙向合規 range check</td><td>~5</td><td>&lt;1%</td></tr>
     </tbody>
   </table>
-  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">總計：~2,257 rows/持倉 × 128 ≈ <strong>289,000 rows, k ≈ 19</strong>。Merkle 占 ~85% — 本研究讓 Δ 成為可能且高效，而不是讓整體變小。</p>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">總計：~2,315 rows/持倉 × 128 ≈ <strong>~296,000 rows, k ≈ 19</strong>（估算，含 σ MDT +58 rows/持倉）。Merkle 占 ~85% — 本研究讓 Δ 成為可能且高效，而不是讓整體變小。</p>
   <figure class="fig" style="margin-top:1rem">
     <svg viewBox="0 0 960 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PF1 cost breakdown">
       <!-- A: 528 rows 23% -->
       <rect x="0"     y="25" width="221" height="40" fill="#4f46e5"/>
       <text x="110" y="43" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif" fill="#ffffff">A: State Merkle</text>
       <text x="110" y="58" text-anchor="middle" style="font:10px 'Inter',monospace" fill="#ffffff" fill-opacity="0.9">528 rows · 23%</text>
-      <!-- A': 1386 rows 61% -->
-      <rect x="221"   y="25" width="586" height="40" fill="#6366f1"/>
-      <text x="514" y="43" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif" fill="#ffffff">A': Market Data Merkle</text>
-      <text x="514" y="58" text-anchor="middle" style="font:10px 'Inter',monospace" fill="#ffffff" fill-opacity="0.9">1,386 rows · 61%</text>
+      <!-- A': 1444 rows 62% (est. 含 +58 σ hash) -->
+      <rect x="221"   y="25" width="599" height="40" fill="#6366f1"/>
+      <text x="520" y="43" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif" fill="#ffffff">A': Market Data Merkle</text>
+      <text x="520" y="58" text-anchor="middle" style="font:10px 'Inter',monospace" fill="#ffffff" fill-opacity="0.9">~1,444 rows · 62%</text>
       <!-- A'': 32 rows 1% -->
       <rect x="807"   y="25" width="13"  height="40" fill="#a5b4fc"/>
       <!-- B: 298 rows 13% -->
@@ -1030,7 +1030,7 @@ figure.fig figcaption strong{color:var(--text)}
       <line x1="954" y1="65" x2="954" y2="78" stroke="#55596b" stroke-width="1"/>
       <text x="954" y="90" text-anchor="end"    style="font:9px 'Inter',sans-serif" fill="#55596b">C 累加 &lt;1%</text>
     </svg>
-    <figcaption>圖：PF1 每持倉 2,257 rows 成本占比 — Merkle 驗證（A + A' + A''）佔 85%，本論文核心 Δ 管線（B）僅 13%。本研究的價值不在縮減整體大小，而在讓 Δ 變得<strong>可行</strong>。</figcaption>
+    <figcaption>圖：PF1 每持倉 ~2,315 rows 成本占比（估算，含 σ MDT +58 rows）— Merkle 驗證（A + A' + A''）佔 ~85%，本論文核心 Δ 管線（B）僅 ~13%。本研究的價值不在縮減整體大小，而在讓 Δ 變得<strong>可行</strong>。</figcaption>
   </figure>
 </section>
 
