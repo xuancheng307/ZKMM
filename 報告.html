@@ -495,7 +495,7 @@ figure.fig figcaption strong{color:var(--text)}
   <h2>兩棵 Merkle Tree</h2>
   <div class="grid-2">
     <div class="card"><h3>Position State Tree</h3><p>記錄當前持倉快照</p><ul><li><strong>5 欄位</strong>：asset_id, w, K, expiry_date, type</li><li>Depth 7（生產 N_max=128；測試 N=8）</li><li>不足 N_max 填 dummy 葉子（隱藏真實持倉數量）</li></ul></div>
-    <div class="card"><h3>Market Data Tree</h3><p>記錄當日市場資料</p><ul><li><strong>8 欄位</strong>：underlying_id, strike, expiry, asset_type, S (spot), r, q, settle_price</li><li>Depth ~20（涵蓋所有標的 × 合約）</li><li>每日由資料提供者重算並發布 root</li></ul></div>
+    <div class="card"><h3>Market Data Tree</h3><p>記錄當日市場資料</p><ul><li><strong>9 欄位</strong>：underlying_id, strike, expiry, asset_type, S (spot), r, q, settle_price, <strong>σ</strong></li><li>Depth ~20（涵蓋所有標的 × 合約）</li><li>每日由資料提供者重算並發布 root</li></ul></div>
   </div>
   <div class="card amber" style="margin-top:1rem"><p><strong>為什麼用 Merkle 而非 Halo2 lookup？</strong> Market data 每日變 — 若用 fixed column lookup 每日得重做 setup + VK。Merkle 讓電路結構一次 setup 永久有效，只有 root 值每日更新。</p></div>
   <div class="quote" style="margin-top:.8rem">
@@ -843,7 +843,7 @@ figure.fig figcaption strong{color:var(--text)}
     <li><strong>Absorb</strong>：把輸入 chunk 加到 rate 部分 → 跑一次 permutation</li>
     <li><strong>Squeeze</strong>：從 rate 讀 output chunk → 跑一次 permutation</li>
   </ul>
-  <div class="card" style="margin-top:.8rem"><p><strong>PF1 使用</strong>：Position leaf（5 欄位 → 3 次 permutation）、Market Data leaf（8 欄位 → 4 次 permutation）。Merkle 每層 hash(left, right) = 1 次 permutation。</p></div>
+  <div class="card" style="margin-top:.8rem"><p><strong>PF1 使用</strong>：Position leaf（5 欄位 → 3 次 permutation）、Market Data leaf（<strong>9 欄位 → 5 次 permutation</strong>，zero-padding on odd tail）。Merkle 每層 hash(left, right) = 1 次 permutation。</p></div>
   <div class="quote" style="margin-top:.8rem">
     <p>"In the absorbing phase, the r-bit input message blocks are XORed into the first r bits of the state, interleaved with applications of the function f. When all message blocks are processed, the sponge construction switches to the squeezing phase."</p>
     <span class="cite">— Bertoni, Daemen, Peeters, Van Assche, <em>Cryptographic Sponge Functions</em> (CSF v0.1, 2011), §1.2 <sup class="ref">[8]</sup></span>
@@ -995,7 +995,7 @@ figure.fig figcaption strong{color:var(--text)}
     <thead><tr><th>Part</th><th>職責</th><th>rows / 持倉</th><th>占比</th></tr></thead>
     <tbody>
       <tr><td><strong>A</strong></td><td>State Merkle 驗證（Position leaf，5 欄位）</td><td>~528</td><td>23%</td></tr>
-      <tr><td><strong>A'</strong></td><td>Market Data Merkle 驗證（8 欄位 × depth ~20）</td><td>~1,386</td><td><strong>61%</strong></td></tr>
+      <tr><td><strong>A'</strong></td><td>Market Data Merkle 驗證（9 欄位 × depth ~20）</td><td>~1,444</td><td><strong>62%</strong></td></tr>
       <tr><td><strong>A''</strong></td><td>σ 正向驗證（BS price 加法形式）</td><td>~32</td><td>1%</td></tr>
       <tr><td><strong>B</strong></td><td>Delta 計算管線（本論文核心）</td><td>~298</td><td>13%</td></tr>
       <tr><td><strong>C</strong></td><td>帶符號累加 + 雙向合規 range check</td><td>~5</td><td>&lt;1%</td></tr>
@@ -1270,13 +1270,15 @@ meta.create_gate("horner_per_step", |meta| {
 
 <section class="slide" data-part="V" data-slide="54">
   <div class="slide-meta"><span class="part-label">Sigma → MDT</span><span class="slide-num">54 / 87</span></div>
-  <h2>σ 正向驗證 + Cross-tree 8 條</h2>
-  <p>σ 在電路外由 Newton-Raphson 反推 — 電路內用 <code class="inline">bs_price</code> gate 正向驗證 BS price ≈ settle_price：</p>
+  <h2>σ 從 MDT 直接提供 + bs_price 雙重容差驗證</h2>
+  <p>σ 作為 Market Data leaf 第 9 欄（index 8），經 Merkle + copy constraint 綁進 <code class="inline">delta.sigma_cell</code>，不再是 prover free witness。<code class="inline">bs_price</code> gate 仍跑完整 BS 公式（exp(-rT)、N(d2)、Horner）做 settle 價格 cross-check：</p>
   <pre>// 加法形式（避免有限域 wrap）:
 // bs + is_put·s_disc_q + term2 = term1 + is_put·k_disc_r
-// 容差 SIGMA_TOL = 0.02 × 2^48 ≈ 5.6 兆（絕對容差）</pre>
-  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">另有 8 條 cross-tree copy constraint（Part II slide 18），把 (underlying_id, K, expiry, type) + (S, r, q) + K 鎖進 state_root 和 market_data_root — 零 gate 成本。</p>
-  <div class="card amber" style="margin-top:.6rem"><p><strong>惡意 prover 故事：</strong> 填入極高 σ 讓 Delta 趨近 0.5 → bs_price 同步暴增（Vega 敏感度 &gt; 0.1），gate 拒絕。</p></div>
+// σV18: |bs − settle| ≤ ABS_TOL           (0.02 × 2^48)
+// σV19: |bs − settle| ≤ REL_TOL·settle/S  (0.5% × 2^48)
+// AND 兩閘：min(ABS, REL) 才通過 — 保守語意</pre>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">另有 8 條 cross-tree copy constraint（Part II slide 18），把 (underlying_id, K, expiry, type) + (S, r, q) + K 鎖進 state_root 和 market_data_root — 零 gate 成本。σ 由 MDT copy 進電路是額外的內部 copy constraint，不算入跨樹 8 條。</p>
+  <div class="card amber" style="margin-top:.6rem"><p><strong>惡意 prover 故事：</strong> 改 σ → MDT root 對不上（Merkle 先拒）；若同時改 MDT 與 settle 配合假 σ，bs_price forward-compute 與 settle 的 |bs−settle| gap 仍會被 σV18/σV19 偵測。</p></div>
 </section>
 
 <section class="slide" data-part="V" data-slide="55">
@@ -1570,7 +1572,7 @@ meta.create_gate("horner_per_step", |meta| {
     <thead><tr><th>Part</th><th>Rows / 持倉</th><th>占比</th><th>瓶頸</th></tr></thead>
     <tbody>
       <tr><td>Part A  (State Merkle)</td><td>~528</td><td>23%</td><td>7 層 Poseidon permutation</td></tr>
-      <tr><td>Part A' (Market Data Merkle)</td><td>~1,386</td><td><strong>61%</strong></td><td>8 欄位 hash + depth ~20</td></tr>
+      <tr><td>Part A' (Market Data Merkle)</td><td>~1,444</td><td><strong>62%</strong></td><td>9 欄位 hash（5 perm）+ depth ~20</td></tr>
       <tr><td>Part A'' (σ 驗證)</td><td>~32</td><td>1%</td><td>BS price 加法形式</td></tr>
       <tr><td>Part B  (Delta 管線)</td><td>~298</td><td>13%</td><td>本論文核心 — d=12 Horner + Method B</td></tr>
       <tr><td>Part C  (累加 + range)</td><td>~5</td><td>&lt;1%</td><td>帶符號分流 + 7-byte range check</td></tr>
@@ -1647,9 +1649,9 @@ meta.create_gate("horner_per_step", |meta| {
   <div class="slide-meta"><span class="part-label">Future work</span><span class="slide-num">78 / 87</span></div>
   <h2>三項工程強化（✅ 已於 2026-04-17 實作）</h2>
   <ol style="padding-left:1.2rem;font-size:.95rem">
-    <li style="list-style:decimal;margin-bottom:.35rem"><strong>bs_price 雙重容差（AND）</strong>：同時要求 <code class="inline">|bs−settle| ≤ ABS_TOL</code>（0.02）<em>且</em> <code class="inline">|bs−settle| ≤ REL_TOL·settle/S</code>（0.5%）— 兩 gate 同時成立才通過，低價與高價選擇權皆有下限保護</li>
+    <li style="list-style:decimal;margin-bottom:.35rem"><strong>bs_price 雙重容差（AND 語意 = min-bound）</strong>：同時要求 <code class="inline">|bs−settle| ≤ ABS_TOL</code>（0.02）<em>且</em> <code class="inline">|bs−settle| ≤ REL_TOL·settle/S</code>（0.5%）— 兩 gate 同時成立才通過。效果上由較緊者綁：昂貴期權 ABS 綁、便宜期權 REL 綁，採「任一違反即拒絕」的壓力測試精神。<span style="color:var(--amber)">trade-off：極便宜期權（settle &lt; $0.02）REL 門檻可能拒絕合理 market noise，已知保守代價。</span></li>
     <li style="list-style:decimal;margin-bottom:.35rem"><strong>T_min 7 日硬下限</strong>：非股票部位強制 <code class="inline">t_days − 7 ≥ 0</code>（2-byte 分解 + byte lookup），排除短期 pin risk 與流動性陷阱</li>
-    <li style="list-style:decimal;margin-bottom:.35rem"><strong>σ 由 MDT 直接提供</strong>：Market Data leaf 由 8 → 9 欄位（新增 σ 於 index 8），Poseidon 吸收 3 次；<em>bs_price 未退役</em>，仍做 settle 價格 cross-check 作為完整性證明</li>
+    <li style="list-style:decimal;margin-bottom:.35rem"><strong>σ 由 MDT 直接提供</strong>：Market Data leaf 由 8 → 9 欄位（新增 σ 於 index 8），Poseidon 5 次 permutation（zero-padding on odd tail）；σ 以 copy constraint 綁進 delta pipeline，<em>bs_price 未退役</em>，仍做完整 BS 反解驗證與 settle cross-check</li>
   </ol>
   <p style="color:var(--text-dim);margin-top:.4rem;font-size:.88rem">Commits <code class="inline">9cf6f45</code> / <code class="inline">bf6bf8d</code>（容差）、<code class="inline">bbc9eaa</code>（T_min）、<code class="inline">43310f6</code>（σ）；以上皆為工程精進，<strong>不影響</strong>核心 ZK-POK 數學 soundness。</p>
 </section>
