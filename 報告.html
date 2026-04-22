@@ -373,8 +373,8 @@ figure.fig figcaption strong{color:var(--text)}
   <div class="slide-meta"><span class="part-label">Contributions</span><span class="slide-num">08 / 87</span></div>
   <h2>本論文四大貢獻</h2>
   <ul>
-    <li><strong>Halo2 上首個 BS Delta 零知識電路</strong> — N=128 持倉、k ≈ 19（~289K rows）</li>
-    <li><strong>pp=48 + Remez minimax + Per-step Horner 的 ln/erf/exp 管線</strong> — 端到端實測 ~6.04 ULP（~2×10⁻¹⁴），理論上界 57.6 ULP</li>
+    <li><strong>Halo2 上首個 BS Delta 零知識電路</strong> — N=128 持倉、k=18（185,856 rows 實測）；scaling law <code class="inline">total(N) = N × (528 + 132·⌈log₂N⌉)</code>，O(N log N)</li>
+    <li><strong>pp=48 + Remez minimax + Per-step Horner 的 ln/erf/exp 管線</strong> — Delta_call 實測 7 ULP（~2×10⁻¹⁴）；kernel per-segment ~1.2 ULP、理論上界 57.6 ULP</li>
     <li><strong>統一 Horner kernel（ln/erf/exp）+ A2 segment-selector gate</strong> — 封閉 saturation / segment 的 soundness 漏洞</li>
     <li><strong>Rust ↔ Python bit-for-bit 雙實作驗證</strong> + 31 custom gates / 6 modules / 66 polynomial constraints 的形式化 ZK-POK 論證</li>
   </ul>
@@ -766,11 +766,13 @@ figure.fig figcaption strong{color:var(--text)}
   <h2>Row / Column / k</h2>
   <ul>
     <li>k = 2 的幾次方的指數 — 總列數 = 2ᵏ</li>
-    <li>PF1 N=128 production：<strong>k ≈ 19 → ~524K rows 上限，實際使用 ~289K rows</strong></li>
-    <li>PF1 N=8 test：k 更小（加速開發）</li>
-    <li>欄數固定、k 決定 prover FFT size 與 proving time</li>
+    <li>PF1 N=128 production：<strong>k=18 → 262,144 rows budget，實測使用 185,856 rows（71% utilization）</strong></li>
+    <li>PF1 N=8 test：<strong>k=13 → 8,192 budget，實測 7,392 rows</strong>（90%）</li>
+    <li>PF1 N=32 mid：<strong>k=16 → 65,536 budget，實測 38,016 rows</strong>（58%）</li>
+    <li>Scaling law：<code class="inline">total(N) = N × (528 + 132·⌈log₂N⌉)</code> — O(N log N)，三點零誤差擬合</li>
+    <li>欄數 94 advice / 16 fixed / 1 instance / 34 selectors / 83 lookup args（固定）</li>
   </ul>
-  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">每增 k 1 — rows 翻倍，proving time 約翻倍。選 k 是「夠用就好」的最小冪次。</p>
+  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">每增 k 1 — rows budget 翻倍，proving time 約翻倍。選 k 是「夠用就好」的最小冪次；production tight-k 選擇能顯著壓低 keygen + prove 時間。</p>
 </section>
 
 <section class="slide" data-part="III" data-slide="32">
@@ -803,7 +805,7 @@ figure.fig figcaption strong{color:var(--text)}
     <li>advice / fixed / instance / selector — 四類欄各司其職</li>
     <li>Universal SRS 取代 per-circuit ceremony（金融每日更新 root 的 enabler）</li>
     <li>Copy constraint + lookup = PF1 soundness 的兩大支柱</li>
-    <li>PF1 N=128: k ≈ 19 → ~289K rows 是我們的 budget</li>
+    <li>PF1 N=128: <strong>k=18 → 262K rows budget / 185,856 實測（71%）</strong></li>
   </ul>
   <p style="color:var(--text-dim);margin-top:1.2rem">下一 Part：電路裡的 hash — Poseidon。</p>
 </section>
@@ -989,48 +991,41 @@ figure.fig figcaption strong{color:var(--text)}
 
 <section class="slide" data-part="V" data-slide="42">
   <div class="slide-meta"><span class="part-label">Architecture</span><span class="slide-num">42 / 87</span></div>
-  <h2>PF1 整體架構 — 5 部分管線</h2>
-  <p>對每筆持倉（最多 N_max=128 slots）獨立執行，再於 Part C 匯總。</p>
+  <h2>PF1 架構 — Merkle column 獨占 rows，Δ 免費疊入</h2>
+  <p>實測發現：<strong>halo2 SimpleFloorPlanner 做 column packing</strong> — Merkle Poseidon 3 columns 是 row bottleneck，Delta/A''/bs_price 用不同 columns 平行塞同 row 範圍，<strong>rows-wise 貢獻 0</strong>。</p>
   <table class="tbl">
-    <thead><tr><th>Part</th><th>職責</th><th>rows / 持倉</th><th>占比</th></tr></thead>
+    <thead><tr><th>Part</th><th>職責</th><th>rows / 持倉</th><th>對 total rows 貢獻</th></tr></thead>
     <tbody>
-      <tr><td><strong>A</strong></td><td>State Merkle 驗證（Position leaf，5 欄位）</td><td>~528</td><td>23%</td></tr>
-      <tr><td><strong>A'</strong></td><td>Market Data Merkle 驗證（9 欄位 × depth ~20）</td><td>~1,444</td><td><strong>62%</strong></td></tr>
-      <tr><td><strong>A''</strong></td><td>σ 正向驗證（BS price 加法形式）</td><td>~32</td><td>1%</td></tr>
-      <tr><td><strong>B</strong></td><td>Delta 計算管線（本論文核心）</td><td>~298</td><td>13%</td></tr>
-      <tr><td><strong>C</strong></td><td>帶符號累加 + 雙向合規 range check</td><td>~5</td><td>&lt;1%</td></tr>
+      <tr><td><strong>A</strong></td><td>Position Merkle（5 欄位 leaf，3 perm + depth×1 perm）</td><td>intrinsic 396<sup>*</sup></td><td rowspan="2" style="vertical-align:middle"><strong>獨占</strong><br/>(Merkle column)</td></tr>
+      <tr><td><strong>A'</strong></td><td>Market Data Merkle（9 欄位 leaf，5 perm + depth×1 perm）</td><td>intrinsic 528<sup>*</sup></td></tr>
+      <tr><td><strong>A''</strong></td><td>σ 正向驗證（BS price 加法形式）</td><td>intrinsic ~32</td><td rowspan="3" style="vertical-align:middle"><strong>0</strong><br/>(平行塞入)</td></tr>
+      <tr><td><strong>B</strong></td><td>Delta 計算管線（本論文核心，17 步）</td><td>intrinsic 61</td></tr>
+      <tr><td><strong>C</strong></td><td>帶符號累加 + 雙向合規 range check</td><td>intrinsic ~5</td></tr>
     </tbody>
   </table>
-  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">總計：~2,315 rows/持倉 × 128 ≈ <strong>~296,000 rows, k ≈ 19</strong>（估算，含 σ MDT +58 rows/持倉）。Merkle 占 ~85% — 本研究讓 Δ 成為可能且高效，而不是讓整體變小。</p>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.9rem"><sup>*</sup> depth=3（N=8）；depth=7（N=128）。scaling law：<strong><code class="inline">total(N) = N × (528 + 132·⌈log₂N⌉)</code></strong>，三點（N=8/32/128）零誤差擬合。</p>
+  <p style="color:var(--text-dim);margin-top:.3rem;font-size:.9rem"><strong>實測（CircuitCost API）</strong>：N=8 → 7,392 rows（k=13）；N=128 → 185,856 rows（k=18）。<strong>caveat</strong>：column-packing 依賴當前 layout（94 advice cols）；rows-only 免費 ≠ prove time 免費（94 cols × rows 仍 scale prove time）。</p>
   <figure class="fig" style="margin-top:1rem">
-    <svg viewBox="0 0 960 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PF1 cost breakdown">
-      <!-- A: 528 rows 23% -->
-      <rect x="0"     y="25" width="221" height="40" fill="#4f46e5"/>
-      <text x="110" y="43" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif" fill="#ffffff">A: State Merkle</text>
-      <text x="110" y="58" text-anchor="middle" style="font:10px 'Inter',monospace" fill="#ffffff" fill-opacity="0.9">528 rows · 23%</text>
-      <!-- A': 1444 rows 62% (est. 含 +58 σ hash) -->
-      <rect x="221"   y="25" width="599" height="40" fill="#6366f1"/>
-      <text x="520" y="43" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif" fill="#ffffff">A': Market Data Merkle</text>
-      <text x="520" y="58" text-anchor="middle" style="font:10px 'Inter',monospace" fill="#ffffff" fill-opacity="0.9">~1,444 rows · 62%</text>
-      <!-- A'': 32 rows 1% -->
-      <rect x="807"   y="25" width="13"  height="40" fill="#a5b4fc"/>
-      <!-- B: 298 rows 13% -->
-      <rect x="820"   y="25" width="127" height="40" fill="#10b981"/>
-      <text x="883" y="43" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif" fill="#ffffff">B: Δ pipeline</text>
-      <text x="883" y="58" text-anchor="middle" style="font:10px 'Inter',monospace" fill="#ffffff" fill-opacity="0.9">298 · 13%</text>
-      <!-- C: 5 rows -->
-      <rect x="947"   y="25" width="13"  height="40" fill="#64748b"/>
+    <svg viewBox="0 0 960 110" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PF1 column packing">
+      <!-- Merkle column row range -->
+      <rect x="0" y="25" width="960" height="40" fill="#6366f1"/>
+      <text x="480" y="43" text-anchor="middle" style="font:600 13px 'Inter','Noto Sans TC',sans-serif" fill="#ffffff">Merkle column（獨占 rows）= A + A' + A''(leaf hash)</text>
+      <text x="480" y="58" text-anchor="middle" style="font:10px 'Inter',monospace" fill="#ffffff" fill-opacity="0.9">N × (528 + 132·⌈log₂N⌉) rows</text>
+      <!-- Parallel columns for Delta/bs_price inside -->
+      <rect x="120" y="32" width="120" height="26" fill="#10b981" opacity="0.85"/>
+      <text x="180" y="48" text-anchor="middle" style="font:600 10px 'Inter',monospace" fill="#ffffff">B: Δ 61 rows</text>
+      <rect x="260" y="32" width="90" height="26" fill="#a5b4fc" opacity="0.85"/>
+      <text x="305" y="48" text-anchor="middle" style="font:600 10px 'Inter',monospace" fill="#1a1a1f">A'' ~32</text>
+      <rect x="370" y="32" width="60" height="26" fill="#64748b" opacity="0.85"/>
+      <text x="400" y="48" text-anchor="middle" style="font:600 10px 'Inter',monospace" fill="#ffffff">C ~5</text>
+      <text x="580" y="48" text-anchor="start" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#ffffff">↑ 全部塞進同 row 範圍（不同 columns）</text>
 
-      <text x="0"   y="18" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">Merkle verification (A + A' + A'') = 85%</text>
-      <text x="820" y="18" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">Δ pipeline (B) = 13%</text>
-
-      <!-- footer callouts -->
-      <line x1="813" y1="65" x2="813" y2="78" stroke="#55596b" stroke-width="1"/>
-      <text x="813" y="90" text-anchor="middle" style="font:9px 'Inter',sans-serif" fill="#55596b">A'' σ 驗證 1%</text>
-      <line x1="954" y1="65" x2="954" y2="78" stroke="#55596b" stroke-width="1"/>
-      <text x="954" y="90" text-anchor="end"    style="font:9px 'Inter',sans-serif" fill="#55596b">C 累加 &lt;1%</text>
+      <text x="0"   y="18" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">94 advice columns 平行利用 — rows-wise Δ / bs_price / 累加 對 total 貢獻 0</text>
+      <text x="0"   y="85" style="font:10px 'Inter','Noto Sans TC',sans-serif" fill="#55596b">N=8 → 7,392 rows (k=13)</text>
+      <text x="380" y="85" text-anchor="middle" style="font:10px 'Inter','Noto Sans TC',sans-serif" fill="#55596b">N=32 → 38,016 rows (k=16)</text>
+      <text x="960" y="85" text-anchor="end" style="font:10px 'Inter','Noto Sans TC',sans-serif" fill="#55596b">N=128 → 185,856 rows (k=18)</text>
     </svg>
-    <figcaption>圖：PF1 每持倉 ~2,315 rows 成本占比（估算，含 σ MDT +58 rows）— Merkle 驗證（A + A' + A''）佔 ~85%，本論文核心 Δ 管線（B）僅 ~13%。本研究的價值不在縮減整體大小，而在讓 Δ 變得<strong>可行</strong>。</figcaption>
+    <figcaption>圖：column-packing 下 Merkle 獨占 rows；Δ / bs_price / 累加 平行塞入同 row 範圍（不同 advice columns），對 total rows 貢獻 0。本研究的價值：讓 Δ 不只<strong>可行</strong>，而是 <strong>rows-wise 免費</strong>（caveat：prove time 仍 scale 94 columns × rows）。</figcaption>
   </figure>
 </section>
 
@@ -1330,18 +1325,19 @@ meta.create_gate("horner_per_step", |meta| {
 
 <section class="slide" data-part="V" data-slide="58">
   <div class="slide-meta"><span class="part-label">Circuit Size</span><span class="slide-num">58 / 87</span></div>
-  <h2>電路規模 — k ≈ 19 (N=128)</h2>
+  <h2>電路規模 — k=18 (N=128)，O(N log N) scaling</h2>
   <table class="tbl">
-    <thead><tr><th>指標</th><th>N=8 test</th><th>N=128 production</th></tr></thead>
+    <thead><tr><th>指標</th><th>N=8 test</th><th>N=32 mid</th><th>N=128 production</th></tr></thead>
     <tbody>
-      <tr><td>Merkle depth</td><td>3</td><td>7</td></tr>
-      <tr><td>Rows / position</td><td>~2,257</td><td>~2,257</td></tr>
-      <tr><td>Total rows</td><td>~18K</td><td><strong>~289K</strong></td></tr>
-      <tr><td>k</td><td>~15</td><td><strong>~19</strong></td></tr>
-      <tr><td>Custom gates</td><td colspan="2" style="text-align:center">31（6 modules）</td></tr>
-      <tr><td>Polynomial constraints</td><td colspan="2" style="text-align:center">66</td></tr>
-      <tr><td>Delta pipeline 占比</td><td colspan="2" style="text-align:center">~13%（298 rows/持倉）</td></tr>
-      <tr><td>Merkle 占比</td><td colspan="2" style="text-align:center">~85%（A 23% + A' 61%）</td></tr>
+      <tr><td>Merkle depth</td><td>3</td><td>5</td><td>7</td></tr>
+      <tr><td>Rows / position</td><td>924</td><td>1,188</td><td>1,452</td></tr>
+      <tr><td><strong>Total rows (實測)</strong></td><td><strong>7,392</strong></td><td><strong>38,016</strong></td><td><strong>185,856</strong></td></tr>
+      <tr><td>tight k</td><td>13</td><td>16</td><td><strong>18</strong></td></tr>
+      <tr><td>k budget utilization</td><td>90%</td><td>58%</td><td>71%</td></tr>
+      <tr><td>Custom gates</td><td colspan="3" style="text-align:center">31（6 modules）</td></tr>
+      <tr><td>Polynomial constraints</td><td colspan="3" style="text-align:center">66</td></tr>
+      <tr><td>Scaling law</td><td colspan="3" style="text-align:center"><code class="inline">total(N) = N × (528 + 132·⌈log₂N⌉)</code> · 三點零誤差</td></tr>
+      <tr><td>Column packing</td><td colspan="3" style="text-align:center">Merkle 獨占 rows；Δ / bs_price / 累加 平行塞入貢獻 0</td></tr>
     </tbody>
   </table>
 </section>
@@ -1394,42 +1390,58 @@ meta.create_gate("horner_per_step", |meta| {
     <li><strong>Curve</strong>：BLS12-381（prime field ~254-bit，gcd(5, p−1)=1，x⁵ 可當 Poseidon S-box）</li>
     <li><strong>Commitment</strong>：KZG (SHPLONK) — 常數 proof size、毫秒級 verify</li>
   </ul>
-  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem;color:var(--amber)"><span class="tag todo">TODO</span> 具體 CPU/RAM、halo2_proofs commit hash、release build 設定待補</p>
+  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">Release build（`cargo bench --release`）, wall-clock 3-run median；SRS 採 tight k per N（N=8 k=13 / N=32 k=16 / N=128 k=18）。實測 commit hash / CPU / RAM 請見 zkmm-pf2 repo `benches/p1_results.md`。</p>
 </section>
 
 <section class="slide" data-part="VI" data-slide="63">
   <div class="slide-meta"><span class="part-label">Proving time</span><span class="slide-num">63 / 87</span></div>
-  <h2>Proving time（scenario_a_full）</h2>
+  <h2>Proving time（scenario_a_full，tight k per N）</h2>
   <table class="tbl">
-    <thead><tr><th>配置</th><th>k</th><th>Rows</th><th>Proving time</th></tr></thead>
+    <thead><tr><th>配置</th><th>k</th><th>Rows (實測)</th><th>Proving time (median of 3)</th></tr></thead>
     <tbody>
-      <tr><td>N=8 持倉 (test)</td><td>~15</td><td>~18K</td><td><span class="tag todo">待測</span></td></tr>
-      <tr><td>N=128 持倉 (production)</td><td>~19</td><td>~289K</td><td><span class="tag todo">待測</span></td></tr>
+      <tr><td>N=8 持倉 (test)</td><td>13</td><td>7,392</td><td><strong>3,567 ms</strong></td></tr>
+      <tr><td>N=32 持倉 (mid)</td><td>16</td><td>38,016</td><td><strong>21,234 ms</strong></td></tr>
+      <tr><td>N=128 持倉 (production)</td><td>18</td><td>185,856</td><td><strong>88,891 ms (~1.5 min)</strong></td></tr>
     </tbody>
   </table>
-  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">估計：N=8 約 3–8s、N=128 約 1–3 min（FFT 主導，quasi-linear）。</p>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">Wall-clock 3-run median, release build。FFT 主導（2ᵏ 規模），proving time 隨 k 約翻倍（k 13→16 ~6×，16→18 ~4×）。不同 N 用 tight k 反映實際部署情境。</p>
 </section>
 
 <section class="slide" data-part="VI" data-slide="64">
   <div class="slide-meta"><span class="part-label">Verify time</span><span class="slide-num">64 / 87</span></div>
-  <h2>Verification time</h2>
-  <ul>
-    <li>KZG SHPLONK 驗證 = 常數 pairing 操作數</li>
-    <li>與 circuit size / k 無關（pairing 只看 VK 結構）</li>
-    <li>預估 ~20–50 ms on commodity hardware</li>
+  <h2>Verification time — near-constant across N</h2>
+  <table class="tbl" style="max-width:560px">
+    <thead><tr><th>配置</th><th>k</th><th>Verify time</th></tr></thead>
+    <tbody>
+      <tr><td>N=8</td><td>13</td><td><strong>8.6 ms</strong></td></tr>
+      <tr><td>N=32</td><td>16</td><td><strong>8.4 ms</strong></td></tr>
+      <tr><td>N=128</td><td>18</td><td><strong>8.3 ms</strong></td></tr>
+    </tbody>
+  </table>
+  <ul style="margin-top:.6rem">
+    <li>KZG + SHPLONK 驗證 = 常數 pairing 操作數</li>
+    <li><strong>O(columns) 非 O(rows)</strong> — 94 advice 固定，verify cost 幾乎不隨 N 改變</li>
+    <li>實測 8.3–8.6 ms，符合「commodity hardware 毫秒級 verify」承諾</li>
   </ul>
-  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem;color:var(--amber)"><span class="tag todo">TODO</span> 實測數字（ms 級）待補</p>
 </section>
 
 <section class="slide" data-part="VI" data-slide="65">
   <div class="slide-meta"><span class="part-label">Proof size</span><span class="slide-num">65 / 87</span></div>
-  <h2>Proof size</h2>
-  <ul>
-    <li>KZG commitments（每個 column 一個 G1 點 ~48 B）+ opening proofs</li>
-    <li>與 column 數、queries 數線性相關；與 row 數無關</li>
-    <li>預估 ~1–3 KB（常數級）</li>
+  <h2>Proof size — N-invariant 31,872 bytes</h2>
+  <table class="tbl" style="max-width:560px">
+    <thead><tr><th>配置</th><th>k</th><th>Proof size</th></tr></thead>
+    <tbody>
+      <tr><td>N=8</td><td>13</td><td><strong>31,872 bytes</strong></td></tr>
+      <tr><td>N=32</td><td>16</td><td><strong>31,872 bytes</strong></td></tr>
+      <tr><td>N=128</td><td>18</td><td><strong>31,872 bytes</strong></td></tr>
+    </tbody>
+  </table>
+  <ul style="margin-top:.6rem">
+    <li>KZG + SHPLONK 是 <strong>O(columns)</strong>，不是 O(rows)</li>
+    <li>94 advice + 16 fixed + 1 instance 固定 → proof size 跨 N 完全不變</li>
+    <li>31,872 bytes ≈ 31 KB — 可放進單一 blockchain tx calldata</li>
   </ul>
-  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem;color:var(--amber)"><span class="tag todo">TODO</span> 實際 bytes + 各組件 breakdown 待補</p>
+  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.9rem">這是 KZG+SHPLONK 的內建特性（vs STARK/FRI 的 O(log² rows)），對大 portfolio 無額外 bandwidth 成本。</p>
 </section>
 
 <section class="slide" data-part="VI" data-slide="66">
@@ -1447,16 +1459,18 @@ meta.create_gate("horner_per_step", |meta| {
 
 <section class="slide" data-part="VI" data-slide="67">
   <div class="slide-meta"><span class="part-label">E2E Accuracy</span><span class="slide-num">67 / 87</span></div>
-  <h2>端到端精度 — Running Example</h2>
+  <h2>端到端精度 — Running Example（實測）</h2>
+  <p style="font-size:.92rem">Input: S=100, K=100, σ=0.20, r=0.05, q=0, T=30/365</p>
   <table class="tbl">
-    <thead><tr><th>值</th><th>理論 BS</th><th>電路輸出</th><th>ULP</th></tr></thead>
+    <thead><tr><th>值</th><th>理論 BS (f64)</th><th>電路輸出 (pp48)</th><th>ULP 誤差</th></tr></thead>
     <tbody>
-      <tr><td>d₁</td><td>0.057735…</td><td><span class="tag todo">待測</span></td><td>&lt; 2 ULP</td></tr>
-      <tr><td>N(d₁)</td><td>0.523020…</td><td><span class="tag todo">待測</span></td><td>&lt; 4 ULP</td></tr>
-      <tr><td>Δ_call</td><td>0.523020…</td><td><span class="tag todo">待測</span></td><td><strong>≤ 6.04 ULP 實測</strong></td></tr>
+      <tr><td>d₁</td><td>+0.100341881339</td><td>+28,243,728,713,032 / 2⁴⁸</td><td><strong>15 ULP</strong></td></tr>
+      <tr><td>N(d₁)</td><td>+0.539963545623</td><td>+151,986,226,428,854 / 2⁴⁸</td><td><strong>7 ULP</strong></td></tr>
+      <tr><td>Δ_call</td><td>+0.539963545623</td><td>+151,986,226,428,854 / 2⁴⁸</td><td><strong>7 ULP</strong></td></tr>
     </tbody>
   </table>
-  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">理論上界 57.6 ULP（區間算術）；絕對誤差 ~2×10⁻¹⁴；N=20 持倉累積 ≤ 4×10⁻¹²。</p>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.9rem">Δ_call = N(d₁) exactly（因 q=0 → e^(−qT)=1）。d₁ 經過 <code class="inline">ln + FpMul×3 + FpDiv + FpAdd</code> 多步鏈，累積 15 ULP 屬預期；N(d₁) 和 Δ_call 作為最終輸出 7 ULP，符合「Remez kernel ~2.81 ULP + 鏈式累積」理論上界 57.6 ULP。</p>
+  <p style="color:var(--text-dim);margin-top:.3rem;font-size:.88rem">絕對誤差 ~2×10⁻¹⁴；任何合理金融合規門檻（τ ≥ 0.01 = ~10¹² ULP）都留 10 個數量級安全餘裕。</p>
 </section>
 
 <section class="slide" data-part="VI" data-slide="68">
@@ -1509,16 +1523,20 @@ meta.create_gate("horner_per_step", |meta| {
 
 <section class="slide" data-part="VI" data-slide="69">
   <div class="slide-meta"><span class="part-label">Plonkish metrics</span><span class="slide-num">69 / 87</span></div>
-  <h2>Plonkish 指標</h2>
-  <ul>
-    <li><strong>Advice columns</strong>：~10 欄（state / acc / rem / sat_flag / seg_idx 等）</li>
-    <li><strong>Fixed columns</strong>：~5 欄（Remez 係數 × 16 segments、Poseidon round constants）</li>
-    <li><strong>Instance columns</strong>：1 欄（4 public inputs）</li>
-    <li><strong>Selector 欄</strong>：~31（每個 custom gate 一個）</li>
-    <li><strong>Lookup tables</strong>：2 張（ByteTable 256 entries + Pow2Table 48 entries）</li>
-    <li><strong>Max gate degree</strong>：~5（Poseidon x⁵ 為主）</li>
-  </ul>
-  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.92rem;color:var(--amber)"><span class="tag todo">TODO</span> 實際 Meta::num_advice_columns() 等精確值待從 Rust 匯出</p>
+  <h2>Plonkish 指標（實測 from halo2 ConstraintSystem）</h2>
+  <table class="tbl" style="max-width:640px">
+    <thead><tr><th>類別</th><th>數量</th><th>說明</th></tr></thead>
+    <tbody>
+      <tr><td>Advice columns</td><td><strong>94</strong></td><td>State Merkle / Δ pipeline / bs_price / 累加 等平行塞入</td></tr>
+      <tr><td>Fixed columns</td><td><strong>16</strong></td><td>Remez 係數、Poseidon round constants、Lookup tables</td></tr>
+      <tr><td>Instance columns</td><td><strong>1</strong></td><td>4 public inputs（state roots、batch commitment 等）</td></tr>
+      <tr><td>Selector 欄</td><td><strong>34</strong></td><td>每個 custom gate 一個 selector</td></tr>
+      <tr><td>Lookup arguments</td><td><strong>83</strong></td><td>ByteTable 256 entries 被 6-byte / 7-byte / 8-byte 分解複用</td></tr>
+      <tr><td>Max gate degree</td><td><strong>6</strong></td><td>多元高 degree 約束（Poseidon x⁵ + selector 乘數）</td></tr>
+      <tr><td>Min k</td><td><strong>8</strong></td><td>lookup 表 pad 到 2ᵏ−6 的 minimum 保留</td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.9rem">94 advice 看似多，其實是 column-packing 策略 — 平行安排讓 rows-intensive 的 Merkle 不被 Δ pipeline 擠兌。Proof size O(columns) 固定 31,872 bytes（slide 65）。</p>
 </section>
 
 <section class="slide" data-part="VI" data-slide="70">
@@ -1527,46 +1545,44 @@ meta.create_gate("horner_per_step", |meta| {
   <table class="tbl">
     <thead><tr><th>N (持倉)</th><th>Merkle depth</th><th>Total rows</th><th>k</th></tr></thead>
     <tbody>
-      <tr><td>8 (test)</td><td>3</td><td>~18K</td><td>~15</td></tr>
-      <tr><td>32</td><td>5</td><td>~72K</td><td>~17</td></tr>
-      <tr><td>128 (production)</td><td>7</td><td>~289K</td><td>~19</td></tr>
+      <tr><td>8 (test)</td><td>3</td><td><strong>7,392</strong></td><td><strong>13</strong></td></tr>
+      <tr><td>32 (mid)</td><td>5</td><td><strong>38,016</strong></td><td><strong>16</strong></td></tr>
+      <tr><td>128 (production)</td><td>7</td><td><strong>185,856</strong></td><td><strong>18</strong></td></tr>
     </tbody>
   </table>
-  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">Linear in N（每 position 獨立），Merkle depth log(N) — 整體 ~N·(const + log N)。</p>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">Scaling law：<code class="inline">total(N) = N × (528 + 132·⌈log₂N⌉)</code> — <strong>O(N log N)</strong>（非線性；per-position 成本隨 Merkle depth 增長）。三點實測零誤差擬合。</p>
   <p style="color:var(--text-dim);margin-top:.3rem;font-size:.92rem">不足 N_max 填 dummy leaf（隱藏真實持倉數量，隱私保護）。</p>
   <figure class="fig" style="margin-top:.6rem">
     <svg viewBox="0 0 820 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="N-position scaling">
-      <text x="410" y="16" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif" fill="#4f46e5">Total rows vs N — 近似線性成長（k 僅對數增長）</text>
-      <!-- axis x=100..780, y=148..30 -->
+      <text x="410" y="16" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif" fill="#4f46e5">Total rows vs N — O(N log N) 實測擬合 · 三點零誤差</text>
       <line x1="100" y1="148" x2="780" y2="148" stroke="#c7c9d3" stroke-width="1"/>
       <line x1="100" y1="30" x2="100" y2="148" stroke="#c7c9d3" stroke-width="1"/>
-      <!-- y-axis ticks 0, 100K, 200K, 300K -->
       <g style="font:10px 'Inter',monospace;fill:#55596b">
         <text x="94" y="152" text-anchor="end">0</text>
-        <line x1="96" y1="109" x2="100" y2="109" stroke="#c7c9d3"/><text x="94" y="113" text-anchor="end">100K</text>
-        <line x1="96" y1="70" x2="100" y2="70" stroke="#c7c9d3"/><text x="94" y="74" text-anchor="end">200K</text>
-        <line x1="96" y1="31" x2="100" y2="31" stroke="#c7c9d3"/><text x="94" y="35" text-anchor="end">300K</text>
+        <line x1="96" y1="110" x2="100" y2="110" stroke="#c7c9d3"/><text x="94" y="114" text-anchor="end">60K</text>
+        <line x1="96" y1="71" x2="100" y2="71" stroke="#c7c9d3"/><text x="94" y="75" text-anchor="end">120K</text>
+        <line x1="96" y1="32" x2="100" y2="32" stroke="#c7c9d3"/><text x="94" y="36" text-anchor="end">180K</text>
       </g>
-      <!-- bars (total rows) scale: 300K = 118px height -->
-      <!-- N=8 → 18K rows: h = 18/300*118 = 7.08, y = 148-7 = 141 -->
-      <rect x="180" y="141" width="100" height="7" fill="#a5b4fc"/>
-      <text x="230" y="135" text-anchor="middle" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">18K</text>
-      <text x="230" y="163" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">N=8 · depth 3 · k≈15</text>
-      <!-- N=32 → 72K rows: h = 72/300*118 = 28.3, y = 148-28 = 120 -->
-      <rect x="360" y="120" width="100" height="28" fill="#6366f1"/>
-      <text x="410" y="114" text-anchor="middle" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">72K</text>
-      <text x="410" y="163" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">N=32 · depth 5 · k≈17</text>
-      <!-- N=128 → 289K rows: h = 289/300*118 = 113.6, y = 148-114 = 34 -->
-      <rect x="540" y="34" width="100" height="114" fill="#4f46e5"/>
-      <text x="590" y="28" text-anchor="middle" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">289K</text>
-      <text x="590" y="163" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">N=128 · depth 7 · k≈19</text>
-      <!-- annotation: linear growth arrow -->
-      <path d="M280,141 Q420,90 540,50" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3 2" fill="none"/>
-      <text x="680" y="60" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#dc2626">rows ≈ N×2,257</text>
-      <text x="680" y="74" style="font:10px 'Inter','Noto Sans TC',sans-serif" fill="#dc2626">16× N → 16× rows</text>
-      <text x="680" y="90" style="font:10px 'Inter','Noto Sans TC',sans-serif" fill="#dc2626">但 k 僅 +4（log₂ N）</text>
+      <!-- bars (total rows) scale: 200K = 118px height -->
+      <!-- N=8 → 7392 rows: h = 7.392/200*118 = 4.36, y = 148-4 = 144 -->
+      <rect x="180" y="144" width="100" height="4" fill="#a5b4fc"/>
+      <text x="230" y="138" text-anchor="middle" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">7,392</text>
+      <text x="230" y="163" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">N=8 · depth 3 · k=13</text>
+      <!-- N=32 → 38016 rows: h = 38/200*118 = 22.4, y = 148-22 = 126 -->
+      <rect x="360" y="126" width="100" height="22" fill="#6366f1"/>
+      <text x="410" y="120" text-anchor="middle" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">38,016</text>
+      <text x="410" y="163" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">N=32 · depth 5 · k=16</text>
+      <!-- N=128 → 185856 rows: h = 186/200*118 = 109.7, y = 148-110 = 38 -->
+      <rect x="540" y="38" width="100" height="110" fill="#4f46e5"/>
+      <text x="590" y="32" text-anchor="middle" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">185,856</text>
+      <text x="590" y="163" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">N=128 · depth 7 · k=18</text>
+      <path d="M280,144 Q420,90 540,54" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3 2" fill="none"/>
+      <text x="680" y="55" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#dc2626">O(N log N)</text>
+      <text x="680" y="69" style="font:9px 'Inter',monospace" fill="#dc2626">N·(528+132·⌈log₂N⌉)</text>
+      <text x="680" y="84" style="font:10px 'Inter','Noto Sans TC',sans-serif" fill="#dc2626">16× N → 25× rows</text>
+      <text x="680" y="98" style="font:10px 'Inter','Noto Sans TC',sans-serif" fill="#dc2626">k 僅 +5（log₂N）</text>
     </svg>
-    <figcaption>圖：rows 對 N 近似線性（每持倉 ~2,257 rows 獨立計算），但 k 只隨 log₂N 上升 — 這是 SNARK 對大 portfolio 友善的原因。Merkle depth = ⌈log₂N⌉。</figcaption>
+    <figcaption>圖：Total rows vs N 實測（`halo2 CircuitCost` API）— 曲線為 <code class="inline">N × (528 + 132·⌈log₂N⌉)</code>，三點零誤差。rows 成 O(N log N) 因 per-position 成本含 Merkle depth log(N)；k 只隨 log₂N 上升（SNARK 對大 portfolio 友善）。</figcaption>
   </figure>
 </section>
 
@@ -1683,8 +1699,8 @@ meta.create_gate("horner_per_step", |meta| {
   <div class="slide-meta"><span class="part-label">Recap</span><span class="slide-num">81 / 87</span></div>
   <h2>貢獻 recap</h2>
   <ul>
-    <li>Halo2 上首個 BS Delta 零知識電路，N=128、k ≈ 19（~289K rows）</li>
-    <li>pp=48 + Remez minimax d=12 + Per-step Horner，實測 ~6.04 ULP（理論上界 57.6）</li>
+    <li>Halo2 上首個 BS Delta 零知識電路，N=128、<strong>k=18（185,856 rows 實測）</strong>；scaling law O(N log N)；column-packing 讓 Δ rows-wise 免費</li>
+    <li>pp=48 + Remez minimax d=12 + Per-step Horner，Delta_call 實測 7 ULP（理論上界 57.6）</li>
     <li>A2 segment-selector gate + 統一 Horner kernel（ln/erf/exp 共用）封閉 saturation 與 segment soundness</li>
     <li>31 custom gates / 6 modules / 66 constraints，ZK-POK 三層論證 + 10 攻擊向量全覆蓋</li>
     <li>Rust ↔ Python bit-for-bit 雙實作</li>
