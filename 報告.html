@@ -1149,7 +1149,7 @@ meta.create_gate("horner_per_step", |meta| {
     <thead><tr><th>層級</th><th>精度</th><th>來源</th></tr></thead>
     <tbody>
       <tr><td>Kernel per-segment</td><td>~1.2 ULP</td><td>d=12 Minimax（degree sweep 最優）</td></tr>
-      <tr><td>端到端 實測最差</td><td><strong>~6.04 ULP</strong></td><td>跨測試向量（Rust Halo2 bit-for-bit）</td></tr>
+      <tr><td>端到端 實測（ATM）</td><td><strong>~7 ULP</strong></td><td>ATM 向量 S=K=100,σ=0.20 P1 實測 Δ_call / N(d₁)；上游 d₁ 15 ULP</td></tr>
       <tr><td>端到端 理論上界</td><td>57.6 ULP</td><td>區間算術累積</td></tr>
       <tr><td>絕對誤差</td><td>~2×10⁻¹⁴</td><td>pp=48 scale 下</td></tr>
     </tbody>
@@ -1182,10 +1182,10 @@ meta.create_gate("horner_per_step", |meta| {
       <rect x="200" y="38" width="19"  height="20" fill="#10b981"/>
       <text x="225" y="53" class="val">1.2</text>
 
-      <!-- Measured 6.04 ULP, log10(6.04)≈0.781 -->
-      <text x="195" y="82" text-anchor="end" class="lbl">端到端 實測最差</text>
-      <rect x="200" y="70" width="187" height="20" fill="#4f46e5"/>
-      <text x="393" y="85" class="val">6.04</text>
+      <!-- Measured 7 ULP, log10(7)≈0.845 -->
+      <text x="195" y="82" text-anchor="end" class="lbl">端到端 實測（ATM）</text>
+      <rect x="200" y="70" width="203" height="20" fill="#4f46e5"/>
+      <text x="409" y="85" class="val">7</text>
 
       <!-- Worst-case 57.6 ULP, log10(57.6)≈1.760 -->
       <text x="195" y="114" text-anchor="end" class="lbl">端到端 理論上界</text>
@@ -1198,7 +1198,7 @@ meta.create_gate("horner_per_step", |meta| {
       <text x="683" y="52" class="tk" fill="#dc2626">τ ≥ 0.01</text>
       <text x="683" y="64" class="tk" fill="#dc2626">≈ 10¹² ULP</text>
     </svg>
-    <figcaption>圖：pp=48 定點下 Δ 計算的 ULP 誤差（對數軸）— 實測（6.04）遠低於理論上界（57.6），而任何合理合規門檻 τ ≥ 0.01 換算後高達 ~10¹² ULP，還有 10 個數量級的安全餘裕。</figcaption>
+    <figcaption>圖：pp=48 定點下 Δ 計算的 ULP 誤差（對數軸）— ATM 向量實測 7 ULP（上游中介 d₁ 15 ULP），遠低於理論上界 57.6，而任何合理合規門檻 τ ≥ 0.01 換算後高達 ~10¹² ULP，仍有 10 個數量級的安全餘裕。</figcaption>
   </figure>
   <div class="quote" style="margin-top:.8rem;border-left-color:var(--text-dim)">
     <p><strong>[Paraphrase — 非原文]</strong> Remez 1934 交替演算法求一連續函數在閉區間上的最佳一致逼近多項式；由 Chebyshev 等振盪定理保證「誤差曲線在至少 d+2 個點上以相等絕對值交替取極值」即為最佳解，因此 minimax 多項式的最壞誤差理論上無法再小。</p>
@@ -1362,7 +1362,7 @@ meta.create_gate("horner_per_step", |meta| {
     <li>17 步 pipeline，全程 pp=48 定點；ln/erf/exp 共用 Remez + Per-step Horner kernel</li>
     <li>A2 segment-selector gate 封閉 saturation + segment 的 soundness</li>
     <li>31 custom gates / 66 constraints / 6 modules — 形式化 ZK-POK 三層論證</li>
-    <li>實測 ~6.04 ULP，理論上界 57.6 ULP — 比任何合理 τ 小 10 個數量級</li>
+    <li>實測 7 ULP（ATM 向量 N(d₁)/Δ_call；上游 d₁ 15 ULP），理論上界 57.6 ULP — 比任何合理 τ 小 10 個數量級</li>
   </ul>
   <p style="color:var(--text-dim);margin-top:1.2rem">下一 Part：數字說話 — benchmark & 精度實測。</p>
 </section>
@@ -1376,7 +1376,7 @@ meta.create_gate("horner_per_step", |meta| {
   <ul>
     <li>proving / verification time、proof size — 哪些 release benchmark 已跑、哪些待測</li>
     <li>Rust ↔ Python bit-for-bit 一致性</li>
-    <li>端到端精度 vs 理論 BS（實測 6.04 ULP，上界 57.6 ULP）</li>
+    <li>端到端精度 vs 理論 BS（ATM 實測 7 ULP，上界 57.6 ULP）</li>
     <li>電路成本拆解（A 23% / A' 61% / A'' 1% / B 13% / C &lt;1%）</li>
   </ul>
 </section>
@@ -1607,7 +1607,7 @@ meta.create_gate("horner_per_step", |meta| {
   <div class="slide-meta"><span class="part-label">PART VI · Recap</span><span class="slide-num">72 / 87</span></div>
   <h2>Part VI takeaways</h2>
   <ul>
-    <li>Running example 可實際 prove / verify、端到端實測 ~6.04 ULP（理論上界 57.6）</li>
+    <li>Running example 可實際 prove / verify、端到端 ATM 實測 7 ULP（理論上界 57.6）</li>
     <li>Rust ↔ Python bit-for-bit 雙實作驗證通過</li>
     <li>電路主要成本在 Merkle (85%)，Delta 管線僅 13%</li>
     <li>Proving / verify / proof-size 具體 release 數字 <span class="tag todo">待補</span></li>
