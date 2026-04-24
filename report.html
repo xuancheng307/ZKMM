@@ -485,7 +485,7 @@ figure.fig figcaption strong{color:var(--text)}
   <p>PF2 負責「State Transition」：State(T) = State(T−1) + apply(Trades(T))，每筆交易有合法交易所 EdDSA 簽章。</p>
   <div class="grid-2" style="margin-top:1rem">
     <div class="card"><h3>PF1（本論文）</h3><p>證明「這組持倉的加權 Δ 合規」<br>涉及超越函數 ln / erf / exp</p></div>
-    <div class="card"><h3>PF2（介面定義，實作另案）</h3><p>證明「這組持倉是從已簽交易正確演化而來」<br>僅需 EdDSA 驗簽（Babyjubjub ~6K constraints/次）</p></div>
+    <div class="card"><h3>PF2（介面定義，實作另案）</h3><p>證明「這組持倉是從已簽交易正確演化而來」<br>EdDSA Babyjubjub ~4.6K rows/verify（含 subgroup + S&lt;L + domain sep）</p></div>
   </div>
   <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">PF1 假設 State Tree 完整（Assumption 1）— 這個保證由 PF2 提供。兩個 proof 透過 <code class="inline">state_root</code> 綁定。</p>
 </section>
@@ -1154,7 +1154,7 @@ meta.create_gate("horner_per_step", |meta| {
       <tr><td>絕對誤差</td><td>~2×10⁻¹⁴</td><td>pp=48 scale 下</td></tr>
     </tbody>
   </table>
-  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">N=20 持倉典型情境累積偏差 ≤ 4×10⁻¹² — 比任何合理門檻 τ ≥ 0.01 小 10 個數量級。</p>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">實測 Δ_call 絕對誤差 ~2×10⁻¹⁴（ATM）— 比任何合理門檻 τ ≥ 0.01 小 12 個數量級。</p>
   <figure class="fig" style="margin-top:.8rem">
     <svg viewBox="0 0 820 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ULP comparison">
       <defs>
@@ -1374,7 +1374,7 @@ meta.create_gate("horner_per_step", |meta| {
   <h1>Part VI — 實驗結果</h1>
   <p class="lead">Part VI 結束後你會看到：</p>
   <ul>
-    <li>proving / verification time、proof size — 哪些 release benchmark 已跑、哪些待測</li>
+    <li>Proving time（N=8/32/128 實測）、verify ~8.3-8.6 ms 常數、proof size N-invariant 31,872 bytes</li>
     <li>Rust ↔ Python bit-for-bit 一致性</li>
     <li>端到端精度 vs 理論 BS（ATM 實測 7 ULP，上界 57.6 ULP）</li>
     <li>電路成本拆解（A 23% / A' 61% / A'' 1% / B 13% / C &lt;1%）</li>
@@ -1610,7 +1610,7 @@ meta.create_gate("horner_per_step", |meta| {
     <li>Running example 可實際 prove / verify、端到端 ATM 實測 7 ULP（理論上界 57.6）</li>
     <li>Rust ↔ Python bit-for-bit 雙實作驗證通過</li>
     <li>電路主要成本在 Merkle (85%)，Delta 管線僅 13%</li>
-    <li>Proving / verify / proof-size 具體 release 數字 <span class="tag todo">待補</span></li>
+    <li>N=128 完整 proof 產生 ~89s / verify 8.3 ms / proof 31 KB — 毫秒級 verify + N-invariant proof size 兩大 KZG+SHPLONK 特徵實測確認</li>
   </ul>
   <p style="color:var(--text-dim);margin-top:1.2rem">下一 Part：誠實面對 — 限制與未來工作。</p>
 </section>
@@ -1639,7 +1639,7 @@ meta.create_gate("horner_per_step", |meta| {
   <h2>Portfolio N-position — N=8 test → N=128 production</h2>
   <ul>
     <li>當前實作：N=8（Merkle depth 3），開發驗證加速</li>
-    <li>生產目標：N=128（Merkle depth 7，k ≈ 19）</li>
+    <li>生產目標：N=128（Merkle depth 7，<strong>k = 18 實測</strong>，185,856 rows）</li>
     <li>不足 N_max 的持倉填 dummy leaf — 隱藏真實持倉數量</li>
     <li>CLAUDE1.2 portfolio 電路分工進行中</li>
   </ul>
@@ -1647,13 +1647,28 @@ meta.create_gate("horner_per_step", |meta| {
 
 <section class="slide" data-part="VII" data-slide="76">
   <div class="slide-meta"><span class="part-label">PF2</span><span class="slide-num">76 / 87</span></div>
-  <h2>PF2 — 商業 IP 考量</h2>
-  <p>PF2 負責 State Transition + 交易所 EdDSA 驗簽，論文中保留介面定義與 relation，實作細節另案。</p>
-  <ul>
-    <li>EdDSA Babyjubjub ~6K constraints/簽章 — 已驗證可行</li>
-    <li>與 PF1 透過 state_root 綁定 — 論文敘述完整協議</li>
-    <li>PF1 的 Assumption 1（State Tree 完整性）= PF2 的 soundness</li>
-  </ul>
+  <h2>PF2 — 商業 IP 考量 & Scope 定位</h2>
+  <p style="font-size:.94rem">PF2 負責 State Transition + 交易所 EdDSA 驗簽，論文保留介面定義與 relation，實作細節另案（private repo）。</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin-top:.5rem">
+    <div style="background:#eef2ff;border-left:3px solid #4f46e5;padding:.55rem .7rem;border-radius:3px">
+      <div style="font-weight:600;color:#4f46e5;font-size:.88rem;margin-bottom:.25rem">✅ PF2 作為 atomic primitive（已完成）</div>
+      <ul style="margin:0;padding-left:1rem;font-size:.84rem;line-height:1.45">
+        <li>~4,573 rows/verify（EdDSA + subgroup + S&lt;L + domain sep 全齊）</li>
+        <li>47+33 tests pass，7 攻擊向量全擋（S+kL / low-order / S=0 / off-curve / tamper / cross-protocol / key mismatch）</li>
+        <li>Merkle root chain + 同位置更新 + corp action ratio（split / reverse / stock div）</li>
+      </ul>
+    </div>
+    <div style="background:#fef3c7;border-left:3px solid #d97706;padding:.55rem .7rem;border-radius:3px">
+      <div style="font-weight:600;color:#d97706;font-size:.88rem;margin-bottom:.25rem">⚠️ 不等於完整 fund 透明度系統</div>
+      <ul style="margin:0;padding-left:1rem;font-size:.84rem;line-height:1.45">
+        <li>Scale：T_MAX=4 / N_MAX=128（需 recursive aggregation）</li>
+        <li>Completeness：電路不保證「這是時段所有交易」需外部 oracle</li>
+        <li>Corp action 僅 ratio 型（spin-off / merger / cash 未涵蓋）</li>
+        <li>Signer role = broker / custodian / clearinghouse（非 raw exchange）</li>
+      </ul>
+    </div>
+  </div>
+  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.84rem">PF1 的 Assumption 1（State Tree 完整性）⇐ PF2 soundness + 上述 4 項 out-of-circuit trust assumption。完整 scope 定義於 <code class="inline">scenario_a_full/src/proof2/SCOPE.md</code>。</p>
 </section>
 
 <section class="slide" data-part="VII" data-slide="77">
