@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenario A — Black-Scholes Delta Hedging Compliance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface-2: #1a1a26;
+      --surface-3: #222233;
+      --border: #2a2a3a;
+      --text: #e4e4ed;
+      --text-dim: #8888a0;
+      --accent: #6366f1;
+      --accent-light: #818cf8;
+      --accent-glow: rgba(99, 102, 241, 0.15);
+      --green: #22c55e;
+      --green-dim: #16a34a;
+      --green-glow: rgba(34, 197, 94, 0.12);
+      --blue: #3b82f6;
+      --blue-glow: rgba(59, 130, 246, 0.12);
+      --orange: #f59e0b;
+      --orange-glow: rgba(245, 158, 11, 0.12);
+      --red: #ef4444;
+      --red-glow: rgba(239, 68, 68, 0.10);
+      --cyan: #06b6d4;
+      --cyan-glow: rgba(6, 182, 212, 0.12);
+      --font-sans: 'Noto Sans TC', 'Inter', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ---- Nav ---- */
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0;
+      background: rgba(10,10,15,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+      padding: 0.75rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+    .nav a { color: var(--text-dim); text-decoration: none; font-size: 0.85rem; font-weight: 500; transition: color 0.15s; }
+    .nav a:hover { color: var(--accent-light); }
+    .nav .nav-title { color: var(--text); font-weight: 700; font-size: 0.9rem; }
+
+    /* ---- Hero ---- */
+    .hero {
+      text-align: center;
+      padding: 7rem 2rem 3rem;
+      position: relative;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 800px; height: 600px;
+      background: radial-gradient(ellipse, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-content { position: relative; z-index: 1; }
+    .hero-badge {
+      display: inline-block;
+      font-size: 0.72rem; font-weight: 600;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--accent-light);
+      background: var(--accent-glow);
+      border: 1px solid rgba(99,102,241,0.25);
+      padding: 0.35rem 1rem;
+      border-radius: 999px;
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(1.8rem, 4.5vw, 3rem);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.25;
+      margin-bottom: 1.25rem;
+      background: linear-gradient(135deg, #fff 0%, #c7d2fe 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .hero-sub {
+      font-size: 1.05rem; color: var(--text-dim);
+      max-width: 680px; margin: 0 auto; line-height: 1.7;
+    }
+
+    /* ---- Container ---- */
+    .container { max-width: 960px; margin: 0 auto; padding: 0 2rem 4rem; }
+
+    /* ---- Section ---- */
+    .section { margin-bottom: 4rem; }
+    .section-label {
+      font-size: 0.72rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.12em;
+      color: var(--accent-light); margin-bottom: 0.5rem;
+    }
+    .section h2 {
+      font-size: 1.6rem; font-weight: 800;
+      letter-spacing: -0.02em; margin-bottom: 1rem;
+    }
+    .section p, .section li {
+      font-size: 0.95rem; color: var(--text-dim); line-height: 1.8;
+    }
+    .section ul { padding-left: 1.5rem; }
+    .section li { margin-bottom: 0.4rem; }
+
+    /* ---- Highlight Box ---- */
+    .highlight-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem 2rem;
+      margin: 1.5rem 0;
+    }
+    .highlight-box.accent { border-left: 3px solid var(--accent); }
+    .highlight-box.green { border-left: 3px solid var(--green); }
+    .highlight-box.orange { border-left: 3px solid var(--orange); }
+    .highlight-box.red { border-left: 3px solid var(--red); }
+    .highlight-box h3 {
+      font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem;
+    }
+    .highlight-box p { font-size: 0.9rem; color: var(--text-dim); }
+
+    /* ---- Diagram (CSS-based) ---- */
+    .diagram {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      margin: 1.5rem 0;
+      overflow-x: auto;
+    }
+
+    /* ---- Layer Stack ---- */
+    .layer-stack { display: flex; flex-direction: column; gap: 0; }
+    .layer {
+      border: 1px solid var(--border);
+      padding: 1.25rem 1.5rem;
+      display: flex; align-items: center; gap: 1.25rem;
+      position: relative;
+    }
+    .layer:first-child { border-radius: var(--radius) var(--radius) 0 0; }
+    .layer:last-child { border-radius: 0 0 var(--radius) var(--radius); }
+    .layer + .layer { border-top: none; }
+    .layer-num {
+      font-family: var(--font-mono);
+      font-size: 0.75rem; font-weight: 700;
+      min-width: 2rem; height: 2rem;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .layer-info { flex: 1; }
+    .layer-info h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.2rem; }
+    .layer-info p { font-size: 0.82rem; color: var(--text-dim); margin: 0; }
+    .layer-tag {
+      font-size: 0.68rem; font-weight: 600; padding: 0.2rem 0.6rem;
+      border-radius: 999px; flex-shrink: 0;
+    }
+
+    .layer.l4 { background: rgba(245,158,11,0.06); }
+    .layer.l4 .layer-num { background: rgba(245,158,11,0.15); color: var(--orange); }
+    .layer.l4 .layer-tag { background: rgba(245,158,11,0.12); color: var(--orange); }
+
+    .layer.l3 { background: rgba(99,102,241,0.06); }
+    .layer.l3 .layer-num { background: rgba(99,102,241,0.15); color: var(--accent-light); }
+    .layer.l3 .layer-tag { background: rgba(99,102,241,0.12); color: var(--accent-light); }
+
+    .layer.l2 { background: rgba(6,182,212,0.06); }
+    .layer.l2 .layer-num { background: rgba(6,182,212,0.15); color: var(--cyan); }
+    .layer.l2 .layer-tag { background: rgba(6,182,212,0.12); color: var(--cyan); }
+
+    .layer.l1 { background: rgba(34,197,94,0.06); }
+    .layer.l1 .layer-num { background: rgba(34,197,94,0.15); color: var(--green); }
+    .layer.l1 .layer-tag { background: rgba(34,197,94,0.12); color: var(--green); }
+
+    /* ---- Pipeline ---- */
+    .pipeline { display: flex; align-items: stretch; gap: 0; flex-wrap: nowrap; }
+    .pipe-stage {
+      flex: 1; min-width: 160px;
+      padding: 1.25rem 1rem;
+      border: 1px solid var(--border);
+      text-align: center;
+      position: relative;
+    }
+    .pipe-stage:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+    .pipe-stage:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+    .pipe-stage + .pipe-stage { border-left: none; }
+    .pipe-stage.ours { background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.3); }
+    .pipe-stage.std { background: var(--surface); }
+    .pipe-stage h4 { font-size: 0.85rem; font-weight: 700; margin-bottom: 0.35rem; }
+    .pipe-stage p { font-size: 0.75rem; color: var(--text-dim); margin: 0; }
+    .pipe-label {
+      font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.08em; margin-bottom: 0.5rem;
+      display: block;
+    }
+    .pipe-label.std-label { color: var(--text-dim); }
+    .pipe-label.ours-label { color: var(--accent-light); }
+
+    .pipe-arrow {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; color: var(--text-dim);
+      min-width: 30px;
+    }
+
+    /* ---- Table ---- */
+    .data-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin: 1.5rem 0;
+      font-size: 0.88rem;
+    }
+    .data-table th, .data-table td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .data-table th {
+      background: var(--surface-2);
+      font-weight: 600; font-size: 0.8rem;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--text-dim);
+    }
+    .data-table thead tr:first-child th:first-child { border-radius: var(--radius-sm) 0 0 0; }
+    .data-table thead tr:first-child th:last-child { border-radius: 0 var(--radius-sm) 0 0; }
+    .data-table tbody tr { transition: background 0.1s; }
+    .data-table tbody tr:hover { background: var(--surface); }
+    .data-table td { color: var(--text-dim); }
+    .data-table .yes { color: var(--green); font-weight: 600; }
+    .data-table .no { color: var(--red); font-weight: 600; }
+    .data-table .partial { color: var(--orange); font-weight: 600; }
+
+    /* ---- Stat Cards ---- */
+    .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 1.25rem 1.5rem;
+      text-align: center;
+    }
+    .stat-card .stat-value {
+      font-size: 1.8rem; font-weight: 800;
+      font-family: var(--font-mono);
+      margin-bottom: 0.25rem;
+    }
+    .stat-card .stat-label { font-size: 0.78rem; color: var(--text-dim); }
+    .stat-card.accent .stat-value { color: var(--accent-light); }
+    .stat-card.green .stat-value { color: var(--green); }
+    .stat-card.cyan .stat-value { color: var(--cyan); }
+    .stat-card.orange .stat-value { color: var(--orange); }
+
+    /* ---- Flow Steps ---- */
+    .flow-steps { display: flex; flex-direction: column; gap: 0; margin: 1.5rem 0; }
+    .flow-step {
+      display: flex; gap: 1rem; align-items: flex-start;
+      padding: 1rem 1.25rem;
+      border-left: 2px solid var(--border);
+      position: relative;
+    }
+    .flow-step::before {
+      content: '';
+      position: absolute; left: -6px; top: 1.25rem;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid var(--bg);
+    }
+    .flow-step:last-child { border-left-color: transparent; }
+    .flow-num {
+      font-family: var(--font-mono); font-size: 0.75rem;
+      font-weight: 700; color: var(--accent-light);
+      min-width: 1.5rem;
+    }
+    .flow-text h4 { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.15rem; }
+    .flow-text p { font-size: 0.82rem; color: var(--text-dim); margin: 0; }
+
+    /* ---- Two-Column ---- */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin: 1.5rem 0; }
+
+    /* ---- Tree Diagram ---- */
+    .tree-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 1.5rem;
+    }
+    .tree-box h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .tree-box p { font-size: 0.82rem; color: var(--text-dim); }
+    .tree-box code {
+      font-family: var(--font-mono); font-size: 0.78rem;
+      background: var(--surface-2); padding: 0.15rem 0.4rem;
+      border-radius: 4px; color: var(--accent-light);
+    }
+    .tree-box ul { padding-left: 1.2rem; margin-top: 0.5rem; }
+    .tree-box li { font-size: 0.82rem; color: var(--text-dim); margin-bottom: 0.2rem; }
+
+    /* ---- Divider ---- */
+    .divider { border: none; height: 1px; background: var(--border); margin: 3rem 0; }
+
+    /* ---- Footer ---- */
+    .footer {
+      text-align: center; padding: 2rem;
+      font-size: 0.8rem; color: var(--text-dim);
+      border-top: 1px solid var(--border);
+    }
+    .footer a { color: var(--accent-light); text-decoration: none; }
+
+    /* ---- Responsive ---- */
+    @media (max-width: 700px) {
+      .hero { padding: 5rem 1.5rem 2rem; }
+      .container { padding: 0 1.25rem 3rem; }
+      .two-col { grid-template-columns: 1fr; }
+      .pipeline { flex-direction: column; }
+      .pipe-stage:first-child { border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+      .pipe-stage:last-child { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+      .pipe-stage + .pipe-stage { border-left: 1px solid var(--border); border-top: none; }
+      .pipe-arrow { transform: rotate(90deg); }
+      .stat-row { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav class="nav">
+    <a href="index.html" class="nav-title">ZKMM</a>
+    <a href="index.html">Home</a>
+    <a href="scenario-a.html" style="color: var(--accent-light);">Scenario A</a>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="hero-content">
+      <div class="hero-badge">Scenario A &mdash; Production-Grade Protocol</div>
+      <h1>Black-Scholes Delta Hedging<br>Privacy Compliance</h1>
+      <p class="hero-sub">
+        對沖基金向監管機構證明「投資組合 Delta 風險在合規範圍內」，<br>
+        但永遠不透露任何持倉細節 &mdash; 包括操作哪支股票、持有多少部位。
+      </p>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- ========== 1. PROBLEM ========== -->
+    <div class="section">
+      <div class="section-label">Problem</div>
+      <h2>為什麼需要隱私合規？</h2>
+      <p>
+        監管機構要求對沖基金定期報告風險暴露。傳統做法是交出完整持倉清單 &mdash;
+        但這等於把交易策略全部公開。競爭對手一旦知道你的部位結構，就能搶先交易（front-running），
+        讓建倉成本大幅上升。
+      </p>
+
+      <div class="two-col">
+        <div class="highlight-box red">
+          <h3>傳統做法</h3>
+          <p>基金交出完整持倉 &rarr; 監管自己算 &rarr; 策略曝光</p>
+        </div>
+        <div class="highlight-box green">
+          <h3>ZK 合規</h3>
+          <p>基金提交 ZK proof &rarr; 監管毫秒級驗證 &rarr; 持倉永遠保密</p>
+        </div>
+      </div>
+
+      <div class="highlight-box accent">
+        <h3>ZK 的獨特價值</h3>
+        <p>零知識證明是唯一能同時做到<strong>即時可驗證 + 永久隱私</strong>的技術。
+           證明的存在本身就代表合規 &mdash; 無法生成 proof 就是不合規。</p>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 2. ROLES ========== -->
+    <div class="section">
+      <div class="section-label">Participants</div>
+      <h2>三方角色</h2>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>角色</th>
+            <th>身份</th>
+            <th>知道什麼</th>
+            <th>不知道什麼</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>證明者</strong></td>
+            <td>對沖基金</td>
+            <td>自己的全部持倉</td>
+            <td>&mdash;</td>
+          </tr>
+          <tr>
+            <td><strong>驗證者</strong></td>
+            <td>監管機構</td>
+            <td>合規 / 不合規（1 bit）</td>
+            <td>標的、數量、方向、任何持倉細節</td>
+          </tr>
+          <tr>
+            <td><strong>簽名者</strong></td>
+            <td>多家交易所</td>
+            <td>各自執行的交易</td>
+            <td>基金在其他交易所的交易 &amp; 完整組合</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>沒有任何一方看到完整組合 &mdash; 基金自己知道全貌，但不需要告訴任何人。</p>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 3. FOUR-LAYER TRUST ========== -->
+    <div class="section">
+      <div class="section-label">Trust Architecture</div>
+      <h2>四層信任模型</h2>
+      <p>單靠密碼學無法解決所有問題。完整的信任需要四層防線，每一層堵住不同的攻擊面。</p>
+
+      <div style="margin: 2rem 0;">
+        <div class="layer-stack">
+          <div class="layer l4">
+            <div class="layer-num">L4</div>
+            <div class="layer-info">
+              <h4>Deterrence &mdash; 威懾</h4>
+              <p>監管隨機抽查 + 交易所反向查核。防禦交易所與基金串通。</p>
+            </div>
+            <div class="layer-tag">制度保證</div>
+          </div>
+          <div class="layer l3">
+            <div class="layer-num">L3</div>
+            <div class="layer-info">
+              <h4>Computational Correctness &mdash; 計算正確性</h4>
+              <p>Delta Compliance Proof (Proof #1)。給定持倉，Delta 確實 &le; &epsilon;。<strong>本研究核心。</strong></p>
+            </div>
+            <div class="layer-tag">ZK 證明</div>
+          </div>
+          <div class="layer l2">
+            <div class="layer-num">L2</div>
+            <div class="layer-info">
+              <h4>Cryptographic Integrity &mdash; 密碼學完整性</h4>
+              <p>交易所簽名 + State Transition Proof (Proof #2)。每筆狀態變化都來自已簽名的交易。</p>
+            </div>
+            <div class="layer-tag">簽名 + ZK</div>
+          </div>
+          <div class="layer l1">
+            <div class="layer-num">L1</div>
+            <div class="layer-info">
+              <h4>Trust Anchor &mdash; 信任錨點</h4>
+              <p>監管機構簽署初始持倉狀態 State(0)。一次性，如同 TLS 根憑證。</p>
+            </div>
+            <div class="layer-tag">一次性簽署</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="highlight-box orange">
+        <h3>為什麼需要四層？</h3>
+        <p>拿掉任何一層都會導致系統崩塌 &mdash;</p>
+      </div>
+
+      <table class="data-table">
+        <thead>
+          <tr><th>拿掉什麼</th><th>後果</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>拿掉 ZK (L3)</td><td>監管必須看到全部持倉才能驗證 &rarr; <span class="no">隱私消失</span></td></tr>
+          <tr><td>拿掉交易所簽名 (L2)</td><td>無法保證輸入真實 &rarr; <span class="no">ZK 證明毫無意義</span></td></tr>
+          <tr><td>拿掉 Genesis (L1)</td><td>信任鏈沒有起點 &rarr; <span class="no">所有後續狀態不可信</span></td></tr>
+          <tr><td>拿掉抽查 (L4)</td><td>交易所串通無代價 &rarr; <span class="no">L2 假設站不住</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 4. TWO TREES ========== -->
+    <div class="section">
+      <div class="section-label">Data Structure</div>
+      <h2>兩棵 Merkle Tree</h2>
+      <p>整個系統的數據結構建立在兩棵互相綁定的 Merkle tree 上。</p>
+
+      <div class="two-col">
+        <div class="tree-box" style="border-left: 3px solid var(--cyan);">
+          <h4 style="color: var(--cyan);">Trade Action Tree</h4>
+          <p>交易動作樹 &mdash; 記錄所有已簽名的交易</p>
+          <ul>
+            <li>每片葉子 = 一筆交易 + 交易所簽名</li>
+            <li>Exchange A 簽了自己的交易</li>
+            <li>Exchange B 簽了自己的交易</li>
+            <li>沒有任何一家交易所看到全貌</li>
+          </ul>
+          <p style="margin-top: 0.75rem;">葉子結構：<code>asset, qty, price, direction, timestamp, exchange_sig</code></p>
+        </div>
+        <div class="tree-box" style="border-left: 3px solid var(--accent);">
+          <h4 style="color: var(--accent-light);">Position State Tree</h4>
+          <p>持倉狀態樹 &mdash; 記錄當前持倉快照</p>
+          <ul>
+            <li>每片葉子 = 一筆持倉的完整參數</li>
+            <li><code>State(T) = State(T-1) + apply(Trades(T))</code></li>
+            <li>本期持倉 = 上期持倉 + 本期所有交易的淨效果</li>
+            <li>不足 N<sub>max</sub> 的部分填 dummy 葉子（隱藏真實持倉數量）</li>
+          </ul>
+          <p style="margin-top: 0.75rem;">葉子結構：<code>asset_id, w, K, expiry_date, type</code>（5 欄位，全部靜態）</p>
+          <p style="font-size: 0.78rem; color: var(--text-dim); margin-top: 0.3rem;">
+            市場參數（S, r, q, &sigma;）由 Market Data Table 提供；T 由電路從 expiry_date 和 today 計算</p>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 5. TWO PROOFS ========== -->
+    <div class="section">
+      <div class="section-label">Zero-Knowledge Proofs</div>
+      <h2>兩個 ZK 證明</h2>
+
+      <div class="two-col">
+        <div class="highlight-box" style="border-left: 3px solid var(--accent); background: rgba(99,102,241,0.05);">
+          <h3 style="color: var(--accent-light);">Proof #1: Delta Compliance</h3>
+          <p style="margin-bottom: 0.75rem;"><strong>本研究核心貢獻</strong></p>
+          <p>證明：給定 Position State Tree 中的持倉，按 Black-Scholes 公式計算的投資組合 Delta 滿足 |&Delta;<sub>total</sub>| &le; &epsilon;。</p>
+          <p style="margin-top: 0.5rem;">包含三個超越函數：<code>ln</code>、<code>erf</code>、<code>exp</code> &mdash; 全部用 Minimax 多項式在 ZK 電路內計算。</p>
+        </div>
+        <div class="highlight-box" style="border-left: 3px solid var(--cyan); background: rgba(6,182,212,0.05);">
+          <h3 style="color: var(--cyan);">Proof #2: State Transition</h3>
+          <p style="margin-bottom: 0.75rem;">架構設計（標準技術）</p>
+          <p>證明：State(T) = State(T-1) + apply(Trades(T))，且每筆交易都有合法交易所的有效簽名。</p>
+          <p style="margin-top: 0.5rem;">使用 EdDSA/Babyjubjub 驗簽（~6K constraints/次），不涉及超越函數。</p>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 6. SETTLEMENT FLOW ========== -->
+    <div class="section">
+      <div class="section-label">Protocol Flow</div>
+      <h2>每個結算日的完整流程</h2>
+
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="flow-num">01</div>
+          <div class="flow-text">
+            <h4>基金收集本期交易</h4>
+            <p>從各交易所收集已簽名的交易記錄</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-num">02</div>
+          <div class="flow-text">
+            <h4>建構 Trade Action Tree</h4>
+            <p>將所有已簽名交易組織成 Merkle tree</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-num">03</div>
+          <div class="flow-text">
+            <h4>計算新持倉狀態</h4>
+            <p>State(T) = State(T-1) + apply(Trades(T))</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-num">04</div>
+          <div class="flow-text">
+            <h4>生成 Proof #2 (State Transition)</h4>
+            <p>驗證每筆交易的簽名有效 + 狀態轉移正確</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-num">05</div>
+          <div class="flow-text">
+            <h4>生成 Proof #1 (Delta Compliance)</h4>
+            <p>Merkle 驗證 + Black-Scholes Delta 計算 + |&Delta;| &le; &epsilon; 合規檢查</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-num">06</div>
+          <div class="flow-text">
+            <h4>提交給監管機構</h4>
+            <p>State(T) root + Proof #1 + Proof #2 &rarr; 監管毫秒級驗證</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 7. CIRCUIT PIPELINE ========== -->
+    <div class="section">
+      <div class="section-label">Circuit Architecture</div>
+      <h2>Proof #1 電路管線</h2>
+      <p>Delta 合規證明的電路由三個階段組成。灰色階段使用已有技術，紫色階段是本研究的核心貢獻。</p>
+
+      <div class="diagram">
+        <div class="pipeline">
+          <div class="pipe-stage std">
+            <span class="pipe-label std-label">Standard</span>
+            <h4>State Merkle</h4>
+            <p>+ T<sub>i</sub> 計算</p>
+            <p style="margin-top: 0.5rem; font-size: 0.72rem; color: var(--green-dim);">Poseidon hash<br>5-field leaf</p>
+          </div>
+          <div class="pipe-arrow">&rarr;</div>
+          <div class="pipe-stage std">
+            <span class="pipe-label std-label">Standard</span>
+            <h4>Market Data</h4>
+            <p>depth-20 Merkle</p>
+            <p style="margin-top: 0.5rem; font-size: 0.72rem; color: var(--green-dim);">S, r, q, settle_price</p>
+          </div>
+          <div class="pipe-arrow">&rarr;</div>
+          <div class="pipe-stage ours">
+            <span class="pipe-label ours-label">This Research</span>
+            <h4>&sigma; 驗證 + Delta</h4>
+            <p>BS forward + 17 steps</p>
+            <p style="margin-top: 0.5rem; font-size: 0.72rem; color: var(--accent-light);">
+              ln &bull; erf &bull; exp<br>
+              equity: &Delta;=1
+            </p>
+          </div>
+          <div class="pipe-arrow">&rarr;</div>
+          <div class="pipe-stage std">
+            <span class="pipe-label std-label">Standard</span>
+            <h4>合規檢查</h4>
+            <p>|&Delta;<sub>total</sub>| &le; &epsilon;</p>
+            <p style="margin-top: 0.5rem; font-size: 0.72rem; color: var(--green-dim);">累加 + 範圍檢查</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="highlight-box accent">
+        <h3>為什麼超越函數是瓶頸？</h3>
+        <p>ZK 電路只能做有限域上的加法和乘法。Black-Scholes 公式中的 ln、exp、erf 都不是加減乘除能算的。
+           傳統方法用巨大的查找表（50M+ 行），在金融級精度下完全不可行。
+           我們的 Minimax 多項式方法只需 256 行共用的 ByteTable。</p>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 8. TRANSCENDENTAL FUNCTIONS ========== -->
+    <div class="section">
+      <div class="section-label">Core Contribution</div>
+      <h2>三個超越函數</h2>
+      <p>Black-Scholes Delta 公式 &Delta;<sub>call</sub> = e<sup>-qT</sup> &sdot; &Phi;(d<sub>1</sub>) 需要三種超越函數：</p>
+
+      <table class="data-table">
+        <thead>
+          <tr><th>函數</th><th>用途</th><th>公式中的位置</th><th>意義</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>ln(x)</strong></td>
+            <td>計算 moneyness</td>
+            <td>ln(S/K)</td>
+            <td>衡量選擇權是價內還是價外</td>
+          </tr>
+          <tr>
+            <td><strong>erf(x)</strong></td>
+            <td>常態分布 CDF</td>
+            <td>&Phi;(d<sub>1</sub>) = &frac12;[1 + erf(d<sub>1</sub>/&radic;2)]</td>
+            <td>選擇權被行使的機率</td>
+          </tr>
+          <tr>
+            <td><strong>exp(x)</strong></td>
+            <td>股息折現</td>
+            <td>e<sup>-qT</sup></td>
+            <td>考慮股息對價值的影響</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>ln 和 erf 共用同一個 256-entry ByteTable，只換係數向量 &mdash; 「函數無關電路」的核心價值。
+         exp 使用 Method B（Chunk Lookup）&mdash; 利用 exp(a+b)=exp(a)&middot;exp(b) 的代數性質拆成小表，每次只需 ~3 rows。</p>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 8.5 ZK STATEMENT ========== -->
+    <div class="section">
+      <div class="section-label">Formal Statement</div>
+      <h2>ZK 陳述與公開輸入</h2>
+
+      <div class="highlight-box accent">
+        <h3>完整的零知識陳述</h3>
+        <p style="font-family: var(--font-mono); font-size: 0.85rem; line-height: 2; color: var(--text);">
+          &ldquo;我知道一組持倉 (asset_id<sub>i</sub>, w<sub>i</sub>, K<sub>i</sub>, expiry_date<sub>i</sub>, type<sub>i</sub>) 和對應的 State / Market Data Merkle paths，使得：<br>
+          &emsp;(1) 每筆持倉都在 State(T) root 中，且覆蓋所有葉子；<br>
+          &emsp;(2) 市場參數 (S<sub>j</sub>, r, q<sub>j</sub>, settle_price<sub>i</sub>) 來自 market_data_root 的公開數據表；<br>
+          &emsp;(3) &sigma;<sub>i</sub> 滿足 BS(S, K, T, r, q, &sigma;) &approx; settle_price（正向驗證）；<br>
+          &emsp;(4) 選擇權 Delta 按 BS 計算，equity Delta = 1，|&Delta;<sub>total</sub>| &le; &epsilon;。&rdquo;
+        </p>
+      </div>
+
+      <div class="highlight-box green">
+        <h3>Proof 存在 = 合規</h3>
+        <p>電路中有 <code>|&Delta;<sub>total</sub>| &le; &tau;</code> 的硬約束。如果不滿足，proof 根本<strong>無法生成</strong>。
+           所以驗證者不需要看到 &Delta; 的值 &mdash; proof 的存在本身就代表合規。收不到合法 proof 就是不合規。</p>
+      </div>
+
+      <div class="two-col">
+        <div class="highlight-box" style="border-left: 3px solid var(--green);">
+          <h3 style="color: var(--green);">公開輸入（4 項，驗證者可見）</h3>
+          <p><code>State(T) root</code> &mdash; 持倉的密碼學承諾<br>
+             <code>market_data_root</code> &mdash; 每日結算數據表的承諾<br>
+             <code>&epsilon;</code> &mdash; 合規門檻（監管規定）<br>
+             <code>today</code> &mdash; 結算日期（計算 T<sub>i</sub> 用）</p>
+          <p style="margin-top: 0.5rem;">&Delta; 的確切數值<strong>永遠不公開</strong>。</p>
+        </div>
+        <div class="highlight-box" style="border-left: 3px solid var(--red);">
+          <h3 style="color: var(--red);">私密見證（驗證者不可見）</h3>
+          <p>asset_id<sub>i</sub>（標的）、w<sub>i</sub>（持倉量）、K<sub>i</sub>（履約價）、expiry_date<sub>i</sub>（到期日）、type<sub>i</sub>（call/put/equity）<br>
+             S<sub>j</sub>（股價）、r（利率）、q<sub>j</sub>（股息率）、&sigma;<sub>i</sub>（波動率 witness）、settle_price<sub>i</sub></p>
+          <p style="margin-top: 0.5rem;">市場參數來自公開表，但查詢行為是私密的（Merkle 路徑不公開）。</p>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 9. SPECS ========== -->
+    <div class="section">
+      <div class="section-label">Technical Specifications</div>
+      <h2>產業級規格</h2>
+      <p>每個組件的選型都遵循產業級標準，確保基金公司可以直接信任並部署。</p>
+
+      <div class="stat-row">
+        <div class="stat-card accent">
+          <div class="stat-value">pp=24</div>
+          <div class="stat-label">金融級精度<br>1 ULP 誤差</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">Poseidon</div>
+          <div class="stat-label">ZK-friendly hash<br>業界安全標準</div>
+        </div>
+        <div class="stat-card cyan">
+          <div class="stat-value">KZG</div>
+          <div class="stat-label">SHPLONK 承諾<br>常數大小證明</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-value">256</div>
+          <div class="stat-label">ByteTable 行數<br>（vs 50M lookup）</div>
+        </div>
+      </div>
+
+      <table class="data-table">
+        <thead>
+          <tr><th>組件</th><th>選型</th><th>理由</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Hash</td>
+            <td><strong>Poseidon</strong></td>
+            <td>抗代數攻擊，Zcash/Filecoin/Polygon 生產驗證。~38 rows/hash，業界標準</td>
+          </tr>
+          <tr>
+            <td>精度</td>
+            <td><strong>pp=24</strong></td>
+            <td>金融級精度，end-to-end 誤差 1 ULP。在此精度下 lookup 方案完全不可行（50M rows）</td>
+          </tr>
+          <tr>
+            <td>承諾方案</td>
+            <td><strong>KZG/SHPLONK</strong></td>
+            <td>常數大小證明、毫秒級驗證，業界最佳實踐</td>
+          </tr>
+          <tr>
+            <td>Kernel</td>
+            <td><strong>Minimax + ByteTable</strong></td>
+            <td>在 pp=24 下唯一可行的方案（lookup 需 k&ge;26）</td>
+          </tr>
+          <tr>
+            <td>簽名（Proof #2）</td>
+            <td><strong>EdDSA/Babyjubjub</strong></td>
+            <td>ZK 原生設計，~6K constraints/次（ECDSA 需 ~30K）</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 9.5 BENCHMARKS (placeholder) ========== -->
+    <div class="section">
+      <div class="section-label">Performance</div>
+      <h2>性能基準</h2>
+      <p>以下為 pp=24 完整 Proof #1 電路的端到端 KZG 性能數據。</p>
+
+      <!-- TODO: 填入 scenario_a_full KZG 測試完成後的實際數據 -->
+      <div class="stat-row">
+        <div class="stat-card accent">
+          <div class="stat-value">&mdash;</div>
+          <div class="stat-label">Proving Time<br>(待測量)</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">&mdash;</div>
+          <div class="stat-label">Verify Time<br>(待測量)</div>
+        </div>
+        <div class="stat-card cyan">
+          <div class="stat-value">&mdash;</div>
+          <div class="stat-label">Proof Size<br>(待測量)</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-value">pp=24</div>
+          <div class="stat-label">金融級精度<br>d=8, k=TBD</div>
+        </div>
+      </div>
+
+      <div class="highlight-box">
+        <h3>待補充</h3>
+        <p>scenario_a_full 電路（8-position portfolio + Poseidon Merkle + KZG）完成後更新此區塊。
+           預估 k&asymp;13, proving ~3-8s, verify ~30ms。</p>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 10. ATTACK DEFENSE ========== -->
+    <div class="section">
+      <div class="section-label">Security Analysis</div>
+      <h2>攻擊防禦矩陣</h2>
+
+      <table class="data-table">
+        <thead>
+          <tr><th>攻擊</th><th>防禦</th><th>機制</th><th>層次</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>基金編造假倉位</td>
+            <td class="yes">&#10003;</td>
+            <td>每筆交易都有交易所簽名，無法偽造</td>
+            <td>L2</td>
+          </tr>
+          <tr>
+            <td>基金漏報倉位</td>
+            <td class="yes">&#10003;</td>
+            <td>State(T) = State(T-1) + 全部交易，漏報導致狀態不一致</td>
+            <td>L2</td>
+          </tr>
+          <tr>
+            <td>基金篡改歷史</td>
+            <td class="yes">&#10003;</td>
+            <td>State(T-1) root 已在上期提交並記錄</td>
+            <td>L1+L2</td>
+          </tr>
+          <tr>
+            <td>Delta 計算作弊</td>
+            <td class="yes">&#10003;</td>
+            <td>ZK 電路硬約束 Black-Scholes 公式</td>
+            <td>L3</td>
+          </tr>
+          <tr>
+            <td>交易所與基金串通</td>
+            <td class="yes">&#10003;</td>
+            <td>監管隨機抽查 + 反向查核交易所獨立記錄</td>
+            <td>L4</td>
+          </tr>
+          <tr>
+            <td>單一交易所看到全貌</td>
+            <td class="yes">&#10003;</td>
+            <td>每家只看到自己執行的交易</td>
+            <td>架構</td>
+          </tr>
+          <tr>
+            <td>監管看到持倉細節</td>
+            <td class="yes">&#10003;</td>
+            <td>只看到 proof 通過（僅抽查的 k 筆除外）</td>
+            <td>L3+L4</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 11. SPOT CHECK ========== -->
+    <div class="section">
+      <div class="section-label">Layer 4 Detail</div>
+      <h2>監管隨機抽查機制</h2>
+      <p>密碼學無法防禦「簽名者本身就是壞人」。Layer 4 用制度設計彌補這個缺口。</p>
+
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="flow-num">01</div>
+          <div class="flow-text">
+            <h4>監管隨機選取 k 個葉子索引</h4>
+            <p>例如 k=5，從 Position State Tree 中指定</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-num">02</div>
+          <div class="flow-text">
+            <h4>基金揭露被選中的葉子</h4>
+            <p>持倉明細 + Merkle proof + 產生該持倉的交易歷史鏈</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-num">03</div>
+          <div class="flow-text">
+            <h4>監管反向查核交易所</h4>
+            <p>「基金說 2/15 在你們這裡買了 50 手 AAPL call K=180，有嗎？」</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-num">04</div>
+          <div class="flow-text">
+            <h4>交叉驗證</h4>
+            <p>Merkle proof 正確 + 交易歷史一致 + 交易所確認 &rarr; 通過</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="highlight-box orange">
+        <h3>統計保證</h3>
+        <p>每期抽查 k 筆，若有 p% 倉位造假，單期發現機率 = 1&minus;(1&minus;p)<sup>k</sup>。
+           連續 n 期不被發現的機率 = [(1&minus;p)<sup>k</sup>]<sup>n</sup>，隨期數指數衰減 &mdash;
+           即使單期發現率只有 65%，12 個月後未被發現的機率已低於 0.0003%。</p>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-card orange">
+          <div class="stat-value">65%</div>
+          <div class="stat-label">單期發現率<br>1-(0.9)<sup>10</sup> &asymp; 0.65</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-value">&asymp;100%</div>
+          <div class="stat-label">一年內發現率<br>1-(0.35)<sup>12</sup> &asymp; 99.9997%</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">N-k</div>
+          <div class="stat-label">未被揭露的持倉<br>永遠保密</div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 12. PRIVACY SUMMARY ========== -->
+    <div class="section">
+      <div class="section-label">Privacy Guarantee</div>
+      <h2>每個角色看到什麼？</h2>
+
+      <table class="data-table">
+        <thead>
+          <tr><th>角色</th><th>看到的資訊</th><th>看不到的資訊</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>監管機構</strong></td>
+            <td>合規/不合規 + 被抽查的 k 筆</td>
+            <td>完整組合、策略方向、所有其他持倉</td>
+          </tr>
+          <tr>
+            <td><strong>Exchange A</strong></td>
+            <td>自己執行的交易</td>
+            <td>基金在 Exchange B/C 的交易 + 完整組合</td>
+          </tr>
+          <tr>
+            <td><strong>Exchange B</strong></td>
+            <td>自己執行的交易</td>
+            <td>基金在 Exchange A/C 的交易 + 完整組合</td>
+          </tr>
+          <tr>
+            <td><strong>任何第三方</strong></td>
+            <td>無</td>
+            <td>一切</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="highlight-box green">
+        <h3>核心結論</h3>
+        <p><strong>沒有人看到完整組合</strong> &mdash; 但四層信任模型讓每個參與者都能信任系統的正確性。
+           隱私是永久的，不存在「之後全部公開」的退路。</p>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 13. TRUST ASSUMPTIONS ========== -->
+    <div class="section">
+      <div class="section-label">Assumptions</div>
+      <h2>信任假設</h2>
+
+      <table class="data-table">
+        <thead>
+          <tr><th>假設</th><th>層次</th><th>合理性</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>監管機構誠實簽署 State(0)</td>
+            <td>L1</td>
+            <td>監管是系統的存在理由 &mdash; 若不信任監管，合規本身無意義</td>
+          </tr>
+          <tr>
+            <td>交易所誠實簽署交易</td>
+            <td>L2</td>
+            <td>交易所是受監管實體，偽造簽名 = 刑事犯罪</td>
+          </tr>
+          <tr>
+            <td>交易所不與基金串通</td>
+            <td>L4</td>
+            <td>靠隨機抽查 + 反向查核威懾，非盲目信任</td>
+          </tr>
+          <tr>
+            <td>ZK 密碼學安全</td>
+            <td>L2-L3</td>
+            <td>基於離散對數困難假設，無已知攻擊</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="highlight-box">
+        <h3>相對傳統做法的改善</h3>
+        <p>
+          <span style="text-decoration: line-through; color: var(--text-dim);">信任單一清算所</span> &rarr; 分散到多家交易所 + 監管抽查<br>
+          <span style="text-decoration: line-through; color: var(--text-dim);">完全公開持倉</span> &rarr; 永遠不需要公開完整組合<br>
+          <span style="text-decoration: line-through; color: var(--text-dim);">信任中心化計算方</span> &rarr; ZK 證明消除對計算方的信任需求
+        </p>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 14. THESIS SCOPE ========== -->
+    <div class="section">
+      <div class="section-label">Scope</div>
+      <h2>論文範疇</h2>
+
+      <table class="data-table">
+        <thead>
+          <tr><th>內容</th><th>層次</th><th>定位</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Genesis 簽署機制</td>
+            <td>L1</td>
+            <td>架構設計</td>
+          </tr>
+          <tr>
+            <td>Proof #2 (State Transition)</td>
+            <td>L2</td>
+            <td>完整實作 &mdash; <a href="protocol.html" style="color: var(--cyan);">完整協議頁面</a></td>
+          </tr>
+          <tr style="background: rgba(99,102,241,0.08);">
+            <td><strong>Proof #1 (Delta Compliance)</strong></td>
+            <td><strong>L3</strong></td>
+            <td><strong style="color: var(--accent-light);">完整實作 + 實驗評估 &mdash; 核心貢獻</strong></td>
+          </tr>
+          <tr>
+            <td>監管隨機抽查機制</td>
+            <td>L4</td>
+            <td>架構設計</td>
+          </tr>
+          <tr>
+            <td>交易所身份隱藏 / 結算延遲 / 公司行動</td>
+            <td>&mdash;</td>
+            <td>Future work</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="highlight-box accent">
+        <h3>定位</h3>
+        <p>本頁聚焦 <strong>Proof #1（Delta Compliance）</strong>&mdash; 核心技術貢獻。
+           完整的雙 proof 協議流程（包含 Proof #2 的 State Transition 實作細節）
+           請見 <a href="protocol.html" style="color: var(--accent-light);">完整協議頁面</a>。</p>
+        <p style="margin-top: 0.5rem;">Proof #1 不是一個孤立的技術展示，而是一個完整可信系統中<strong>不可替代的組件</strong>。
+           描述完整四層架構證明了：我們理解 ZK 的邊界，也知道如何用制度設計彌補密碼學的缺口。</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>ZKMM &mdash; Scenario A: Black-Scholes Delta Hedging Privacy Compliance</p>
+    <p style="margin-top: 0.5rem;"><a href="index.html">&larr; Back to Home</a></p>
+  </footer>
+
+</body>
+</html>

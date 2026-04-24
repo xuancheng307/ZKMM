@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenario A — Protocol Infrastructure</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface-2: #1a1a26;
+      --surface-3: #222233;
+      --border: #2a2a3a;
+      --text: #e4e4ed;
+      --text-dim: #8888a0;
+      --accent: #6366f1;
+      --accent-light: #818cf8;
+      --accent-glow: rgba(99, 102, 241, 0.15);
+      --green: #22c55e;
+      --green-dim: #16a34a;
+      --green-glow: rgba(34, 197, 94, 0.12);
+      --blue: #3b82f6;
+      --blue-glow: rgba(59, 130, 246, 0.12);
+      --orange: #f59e0b;
+      --orange-glow: rgba(245, 158, 11, 0.12);
+      --red: #ef4444;
+      --red-glow: rgba(239, 68, 68, 0.10);
+      --cyan: #06b6d4;
+      --cyan-glow: rgba(6, 182, 212, 0.12);
+      --yellow: #eab308;
+      --yellow-glow: rgba(234, 179, 8, 0.12);
+      --font-sans: 'Noto Sans TC', 'Inter', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ---- Nav ---- */
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0;
+      background: rgba(10,10,15,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+      padding: 0.75rem 2rem;
+      display: flex; align-items: center; gap: 1.5rem;
+    }
+    .nav a { color: var(--text-dim); text-decoration: none; font-size: 0.85rem; font-weight: 500; transition: color 0.15s; }
+    .nav a:hover { color: var(--accent-light); }
+    .nav .nav-title { color: var(--text); font-weight: 700; font-size: 0.9rem; }
+
+    /* ---- Hero ---- */
+    .hero {
+      text-align: center;
+      padding: 7rem 2rem 3rem;
+      position: relative;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; top: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 800px; height: 600px;
+      background: radial-gradient(ellipse, var(--cyan-glow) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-content { position: relative; z-index: 1; }
+    .hero-badge {
+      display: inline-block;
+      font-size: 0.72rem; font-weight: 600;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--cyan);
+      background: var(--cyan-glow);
+      border: 1px solid rgba(6,182,212,0.25);
+      padding: 0.35rem 1rem;
+      border-radius: 999px;
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(1.8rem, 4.5vw, 2.8rem);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.25;
+      margin-bottom: 1.25rem;
+      background: linear-gradient(135deg, #fff 0%, #a5f3fc 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .hero-sub {
+      font-size: 1.05rem; color: var(--text-dim);
+      max-width: 720px; margin: 0 auto; line-height: 1.7;
+    }
+
+    /* ---- Container ---- */
+    .container { max-width: 1000px; margin: 0 auto; padding: 0 2rem 4rem; }
+
+    /* ---- TOC ---- */
+    .toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem 2rem;
+      margin-bottom: 3rem;
+      columns: 2;
+      column-gap: 2rem;
+    }
+    .toc h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 0.75rem; column-span: all; }
+    .toc a {
+      display: block; font-size: 0.85rem; color: var(--text-dim);
+      text-decoration: none; padding: 0.2rem 0;
+      transition: color 0.15s;
+      break-inside: avoid;
+    }
+    .toc a:hover { color: var(--accent-light); }
+    .toc .toc-num { color: var(--cyan); font-family: var(--font-mono); font-weight: 600; margin-right: 0.5rem; }
+
+    /* ---- Section ---- */
+    .section { margin-bottom: 4rem; }
+    .section-label {
+      font-size: 0.72rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.12em;
+      color: var(--cyan); margin-bottom: 0.5rem;
+    }
+    .section h2 {
+      font-size: 1.6rem; font-weight: 800;
+      letter-spacing: -0.02em; margin-bottom: 1rem;
+    }
+    .section p, .section li {
+      font-size: 0.95rem; color: var(--text-dim); line-height: 1.8;
+    }
+    .section ul { padding-left: 1.5rem; }
+    .section li { margin-bottom: 0.4rem; }
+
+    /* ---- Highlight Box ---- */
+    .highlight-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem 2rem;
+      margin: 1.5rem 0;
+    }
+    .highlight-box.accent { border-left: 3px solid var(--accent); }
+    .highlight-box.green { border-left: 3px solid var(--green); }
+    .highlight-box.orange { border-left: 3px solid var(--orange); }
+    .highlight-box.red { border-left: 3px solid var(--red); }
+    .highlight-box.cyan { border-left: 3px solid var(--cyan); }
+    .highlight-box.yellow { border-left: 3px solid var(--yellow); }
+    .highlight-box h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .highlight-box p { font-size: 0.9rem; color: var(--text-dim); }
+
+    /* ---- Table ---- */
+    .data-table {
+      width: 100%; border-collapse: separate; border-spacing: 0;
+      margin: 1.5rem 0; font-size: 0.88rem;
+    }
+    .data-table th, .data-table td {
+      padding: 0.75rem 1rem; text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .data-table th {
+      background: var(--surface-2);
+      font-weight: 600; font-size: 0.8rem;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--text-dim);
+    }
+    .data-table thead tr:first-child th:first-child { border-radius: var(--radius-sm) 0 0 0; }
+    .data-table thead tr:first-child th:last-child { border-radius: 0 var(--radius-sm) 0 0; }
+    .data-table tbody tr { transition: background 0.1s; }
+    .data-table tbody tr:hover { background: var(--surface); }
+    .data-table td { color: var(--text-dim); }
+    .data-table code {
+      font-family: var(--font-mono); font-size: 0.82rem;
+      background: var(--surface-2); padding: 0.1rem 0.35rem;
+      border-radius: 4px; color: var(--accent-light);
+    }
+    .data-table .yes { color: var(--green); font-weight: 600; }
+    .data-table .no { color: var(--red); font-weight: 600; }
+
+    /* ---- Two-Column ---- */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin: 1.5rem 0; }
+    .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem; margin: 1.5rem 0; }
+
+    /* ---- Tree Card ---- */
+    .tree-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .tree-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .tree-card.tree-state::before { background: var(--accent); }
+    .tree-card.tree-trade::before { background: var(--cyan); }
+    .tree-card.tree-market::before { background: var(--green); }
+    .tree-card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.35rem; }
+    .tree-card .tree-en { font-size: 0.78rem; font-family: var(--font-mono); margin-bottom: 1rem; }
+    .tree-card.tree-state .tree-en { color: var(--accent-light); }
+    .tree-card.tree-trade .tree-en { color: var(--cyan); }
+    .tree-card.tree-market .tree-en { color: var(--green); }
+    .tree-card p { font-size: 0.88rem; color: var(--text-dim); margin-bottom: 0.5rem; }
+    .tree-card ul { padding-left: 1.2rem; margin: 0.5rem 0; }
+    .tree-card li { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.3rem; }
+    .tree-card .tree-meta {
+      margin-top: 1rem; padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;
+    }
+    .tree-card .meta-item { font-size: 0.78rem; }
+    .tree-card .meta-label { color: var(--text-dim); }
+    .tree-card .meta-value { font-family: var(--font-mono); font-weight: 600; }
+    .tree-card.tree-state .meta-value { color: var(--accent-light); }
+    .tree-card.tree-trade .meta-value { color: var(--cyan); }
+    .tree-card.tree-market .meta-value { color: var(--green); }
+
+    /* ---- Leaf Diagram ---- */
+    .leaf-diagram {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      overflow-x: auto;
+    }
+    .leaf-diagram .field {
+      display: inline-block;
+      padding: 0.3rem 0.6rem;
+      margin: 0.15rem;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .leaf-diagram .field.trade { background: rgba(99,102,241,0.15); color: var(--accent-light); }
+    .leaf-diagram .field.market { background: rgba(34,197,94,0.15); color: var(--green); }
+    .leaf-diagram .field.derived { background: rgba(245,158,11,0.15); color: var(--orange); }
+    .leaf-diagram .field.sig { background: rgba(6,182,212,0.15); color: var(--cyan); }
+    .leaf-diagram .field.pub { background: rgba(239,68,68,0.12); color: var(--red); }
+
+    /* ---- Proof Card ---- */
+    .proof-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      position: relative;
+    }
+    .proof-card .proof-num {
+      font-family: var(--font-mono);
+      font-size: 2rem; font-weight: 900;
+      position: absolute; top: 1.5rem; right: 1.5rem;
+      opacity: 0.15;
+    }
+    .proof-card h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .proof-card .proof-en { font-size: 0.78rem; font-family: var(--font-mono); margin-bottom: 1rem; }
+    .proof-card p { font-size: 0.88rem; color: var(--text-dim); margin-bottom: 0.5rem; }
+    .proof-card .io-section {
+      margin-top: 1rem; padding: 1rem;
+      background: var(--surface-2);
+      border-radius: var(--radius-sm);
+    }
+    .proof-card .io-title {
+      font-size: 0.72rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+    }
+    .proof-card .io-item {
+      font-size: 0.85rem; color: var(--text-dim);
+      padding: 0.15rem 0;
+      display: flex; gap: 0.5rem;
+    }
+    .proof-card .io-item code {
+      font-family: var(--font-mono); font-size: 0.82rem;
+      background: var(--surface-3); padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+    }
+    .proof-card.proof1 { border-top: 3px solid var(--accent); }
+    .proof-card.proof1 .proof-num { color: var(--accent); }
+    .proof-card.proof1 .proof-en { color: var(--accent-light); }
+    .proof-card.proof1 .io-title.pub { color: var(--green); }
+    .proof-card.proof1 .io-title.priv { color: var(--red); }
+    .proof-card.proof2 { border-top: 3px solid var(--cyan); }
+    .proof-card.proof2 .proof-num { color: var(--cyan); }
+    .proof-card.proof2 .proof-en { color: var(--cyan); }
+    .proof-card.proof2 .io-title.pub { color: var(--green); }
+    .proof-card.proof2 .io-title.priv { color: var(--red); }
+
+    /* ---- Protocol Flow ---- */
+    .proto-flow {
+      display: flex; flex-direction: column; gap: 0;
+      margin: 2rem 0;
+    }
+    .proto-step {
+      display: flex; gap: 1.25rem; align-items: flex-start;
+      padding: 1.25rem 1.5rem;
+      border-left: 2px solid var(--border);
+      position: relative;
+    }
+    .proto-step::before {
+      content: '';
+      position: absolute; left: -7px; top: 1.5rem;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      border: 2px solid var(--bg);
+    }
+    .proto-step.step-exchange::before { background: var(--cyan); }
+    .proto-step.step-fund::before { background: var(--accent); }
+    .proto-step.step-data::before { background: var(--green); }
+    .proto-step.step-regulator::before { background: var(--orange); }
+    .proto-step:last-child { border-left-color: transparent; }
+    .proto-step .step-who {
+      font-family: var(--font-mono);
+      font-size: 0.7rem; font-weight: 700;
+      min-width: 4.5rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .proto-step.step-exchange .step-who { background: rgba(6,182,212,0.15); color: var(--cyan); }
+    .proto-step.step-fund .step-who { background: rgba(99,102,241,0.15); color: var(--accent-light); }
+    .proto-step.step-data .step-who { background: rgba(34,197,94,0.15); color: var(--green); }
+    .proto-step.step-regulator .step-who { background: rgba(245,158,11,0.15); color: var(--orange); }
+    .proto-step .step-info { flex: 1; }
+    .proto-step .step-info h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.15rem; }
+    .proto-step .step-info p { font-size: 0.82rem; color: var(--text-dim); margin: 0; }
+
+    /* ---- Stat Cards ---- */
+    .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 1.25rem 1.5rem;
+      text-align: center;
+    }
+    .stat-card .stat-value {
+      font-size: 1.6rem; font-weight: 800;
+      font-family: var(--font-mono);
+      margin-bottom: 0.25rem;
+    }
+    .stat-card .stat-label { font-size: 0.78rem; color: var(--text-dim); }
+    .stat-card.accent .stat-value { color: var(--accent-light); }
+    .stat-card.green .stat-value { color: var(--green); }
+    .stat-card.cyan .stat-value { color: var(--cyan); }
+    .stat-card.orange .stat-value { color: var(--orange); }
+
+    /* ---- Guarantee Chain ---- */
+    .chain {
+      display: flex; align-items: stretch; gap: 0; margin: 1.5rem 0;
+      flex-wrap: nowrap; overflow-x: auto;
+    }
+    .chain-node {
+      flex: 1; min-width: 140px;
+      padding: 1rem;
+      border: 1px solid var(--border);
+      text-align: center;
+      background: var(--surface);
+    }
+    .chain-node:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+    .chain-node:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+    .chain-node + .chain-node { border-left: none; }
+    .chain-node h4 { font-size: 0.82rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .chain-node p { font-size: 0.72rem; color: var(--text-dim); margin: 0; }
+    .chain-arrow {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; color: var(--text-dim); min-width: 30px;
+    }
+
+    /* ---- Commitment Map ---- */
+    .commit-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem; margin: 1.5rem 0;
+    }
+    .commit-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .commit-item .commit-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .commit-item h4 {
+      font-size: 0.85rem; font-weight: 700;
+      font-family: var(--font-mono);
+      margin-bottom: 0.35rem;
+    }
+    .commit-item p { font-size: 0.78rem; color: var(--text-dim); }
+    .commit-item .commit-who {
+      font-size: 0.7rem; font-weight: 600;
+      margin-top: 0.5rem; padding: 0.15rem 0.5rem;
+      border-radius: 999px; display: inline-block;
+    }
+
+    /* ---- Divider ---- */
+    .divider { border: none; height: 1px; background: var(--border); margin: 3rem 0; }
+
+    /* ---- Footer ---- */
+    .footer {
+      text-align: center; padding: 2rem;
+      font-size: 0.8rem; color: var(--text-dim);
+      border-top: 1px solid var(--border);
+    }
+    .footer a { color: var(--accent-light); text-decoration: none; }
+
+    /* ---- Responsive ---- */
+    @media (max-width: 700px) {
+      .hero { padding: 5rem 1.5rem 2rem; }
+      .container { padding: 0 1.25rem 3rem; }
+      .two-col, .three-col { grid-template-columns: 1fr; }
+      .toc { columns: 1; }
+      .chain { flex-direction: column; }
+      .chain-node:first-child { border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+      .chain-node:last-child { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+      .chain-node + .chain-node { border-left: 1px solid var(--border); border-top: none; }
+      .chain-arrow { transform: rotate(90deg); }
+      .stat-row { grid-template-columns: 1fr 1fr; }
+      .commit-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav class="nav">
+    <a href="index.html" class="nav-title">ZKMM</a>
+    <a href="index.html">Home</a>
+    <a href="scenario-a.html">Scenario A</a>
+    <a href="protocol.html" style="color: var(--cyan);">Protocol</a>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="hero-content">
+      <div class="hero-badge">Scenario A &mdash; Infrastructure Reference</div>
+      <h1>Protocol Infrastructure<br>完整協議基礎建設</h1>
+      <p class="hero-sub">
+        情境 A 的完整技術規格：三棵 Merkle Tree、兩個零知識證明、所有參數的來源與保證機制、
+        電路內的查表結構、簽章需求，以及協議的運作環境。
+      </p>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- ========== TOC ========== -->
+    <div class="toc">
+      <h3>目錄</h3>
+      <a href="#overview"><span class="toc-num">01</span> 協議總覽</a>
+      <a href="#trees"><span class="toc-num">02</span> 三棵 Merkle Tree</a>
+      <a href="#proofs"><span class="toc-num">03</span> 兩個零知識證明</a>
+      <a href="#params"><span class="toc-num">04</span> 完整參數清冊</a>
+      <a href="#commitments"><span class="toc-num">05</span> 承諾地圖</a>
+      <a href="#tables"><span class="toc-num">06</span> 電路內查表</a>
+      <a href="#guarantees"><span class="toc-num">07</span> 輸入正確性保證鏈</a>
+      <a href="#signatures"><span class="toc-num">08</span> 簽章需求</a>
+      <a href="#runtime"><span class="toc-num">09</span> 運作環境</a>
+      <a href="#costs"><span class="toc-num">10</span> 電路規模與成本</a>
+    </div>
+
+    <!-- ========== 1. OVERVIEW ========== -->
+    <div class="section" id="overview">
+      <div class="section-label">01 &mdash; Protocol Overview</div>
+      <h2>協議總覽</h2>
+
+      <p>每個結算日，對沖基金透過以下流程向監管機構證明合規：</p>
+
+      <div class="proto-flow">
+        <div class="proto-step step-exchange">
+          <div class="step-who">交易所</div>
+          <div class="step-info">
+            <h4>簽署交易 + 發布批次承諾</h4>
+            <p>每家交易所簽署自己執行的交易，並發布 batch_root（本期所有交易的 Merkle 承諾）</p>
+          </div>
+        </div>
+        <div class="proto-step step-data">
+          <div class="step-who">數據商</div>
+          <div class="step-info">
+            <h4>發布 Market Data Table</h4>
+            <p>每日收盤後，數據提供者發布結算數據（股價 S、利率 r、股息率 q、結算價 settle_price），承諾為 Merkle tree</p>
+          </div>
+        </div>
+        <div class="proto-step step-fund">
+          <div class="step-who">基金</div>
+          <div class="step-info">
+            <h4>建構 Trade Action Tree</h4>
+            <p>將本期所有已簽名交易組織成 Merkle tree</p>
+          </div>
+        </div>
+        <div class="proto-step step-fund">
+          <div class="step-who">基金</div>
+          <div class="step-info">
+            <h4>計算狀態轉移 State(T) = State(T-1) + apply(Trades)</h4>
+            <p>將交易效果套用到上期持倉，得到本期持倉狀態樹</p>
+          </div>
+        </div>
+        <div class="proto-step step-fund">
+          <div class="step-who">基金</div>
+          <div class="step-info">
+            <h4>生成 Proof #2（State Transition）</h4>
+            <p>證明每筆交易都有交易所簽名，且 State(T) = State(T-1) + Trades(T)</p>
+          </div>
+        </div>
+        <div class="proto-step step-fund">
+          <div class="step-who">基金</div>
+          <div class="step-info">
+            <h4>計算 &sigma; 並生成 Proof #1（Delta Compliance）</h4>
+            <p>用 Newton-Raphson 反推 &sigma;，在電路內驗證 BS(&sigma;) &asymp; settle_price，計算 Delta，驗證 |&Delta;| &le; &epsilon;</p>
+          </div>
+        </div>
+        <div class="proto-step step-fund">
+          <div class="step-who">基金</div>
+          <div class="step-info">
+            <h4>提交給監管機構</h4>
+            <p>提交 State(T) root + market_data_root + &tau; + Proof #1 + Proof #2</p>
+          </div>
+        </div>
+        <div class="proto-step step-regulator">
+          <div class="step-who">監管</div>
+          <div class="step-info">
+            <h4>驗證兩個 proof（毫秒級）</h4>
+            <p>Proof #1 通過 &rarr; Delta 合規。Proof #2 通過 &rarr; 持倉真實。兩者都通過 &rarr; 合規確認。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="highlight-box cyan">
+        <h3>核心設計原則</h3>
+        <p>Proof 的存在本身就代表合規 &mdash; 無法生成 proof 就是不合規。
+           監管機構不需要看到 &Delta; 的數值，不需要知道基金操作哪些標的。
+           兩個 proof 獨立驗證：Proof #2 產出的 verified root 作為 Proof #1 的公開輸入。</p>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 2. THREE TREES ========== -->
+    <div class="section" id="trees">
+      <div class="section-label">02 &mdash; Merkle Trees</div>
+      <h2>三棵 Merkle Tree</h2>
+      <p>整個協議建立在三棵 Merkle tree 上。每棵樹承諾不同類型的數據，由不同角色維護。</p>
+
+      <!-- Tree 1: Position State Tree -->
+      <div class="tree-card tree-state" style="margin-top: 1.5rem;">
+        <h3>Position State Tree</h3>
+        <div class="tree-en">持倉狀態樹 &mdash; 當前持倉的完整快照</div>
+        <p><strong>用途</strong>：記錄基金在每個結算時點的所有持倉。
+           每片葉子代表一筆選擇權部位，不足 N<sub>max</sub> 的部分以 dummy 葉子（w=0）填充，
+           確保驗證者無法從 trace 長度推斷真實持倉數量。</p>
+        <p><strong>更新時機</strong>：僅在交易發生時更新（透過 Proof #2 的 State Transition）。</p>
+        <p><strong>葉子結構</strong>：</p>
+        <div class="leaf-diagram">
+          <span class="field trade">asset_id</span>
+          <span class="field trade">w</span>
+          <span class="field trade">K</span>
+          <span class="field trade">T</span>
+          <span class="field trade">opt_type</span>
+        </div>
+        <table class="data-table" style="margin-top: 0.75rem; font-size: 0.82rem;">
+          <thead><tr><th>欄位</th><th>意義</th><th>來源</th></tr></thead>
+          <tbody>
+            <tr><td><code>asset_id</code></td><td>標的資產識別碼</td><td>交易簽名</td></tr>
+            <tr><td><code>w</code></td><td>持倉數量（正=多，負=空，0=dummy）</td><td>交易簽名</td></tr>
+            <tr><td><code>K</code></td><td>履約價格（fixed-point pp=24）</td><td>交易簽名</td></tr>
+            <tr><td><code>T</code></td><td>到期時間（fixed-point pp=24）</td><td>交易簽名</td></tr>
+            <tr><td><code>opt_type</code></td><td>選擇權類型（0=call, 1=put）</td><td>交易簽名</td></tr>
+          </tbody>
+        </table>
+        <div class="tree-meta">
+          <div class="meta-item"><span class="meta-label">深度：</span><span class="meta-value">7</span></div>
+          <div class="meta-item"><span class="meta-label">最大葉子：</span><span class="meta-value">128 (N<sub>max</sub>)</span></div>
+          <div class="meta-item"><span class="meta-label">Hash：</span><span class="meta-value">Poseidon</span></div>
+          <div class="meta-item"><span class="meta-label">Root 公開：</span><span class="meta-value">state_root</span></div>
+        </div>
+      </div>
+
+      <!-- Tree 2: Trade Action Tree -->
+      <div class="tree-card tree-trade" style="margin-top: 1.5rem;">
+        <h3>Trade Action Tree</h3>
+        <div class="tree-en">交易動作樹 &mdash; 本期所有已簽名的交易</div>
+        <p><strong>用途</strong>：記錄結算期內所有交易動作。每片葉子代表一筆已簽名的交易。
+           交易所各自只簽署自己執行的交易 &mdash; 沒有任何一家交易所看到基金的完整組合。</p>
+        <p><strong>更新時機</strong>：每個結算期重新建構。</p>
+        <p><strong>葉子結構</strong>：</p>
+        <div class="leaf-diagram">
+          <span class="field trade">asset_id</span>
+          <span class="field trade">qty</span>
+          <span class="field trade">price</span>
+          <span class="field trade">direction</span>
+          <span class="field trade">K</span>
+          <span class="field trade">T</span>
+          <span class="field trade">opt_type</span>
+          <span class="field sig">timestamp</span>
+          <span class="field sig">exchange_id</span>
+          <span class="field sig">signature</span>
+        </div>
+        <p style="margin-top: 0.75rem;">
+          <span style="display:inline-block; width:10px; height:10px; border-radius:3px; background:rgba(99,102,241,0.3); margin-right:4px;"></span>
+          <span style="font-size:0.78rem; color:var(--text-dim);">交易內容</span>
+          &ensp;
+          <span style="display:inline-block; width:10px; height:10px; border-radius:3px; background:rgba(6,182,212,0.3); margin-right:4px;"></span>
+          <span style="font-size:0.78rem; color:var(--text-dim);">簽章後設資料</span>
+        </p>
+        <div class="tree-meta">
+          <div class="meta-item"><span class="meta-label">深度：</span><span class="meta-value">動態</span></div>
+          <div class="meta-item"><span class="meta-label">葉子數：</span><span class="meta-value">T_MAX/期</span></div>
+          <div class="meta-item"><span class="meta-label">Hash：</span><span class="meta-value">Poseidon</span></div>
+          <div class="meta-item"><span class="meta-label">Root 公開：</span><span class="meta-value">batch_root</span></div>
+        </div>
+      </div>
+
+      <!-- Tree 3: Market Data Table -->
+      <div class="tree-card tree-market" style="margin-top: 1.5rem;">
+        <h3>Market Data Table</h3>
+        <div class="tree-en">市場數據表 &mdash; 每日收盤結算數據</div>
+        <p><strong>用途</strong>：提供非交易參數（股價 S、利率 r、股息率 q、結算價格）的公開可驗證來源。
+           消除了「基金可以填假的市場參數」的信任缺口。
+           表本身是公開的，但基金查詢了哪些條目（即操作哪些標的）是私密的。</p>
+        <p><strong>更新時機</strong>：每日收盤後由數據提供者重新發布。電路結構和 VK 不受影響 &mdash; 僅 root 值更新。</p>
+        <p><strong>葉子結構</strong>：</p>
+        <div class="leaf-diagram">
+          <span class="field market">asset_id</span>
+          <span class="field market">S</span>
+          <span class="field market">r</span>
+          <span class="field market">q</span>
+          <span class="field market">settle_price</span>
+        </div>
+        <table class="data-table" style="margin-top: 0.75rem; font-size: 0.82rem;">
+          <thead><tr><th>欄位</th><th>意義</th><th>備註</th></tr></thead>
+          <tbody>
+            <tr><td><code>asset_id</code></td><td>標的資產識別碼</td><td>與 Position State Tree 中的 asset_id 對應</td></tr>
+            <tr><td><code>S</code></td><td>股價（收盤價，fixed-point pp=24）</td><td>每日更新</td></tr>
+            <tr><td><code>r</code></td><td>無風險利率（全域參數）</td><td>所有標的共用</td></tr>
+            <tr><td><code>q</code></td><td>股息率（per-asset）</td><td>每日更新</td></tr>
+            <tr><td><code>settle_price</code></td><td>選擇權結算價格</td><td>用於 &sigma; 驗證：BS(S,K,T,r,q,&sigma;) &asymp; settle_price</td></tr>
+          </tbody>
+        </table>
+        <div class="tree-meta">
+          <div class="meta-item"><span class="meta-label">深度：</span><span class="meta-value">&asymp; 20</span></div>
+          <div class="meta-item"><span class="meta-label">最大葉子：</span><span class="meta-value">&asymp; 1M 條目</span></div>
+          <div class="meta-item"><span class="meta-label">Hash：</span><span class="meta-value">Poseidon</span></div>
+          <div class="meta-item"><span class="meta-label">Root 公開：</span><span class="meta-value">market_data_root</span></div>
+        </div>
+      </div>
+
+      <div class="highlight-box" style="margin-top: 1.5rem;">
+        <h3>三棵樹的關係</h3>
+        <p>
+          <strong>Trade Action Tree</strong> 驅動 <strong>Position State Tree</strong> 的更新
+          （State(T) = State(T-1) + apply(Trades)，由 Proof #2 保證）。<br>
+          <strong>Position State Tree</strong> 的每筆部位透過 asset_id 連結到 <strong>Market Data Table</strong>
+          （市場參數查詢，由 Proof #1 內的 Merkle 驗證保證）。<br>
+          三棵樹的 root 全部作為公開輸入 &mdash; 驗證者只看到三個 hash 值，看不到任何內容。
+        </p>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 3. TWO PROOFS ========== -->
+    <div class="section" id="proofs">
+      <div class="section-label">03 &mdash; Zero-Knowledge Proofs</div>
+      <h2>兩個零知識證明</h2>
+      <p>兩個 proof 各自獨立生成、獨立驗證。Proof #2 的輸出（verified state_root）成為 Proof #1 的公開輸入，
+         不需要遞歸證明組合（recursive composition）。</p>
+
+      <div class="two-col" style="margin-top: 1.5rem;">
+        <!-- Proof #1 -->
+        <div class="proof-card proof1">
+          <div class="proof-num">#1</div>
+          <h3>Delta Compliance</h3>
+          <div class="proof-en">Delta 合規證明 &mdash; 本研究核心</div>
+          <p>證明基金的投資組合 Delta 風險在合規範圍內，且所有計算參數來自可驗證的公開數據。</p>
+
+          <div class="io-section">
+            <div class="io-title pub">公開輸入（3 個）</div>
+            <div class="io-item"><code>state_root</code> &mdash; Position State Tree root</div>
+            <div class="io-item"><code>market_data_root</code> &mdash; Market Data Table root</div>
+            <div class="io-item"><code>&tau;</code> &mdash; 合規門檻（監管規定）</div>
+          </div>
+
+          <div class="io-section" style="margin-top: 0.75rem;">
+            <div class="io-title priv">私密見證</div>
+            <div class="io-item">每筆部位的 (asset_id, w, K, T, type)</div>
+            <div class="io-item">每筆部位的 State Merkle path</div>
+            <div class="io-item">每筆部位的 Market Data Merkle path</div>
+            <div class="io-item">每筆部位的 &sigma;（prover 計算，電路驗證）</div>
+          </div>
+
+          <p style="margin-top: 1rem; font-size: 0.82rem; color: var(--accent-light);">
+            <strong>電路內操作</strong>：State Merkle 驗證 &rarr; Market Data 查詢 &rarr; &sigma; 驗證 &rarr;
+            Black-Scholes Delta 計算（ln, erf, exp）&rarr; 累加 &rarr; |&Delta;| &le; &tau;
+          </p>
+        </div>
+
+        <!-- Proof #2 -->
+        <div class="proof-card proof2">
+          <div class="proof-num">#2</div>
+          <h3>State Transition</h3>
+          <div class="proof-en">狀態轉移證明 &mdash; 標準技術</div>
+          <p>證明持倉狀態的每次變化都可追溯到已簽名的合法交易，且沒有遺漏。</p>
+
+          <div class="io-section">
+            <div class="io-title pub">公開輸入（3 個）</div>
+            <div class="io-item"><code>state_root_prev</code> &mdash; State(T-1) root</div>
+            <div class="io-item"><code>state_root</code> &mdash; State(T) root</div>
+            <div class="io-item"><code>batch_root</code> &mdash; 交易所批次承諾 root</div>
+          </div>
+
+          <div class="io-section" style="margin-top: 0.75rem;">
+            <div class="io-title priv">私密見證</div>
+            <div class="io-item">每筆交易的完整參數 + 交易所簽名</div>
+            <div class="io-item">每筆交易的 Merkle path（舊根 &rarr; 新根）</div>
+            <div class="io-item">增量式 Merkle 更新鏈</div>
+          </div>
+
+          <p style="margin-top: 1rem; font-size: 0.82rem; color: var(--cyan);">
+            <strong>電路內操作</strong>：驗證交易所簽名（EdDSA）&rarr; 驗證交易承諾 &rarr;
+            增量式 Merkle 更新 &rarr; 鏈接 root 轉移
+          </p>
+        </div>
+      </div>
+
+      <div class="highlight-box accent" style="margin-top: 1.5rem;">
+        <h3>完整的零知識陳述</h3>
+        <p style="font-family: var(--font-mono); font-size: 0.85rem; line-height: 2.2; color: var(--text);">
+          <strong>Proof #1</strong>：「我知道一組持倉和對應的 Merkle paths，使得：<br>
+          &ensp;(1) 每筆持倉都在 state_root 中，且覆蓋所有葉子；<br>
+          &ensp;(2) 每筆持倉的市場參數來自 market_data_root 承諾的公開數據表；<br>
+          &ensp;(3) 每筆 &sigma;<sub>i</sub> 滿足 BS(S,K,T,r,q,&sigma;) &asymp; settle_price；<br>
+          &ensp;(4) |&Delta;<sub>total</sub>| &le; &tau;。」
+        </p>
+        <p style="font-family: var(--font-mono); font-size: 0.85rem; line-height: 2.2; color: var(--text); margin-top: 1rem;">
+          <strong>Proof #2</strong>：「我知道一批交易 Trades(T)，使得：<br>
+          &ensp;(1) 每筆交易都有合法交易所的簽名；<br>
+          &ensp;(2) 所有交易的承諾 = 交易所公布的 batch_root；<br>
+          &ensp;(3) 依序套用交易到 State(T-1) 得到 State(T)。」
+        </p>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 4. PARAMETERS ========== -->
+    <div class="section" id="params">
+      <div class="section-label">04 &mdash; Parameter Registry</div>
+      <h2>完整參數清冊</h2>
+      <p>所有出現在協議中的參數、它們的來源、在哪裡使用、如何保證正確。</p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>參數</th>
+            <th>意義</th>
+            <th>來源</th>
+            <th>用於</th>
+            <th>正確性保證</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="background: rgba(99,102,241,0.04);">
+            <td colspan="5" style="font-weight: 700; color: var(--accent-light); font-size: 0.78rem; letter-spacing: 0.05em;">交易參數（從交易簽名取得）</td>
+          </tr>
+          <tr>
+            <td><code>w<sub>i</sub></code></td>
+            <td>持倉數量（正=多，負=空）</td>
+            <td>交易所簽名</td>
+            <td>Proof #1, #2</td>
+            <td>交易所 EdDSA 簽名 + Proof #2</td>
+          </tr>
+          <tr>
+            <td><code>K<sub>i</sub></code></td>
+            <td>履約價格</td>
+            <td>交易所簽名</td>
+            <td>Proof #1, #2</td>
+            <td>交易所 EdDSA 簽名 + Proof #2</td>
+          </tr>
+          <tr>
+            <td><code>T<sub>i</sub></code></td>
+            <td>到期時間</td>
+            <td>交易所簽名</td>
+            <td>Proof #1, #2</td>
+            <td>交易所 EdDSA 簽名 + Proof #2</td>
+          </tr>
+          <tr>
+            <td><code>opt_type<sub>i</sub></code></td>
+            <td>call (0) / put (1)</td>
+            <td>交易所簽名</td>
+            <td>Proof #1, #2</td>
+            <td>交易所 EdDSA 簽名 + Proof #2</td>
+          </tr>
+          <tr>
+            <td><code>asset_id<sub>i</sub></code></td>
+            <td>標的資產識別碼</td>
+            <td>交易所簽名</td>
+            <td>Proof #1, #2</td>
+            <td>交易所 EdDSA 簽名 + Proof #2</td>
+          </tr>
+
+          <tr style="background: rgba(34,197,94,0.04);">
+            <td colspan="5" style="font-weight: 700; color: var(--green); font-size: 0.78rem; letter-spacing: 0.05em;">市場參數（從 Market Data Table 查詢）</td>
+          </tr>
+          <tr>
+            <td><code>S<sub>j</sub></code></td>
+            <td>股價（收盤價）</td>
+            <td>Market Data Table</td>
+            <td>Proof #1</td>
+            <td>Merkle path &rarr; market_data_root</td>
+          </tr>
+          <tr>
+            <td><code>r</code></td>
+            <td>無風險利率（全域）</td>
+            <td>Market Data Table</td>
+            <td>Proof #1</td>
+            <td>Merkle path &rarr; market_data_root</td>
+          </tr>
+          <tr>
+            <td><code>q<sub>j</sub></code></td>
+            <td>股息率（per-asset）</td>
+            <td>Market Data Table</td>
+            <td>Proof #1</td>
+            <td>Merkle path &rarr; market_data_root</td>
+          </tr>
+          <tr>
+            <td><code>settle_price<sub>i</sub></code></td>
+            <td>選擇權結算價格</td>
+            <td>Market Data Table</td>
+            <td>Proof #1</td>
+            <td>Merkle path &rarr; market_data_root</td>
+          </tr>
+
+          <tr style="background: rgba(245,158,11,0.04);">
+            <td colspan="5" style="font-weight: 700; color: var(--orange); font-size: 0.78rem; letter-spacing: 0.05em;">推導參數（電路內計算 / 驗證）</td>
+          </tr>
+          <tr>
+            <td><code>&sigma;<sub>i</sub></code></td>
+            <td>隱含波動率（per-position）</td>
+            <td>Prover 計算（Newton-Raphson）</td>
+            <td>Proof #1</td>
+            <td>電路驗證 BS(S,K,T,r,q,&sigma;) &asymp; settle_price</td>
+          </tr>
+          <tr>
+            <td><code>d1<sub>i</sub></code></td>
+            <td>Black-Scholes d1 值</td>
+            <td>電路內計算</td>
+            <td>Proof #1</td>
+            <td>電路約束（算術閘）</td>
+          </tr>
+          <tr>
+            <td><code>&Delta;<sub>i</sub></code></td>
+            <td>單一部位的 Delta</td>
+            <td>電路內計算</td>
+            <td>Proof #1</td>
+            <td>電路約束（BS 公式 17 步管線）</td>
+          </tr>
+          <tr>
+            <td><code>contrib<sub>i</sub></code></td>
+            <td>加權 Delta 貢獻 (w &times; &Delta;)</td>
+            <td>電路內計算</td>
+            <td>Proof #1</td>
+            <td>電路約束（乘法閘）</td>
+          </tr>
+
+          <tr style="background: rgba(239,68,68,0.04);">
+            <td colspan="5" style="font-weight: 700; color: var(--red); font-size: 0.78rem; letter-spacing: 0.05em;">公開輸入（驗證者可見）</td>
+          </tr>
+          <tr>
+            <td><code>state_root</code></td>
+            <td>Position State Tree root</td>
+            <td>基金計算</td>
+            <td>Proof #1, #2</td>
+            <td>Proof #2 驗證狀態轉移正確</td>
+          </tr>
+          <tr>
+            <td><code>market_data_root</code></td>
+            <td>Market Data Table root</td>
+            <td>數據提供者發布</td>
+            <td>Proof #1</td>
+            <td>公開可審計的結算數據承諾</td>
+          </tr>
+          <tr>
+            <td><code>&tau;</code></td>
+            <td>合規門檻</td>
+            <td>監管規定</td>
+            <td>Proof #1</td>
+            <td>法規公開值</td>
+          </tr>
+          <tr>
+            <td><code>state_root_prev</code></td>
+            <td>State(T-1) root</td>
+            <td>上期已提交</td>
+            <td>Proof #2</td>
+            <td>鏈上記錄（不可篡改）</td>
+          </tr>
+          <tr>
+            <td><code>batch_root</code></td>
+            <td>交易所批次承諾</td>
+            <td>各交易所發布</td>
+            <td>Proof #2</td>
+            <td>交易所公開發布（受監管）</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 5. COMMITMENTS ========== -->
+    <div class="section" id="commitments">
+      <div class="section-label">05 &mdash; Commitment Map</div>
+      <h2>承諾地圖</h2>
+      <p>誰承諾了什麼、承諾方式、誰可以驗證。</p>
+
+      <div class="commit-grid">
+        <div class="commit-item" style="border-top: 3px solid var(--accent);">
+          <h4>state_root</h4>
+          <p>Position State Tree 的 Merkle root。<br>承諾了基金的全部持倉結構。</p>
+          <div class="commit-who" style="background: rgba(99,102,241,0.15); color: var(--accent-light);">基金計算</div>
+        </div>
+        <div class="commit-item" style="border-top: 3px solid var(--green);">
+          <h4>market_data_root</h4>
+          <p>Market Data Table 的 Merkle root。<br>承諾了當日所有結算數據。</p>
+          <div class="commit-who" style="background: rgba(34,197,94,0.15); color: var(--green);">數據商發布</div>
+        </div>
+        <div class="commit-item" style="border-top: 3px solid var(--cyan);">
+          <h4>batch_root</h4>
+          <p>每家交易所本期交易的 Merkle root。<br>承諾了所有已執行交易（不可遺漏）。</p>
+          <div class="commit-who" style="background: rgba(6,182,212,0.15); color: var(--cyan);">各交易所發布</div>
+        </div>
+        <div class="commit-item" style="border-top: 3px solid var(--orange);">
+          <h4>state_root_prev</h4>
+          <p>上期的 state_root。<br>承諾了上期的持倉狀態（已記錄在案）。</p>
+          <div class="commit-who" style="background: rgba(245,158,11,0.15); color: var(--orange);">歷史記錄</div>
+        </div>
+        <div class="commit-item" style="border-top: 3px solid var(--yellow);">
+          <h4>exchange_sig</h4>
+          <p>交易所對每筆交易的 EdDSA 簽名。<br>承諾了交易的真實性和來源。</p>
+          <div class="commit-who" style="background: rgba(234,179,8,0.15); color: var(--yellow);">各交易所簽章</div>
+        </div>
+        <div class="commit-item" style="border-top: 3px solid var(--red);">
+          <h4>genesis_sig</h4>
+          <p>監管機構對 State(0) 的簽署。<br>承諾了系統的初始狀態（信任錨點）。</p>
+          <div class="commit-who" style="background: rgba(239,68,68,0.12); color: var(--red);">監管機構</div>
+        </div>
+      </div>
+
+      <div class="highlight-box">
+        <h3>承諾方式</h3>
+        <p>
+          <strong>Merkle 承諾</strong>（state_root, market_data_root, batch_root）：
+          使用 Poseidon hash 建構 Merkle tree，root 值作為公開輸入。
+          內容不可見，但可在電路內驗證路徑。<br>
+          <strong>數位簽章</strong>（exchange_sig, genesis_sig）：
+          使用 EdDSA on Babyjubjub（ZK-friendly，~6K constraints/次），
+          在 Proof #2 電路內驗證。<br>
+          <strong>公開可審計</strong>（market_data_root）：
+          Market Data Table 的內容本身是公開的（結算數據），
+          但基金使用了表中的哪些條目是私密的。
+        </p>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 6. IN-CIRCUIT TABLES ========== -->
+    <div class="section" id="tables">
+      <div class="section-label">06 &mdash; In-Circuit Tables</div>
+      <h2>電路內查表</h2>
+      <p>Halo2 PLONKish 電路支援 lookup argument &mdash; 用固定的表格約束值域。
+         以下是 Proof #1 電路中使用的查表結構。</p>
+
+      <div class="two-col">
+        <div class="highlight-box" style="border-left: 3px solid var(--accent);">
+          <h3 style="color: var(--accent-light);">ByteTable（256 行）</h3>
+          <p><strong>用途</strong>：Minimax Horner kernel 的多項式係數查表。
+             ln、erf、exp 三種超越函數共用同一張表，只換係數向量。</p>
+          <p style="margin-top: 0.5rem;"><strong>結構</strong>：每行 = (byte_index, coeff_ln, coeff_erf, coeff_exp)。
+             byte_index &isin; [0, 255] 對應輸入的高 8 位元。</p>
+          <p style="margin-top: 0.5rem;"><strong>性質</strong>：Fixed column，在 setup 時綁定進 VK。
+             永遠不變（數學常數），不受每日數據影響。</p>
+          <p style="margin-top: 0.5rem; font-family: var(--font-mono); font-size: 0.82rem; color: var(--accent-light);">
+            256 行 &times; 27 lookup arguments / 呼叫
+          </p>
+        </div>
+        <div class="highlight-box" style="border-left: 3px solid var(--green);">
+          <h3 style="color: var(--green);">Poseidon 常數</h3>
+          <p><strong>用途</strong>：Poseidon hash 函數的 round constants 和 MDS matrix。
+             所有 Merkle 驗證（State Tree + Market Data Table + Trade Tree）共用。</p>
+          <p style="margin-top: 0.5rem;"><strong>結構</strong>：固定的域元素向量，約 ~200 個常數。</p>
+          <p style="margin-top: 0.5rem;"><strong>性質</strong>：Fixed column / 硬編碼常數。
+             由 Poseidon 規格決定，永遠不變。</p>
+          <p style="margin-top: 0.5rem; font-family: var(--font-mono); font-size: 0.82rem; color: var(--green);">
+            PERM_ROWS &asymp; 66 行 / 排列
+          </p>
+        </div>
+      </div>
+
+      <div class="highlight-box orange">
+        <h3>為什麼 Market Data Table 不是電路內查表？</h3>
+        <p>Halo2 的 fixed column 在 setup 時綁定進 verifying key（VK）。Market Data 每日變動 &mdash;
+           如果用 fixed column，就必須每天重跑 trusted setup + 更換 VK。對驗證者完全不可行。<br>
+           因此 Market Data Table 使用 <strong>Merkle 承諾</strong>（root 作為公開輸入），
+           電路結構和 VK 永遠不變，只有輸入值每天更新。</p>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 7. GUARANTEES ========== -->
+    <div class="section" id="guarantees">
+      <div class="section-label">07 &mdash; Input Guarantee Chain</div>
+      <h2>輸入正確性保證鏈</h2>
+      <p>每一個輸入參數都有明確的信任鏈。沒有任何參數是「只靠基金自己說了算」的。</p>
+
+      <h3 style="margin-top: 2rem; font-size: 1.1rem;">交易參數 (w, K, T, type)</h3>
+      <div class="chain">
+        <div class="chain-node" style="background: rgba(6,182,212,0.06);">
+          <h4 style="color: var(--cyan);">交易所</h4>
+          <p>執行交易 + EdDSA 簽名</p>
+        </div>
+        <div class="chain-arrow">&rarr;</div>
+        <div class="chain-node">
+          <h4>Trade Action Tree</h4>
+          <p>已簽名交易的 Merkle 承諾</p>
+        </div>
+        <div class="chain-arrow">&rarr;</div>
+        <div class="chain-node" style="background: rgba(6,182,212,0.06);">
+          <h4 style="color: var(--cyan);">Proof #2</h4>
+          <p>驗證簽名 + 狀態轉移</p>
+        </div>
+        <div class="chain-arrow">&rarr;</div>
+        <div class="chain-node" style="background: rgba(99,102,241,0.06);">
+          <h4 style="color: var(--accent-light);">Position State Tree</h4>
+          <p>verified state_root</p>
+        </div>
+        <div class="chain-arrow">&rarr;</div>
+        <div class="chain-node" style="background: rgba(99,102,241,0.06);">
+          <h4 style="color: var(--accent-light);">Proof #1</h4>
+          <p>State Merkle 驗證</p>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 2rem; font-size: 1.1rem;">市場參數 (S, r, q)</h3>
+      <div class="chain">
+        <div class="chain-node" style="background: rgba(34,197,94,0.06);">
+          <h4 style="color: var(--green);">數據提供者</h4>
+          <p>收盤後發布結算數據</p>
+        </div>
+        <div class="chain-arrow">&rarr;</div>
+        <div class="chain-node" style="background: rgba(34,197,94,0.06);">
+          <h4 style="color: var(--green);">Market Data Table</h4>
+          <p>Merkle 承諾 &rarr; root</p>
+        </div>
+        <div class="chain-arrow">&rarr;</div>
+        <div class="chain-node" style="background: rgba(99,102,241,0.06);">
+          <h4 style="color: var(--accent-light);">Proof #1</h4>
+          <p>Market Data Merkle 驗證</p>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 2rem; font-size: 1.1rem;">隱含波動率 &sigma;</h3>
+      <div class="chain">
+        <div class="chain-node" style="background: rgba(245,158,11,0.06);">
+          <h4 style="color: var(--orange);">Prover</h4>
+          <p>Newton-Raphson 反推</p>
+        </div>
+        <div class="chain-arrow">&rarr;</div>
+        <div class="chain-node" style="background: rgba(99,102,241,0.06);">
+          <h4 style="color: var(--accent-light);">Proof #1 電路</h4>
+          <p>正向計算 BS(S,K,T,r,q,&sigma;)</p>
+        </div>
+        <div class="chain-arrow">&rarr;</div>
+        <div class="chain-node" style="background: rgba(34,197,94,0.06);">
+          <h4 style="color: var(--green);">settle_price</h4>
+          <p>來自 Market Data Table</p>
+        </div>
+        <div class="chain-arrow">&rarr;</div>
+        <div class="chain-node">
+          <h4>驗證約束</h4>
+          <p>|BS &minus; settle_price| &le; 1 ULP</p>
+        </div>
+      </div>
+
+      <div class="highlight-box green" style="margin-top: 1.5rem;">
+        <h3>零信任設計</h3>
+        <p>
+          <strong>交易參數</strong> &larr; 交易所簽名 + Proof #2 保證<br>
+          <strong>市場參數</strong> &larr; Market Data Table（公開可審計）+ Proof #1 Merkle 驗證<br>
+          <strong>&sigma;</strong> &larr; Prover 計算，但被公開的 settle_price「釘住」&mdash; 造假會讓 BS 約束失敗<br>
+          <strong>State 轉移</strong> &larr; State(T-1) 是歷史記錄 + Proof #2 保證轉移正確<br>
+          基金無法在任何參數上作弊。
+        </p>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 8. SIGNATURES ========== -->
+    <div class="section" id="signatures">
+      <div class="section-label">08 &mdash; Signature Requirements</div>
+      <h2>簽章需求</h2>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>簽章對象</th>
+            <th>簽章者</th>
+            <th>簽章方案</th>
+            <th>驗證位置</th>
+            <th>頻率</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>每筆交易</td>
+            <td>執行交易的交易所</td>
+            <td>EdDSA / Babyjubjub</td>
+            <td>Proof #2 電路內</td>
+            <td>每筆交易</td>
+          </tr>
+          <tr>
+            <td>交易批次承諾 (batch_root)</td>
+            <td>各交易所</td>
+            <td>EdDSA / Babyjubjub</td>
+            <td>Proof #2 公開輸入比對</td>
+            <td>每結算期</td>
+          </tr>
+          <tr>
+            <td>初始狀態 State(0)</td>
+            <td>監管機構</td>
+            <td>EdDSA / Babyjubjub</td>
+            <td>系統啟動時一次性驗證</td>
+            <td>一次</td>
+          </tr>
+          <tr>
+            <td>Market Data Table</td>
+            <td>數據提供者（交易所/Bloomberg）</td>
+            <td>公開發布（多方交叉驗證）</td>
+            <td>Proof #1 Merkle root 比對</td>
+            <td>每日</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="highlight-box cyan">
+        <h3>為什麼選 EdDSA on Babyjubjub？</h3>
+        <p>
+          Babyjubjub 是專為 ZK 電路設計的橢圓曲線，與 BN254 原生相容。
+          EdDSA/Babyjubjub 每次驗簽約 ~6,000 constraints，
+          而 ECDSA（以太坊標準）需要 ~20,000-30,000 constraints。
+          在 Proof #2 中可能需要驗證數十次簽名 &mdash; 3-5 倍的效率差距很關鍵。
+        </p>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 9. RUNTIME ========== -->
+    <div class="section" id="runtime">
+      <div class="section-label">09 &mdash; Runtime Environment</div>
+      <h2>運作環境</h2>
+      <p>協議在四個角色之間運作，各有不同的計算需求和時間點。</p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>角色</th>
+            <th>做什麼</th>
+            <th>在哪裡跑</th>
+            <th>計算量</th>
+            <th>時間點</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>基金（Prover）</strong></td>
+            <td>建構 Trees + 生成 Proof #1 &amp; #2</td>
+            <td>基金內部伺服器<br>（高效能運算資源）</td>
+            <td>Proof #1: ~5-10 min<br>Proof #2: ~1-2 min</td>
+            <td>每日收盤後</td>
+          </tr>
+          <tr>
+            <td><strong>監管（Verifier）</strong></td>
+            <td>驗證 Proof #1 &amp; #2</td>
+            <td>任何電腦<br>（輕量級運算）</td>
+            <td>~30 ms / proof<br>（KZG 常數大小）</td>
+            <td>收到 proof 後</td>
+          </tr>
+          <tr>
+            <td><strong>交易所</strong></td>
+            <td>簽署交易 + 發布 batch_root</td>
+            <td>交易所現有基礎設施</td>
+            <td>EdDSA 簽名（微秒級）</td>
+            <td>交易執行時 + 每結算期末</td>
+          </tr>
+          <tr>
+            <td><strong>數據商</strong></td>
+            <td>發布 Market Data Table</td>
+            <td>數據商現有基礎設施</td>
+            <td>Poseidon Merkle 建構<br>（~1M 葉子 &asymp; 秒級）</td>
+            <td>每日收盤後</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="stat-row">
+        <div class="stat-card accent">
+          <div class="stat-value">1&times;/日</div>
+          <div class="stat-label">Proof 生成頻率<br>每日結算一次</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">~30ms</div>
+          <div class="stat-label">驗證時間<br>KZG 常數大小</div>
+        </div>
+        <div class="stat-card cyan">
+          <div class="stat-value">6 個</div>
+          <div class="stat-label">公開輸入<br>Proof #1: 3 + Proof #2: 3</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-value">0 個</div>
+          <div class="stat-label">需信任的中心方<br>純密碼學 + 公開數據</div>
+        </div>
+      </div>
+
+      <div class="highlight-box">
+        <h3>部署流程</h3>
+        <p>
+          <strong>一次性 Setup</strong>：生成電路的 proving key (PK) 和 verifying key (VK)。
+          電路結構固定 &mdash; VK 永遠不需要更新（Market Data 用 Merkle 而非 fixed column）。<br>
+          <strong>每日 Proving</strong>：基金在收盤後約 10 分鐘內完成兩個 proof 的生成。
+          唯一變動的是公開輸入值（root 值和 &tau;）。<br>
+          <strong>每日 Verification</strong>：監管收到 proof 後毫秒級驗證。
+          如果兩個 proof 都通過 &rarr; 合規確認。
+        </p>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ========== 10. COSTS ========== -->
+    <div class="section" id="costs">
+      <div class="section-label">10 &mdash; Circuit Scale</div>
+      <h2>電路規模與成本</h2>
+      <p>Proof #1（Delta Compliance）的完整電路行數估算（N<sub>max</sub> = 128 部位）。</p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>部分</th>
+            <th>行數 / 部位</th>
+            <th>128 部位</th>
+            <th>佔比</th>
+            <th>技術來源</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Part A: State Merkle</td>
+            <td>~528</td>
+            <td>67,584</td>
+            <td>26%</td>
+            <td>Poseidon hash（已有技術）</td>
+          </tr>
+          <tr style="background: rgba(34,197,94,0.05);">
+            <td><strong>Part A': Market Data Merkle</strong></td>
+            <td><strong>~1,386</strong></td>
+            <td><strong>177,408</strong></td>
+            <td><strong style="color: var(--orange);">55%</strong></td>
+            <td>Poseidon hash（已有技術）</td>
+          </tr>
+          <tr>
+            <td>Part A'': &sigma; 驗證</td>
+            <td>~32</td>
+            <td>4,096</td>
+            <td>2%</td>
+            <td>BS 正向計算（含我們的方法）</td>
+          </tr>
+          <tr style="background: rgba(99,102,241,0.05);">
+            <td><strong>Part B: Delta 管線</strong></td>
+            <td><strong>~58</strong></td>
+            <td><strong>7,424</strong></td>
+            <td><strong style="color: var(--accent-light);">3%</strong></td>
+            <td><strong>我們的多項式方法</strong></td>
+          </tr>
+          <tr>
+            <td>Part C: 累加 + 合規</td>
+            <td>~5</td>
+            <td>~940</td>
+            <td>&lt;1%</td>
+            <td>標準加法 + 範圍檢查</td>
+          </tr>
+          <tr>
+            <td>ByteTable + Portfolio 閘</td>
+            <td>&mdash;</td>
+            <td>~456</td>
+            <td>&lt;1%</td>
+            <td>共用表 + 控制邏輯</td>
+          </tr>
+          <tr style="font-weight: 700; border-top: 2px solid var(--border);">
+            <td>合計</td>
+            <td></td>
+            <td>~257,908</td>
+            <td>100%</td>
+            <td>k &asymp; 18</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="highlight-box orange">
+        <h3>瓶頸分析</h3>
+        <p>Market Data Merkle 路徑驗證（depth &asymp; 20）是最大的行數成本（55%），
+           但這是保證非交易參數（S, r, q, settle_price）真實性的<strong>必要代價</strong>。
+           不使用 Halo2 lookup argument 的原因是 Market Data 每日變動，
+           而 fixed column 在 setup 時綁定 VK &mdash; 不可能每天重跑 setup。</p>
+        <p style="margin-top: 0.5rem;">
+           我們的多項式方法（Part B: Delta 管線）僅佔 3% &mdash;
+           這證明了 Minimax Horner kernel 的高效率：
+           <strong>三個超越函數的電路成本已經不是瓶頸</strong>。</p>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-card accent">
+          <div class="stat-value">k&asymp;18</div>
+          <div class="stat-label">電路大小參數<br>2<sup>18</sup> &asymp; 262K 行</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">58</div>
+          <div class="stat-label">Delta 管線行數<br>行/部位（含 3 kernel）</div>
+        </div>
+        <div class="stat-card cyan">
+          <div class="stat-value">256</div>
+          <div class="stat-label">ByteTable 行數<br>三函數共用</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-value">5-10m</div>
+          <div class="stat-label">Proving Time<br>release build 估算</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>ZKMM &mdash; Scenario A Protocol Infrastructure</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="scenario-a.html">&larr; Scenario A Overview</a>
+      &ensp;&bull;&ensp;
+      <a href="index.html">Home</a>
+    </p>
+  </footer>
+
+</body>
+</html>
