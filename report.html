@@ -1,0 +1,1936 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>口試報告 — ZK-Compliance / PF1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},{left:'\\\\[',right:'\\\\]',display:true},{left:'\\\\(',right:'\\\\)',display:false}],throwOnError:false})"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:true, theme:'default', themeVariables:{fontFamily:"'Noto Sans TC','Inter',sans-serif", primaryColor:'#eef0f4', primaryTextColor:'#1a1a1f', primaryBorderColor:'#4f46e5', lineColor:'#55596b', secondaryColor:'#f7f8fa', tertiaryColor:'#ffffff'}});
+  window.mermaid = mermaid;
+</script>
+<style>
+:root{
+  --bg:#ffffff; --surface:#f7f8fa; --surface-2:#eef0f4; --border:#d9dce3;
+  --text:#1a1a1f; --text-dim:#55596b; --text-faint:#8b94a3;
+  --accent:#4f46e5; --accent-light:#4338ca; --accent-glow:rgba(79,70,229,.12);
+  --green:#16a34a; --blue:#2563eb; --amber:#d97706; --red:#dc2626;
+  --font-sans:'Noto Sans TC','Inter',-apple-system,sans-serif;
+  --font-mono:'JetBrains Mono','Fira Code',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font-sans);background:var(--bg);color:var(--text);line-height:1.7;overflow:hidden}
+
+/* --- Top navbar --- */
+.topbar{
+  position:fixed;top:0;left:0;right:0;height:56px;z-index:50;
+  display:flex;align-items:center;gap:1rem;padding:0 1.5rem;
+  background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+}
+.brand{font-weight:900;letter-spacing:-.02em;font-size:.95rem}
+.brand .tag{color:var(--accent-light);font-weight:600;margin-left:.5rem;font-size:.75rem;text-transform:uppercase;letter-spacing:.1em}
+.pills{display:flex;gap:.25rem;flex:1;justify-content:center;overflow-x:auto;scrollbar-width:none}
+.pills::-webkit-scrollbar{display:none}
+.pill{
+  font-size:.75rem;font-weight:600;padding:.35rem .7rem;border-radius:999px;
+  color:var(--text-dim);background:transparent;border:1px solid transparent;
+  cursor:pointer;white-space:nowrap;transition:all .15s;
+}
+.pill:hover{color:var(--text);background:var(--surface)}
+.pill.active{color:var(--accent-light);background:var(--accent-glow);border-color:rgba(99,102,241,.3)}
+.topbar-right{display:flex;gap:.5rem;align-items:center}
+.glossary-btn,.home-link{
+  font-size:.75rem;font-weight:600;padding:.4rem .8rem;border-radius:8px;
+  color:var(--text-dim);background:var(--surface);border:1px solid var(--border);
+  cursor:pointer;text-decoration:none;transition:all .15s;
+}
+.glossary-btn:hover,.home-link:hover{color:var(--text);border-color:var(--accent)}
+
+/* --- Right dots --- */
+.dots{
+  position:fixed;top:56px;bottom:0;right:8px;z-index:40;
+  display:flex;flex-direction:column;gap:4px;padding:1rem 0;
+  overflow-y:auto;scrollbar-width:none;
+}
+.dots::-webkit-scrollbar{display:none}
+.dot{
+  width:8px;height:8px;border-radius:50%;background:var(--border);
+  cursor:pointer;transition:all .15s;flex-shrink:0;
+}
+.dot:hover{background:var(--text-dim);transform:scale(1.3)}
+.dot.active{background:var(--accent);transform:scale(1.4);box-shadow:0 0 8px var(--accent-glow)}
+.dot.part-start{margin-top:10px;position:relative}
+.dot.part-start::before{
+  content:attr(data-part);position:absolute;right:14px;top:-2px;
+  font-size:.65rem;font-weight:700;color:var(--text-faint);
+  font-family:var(--font-mono);
+}
+
+/* --- Deck & slides --- */
+.deck{
+  position:fixed;inset:56px 30px 0 0;
+  overflow-y:scroll;scroll-snap-type:y mandatory;scroll-behavior:smooth;
+}
+.slide{
+  min-height:calc(100vh - 56px);scroll-snap-align:start;scroll-snap-stop:always;
+  padding:3rem 5rem;display:flex;flex-direction:column;justify-content:center;
+  position:relative;
+}
+.slide-meta{
+  position:absolute;top:1.2rem;left:5rem;display:flex;gap:.8rem;align-items:center;
+  font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--text-faint);
+}
+.slide-meta .part-label{color:var(--accent-light)}
+.slide-meta .slide-num{font-family:var(--font-mono)}
+
+.slide h1{font-size:clamp(2rem,4.5vw,3.2rem);font-weight:900;letter-spacing:-.03em;line-height:1.15;margin-bottom:1.5rem}
+.slide h2{font-size:clamp(1.5rem,3vw,2.2rem);font-weight:800;letter-spacing:-.02em;line-height:1.2;margin-bottom:1.2rem}
+.slide h3{font-size:1.2rem;font-weight:700;margin-bottom:.8rem;color:var(--accent-light)}
+.slide p,.slide li{font-size:1.05rem;color:var(--text);max-width:980px}
+.slide p+p,.slide p+ul,.slide ul+p{margin-top:1rem}
+.slide ul{list-style:none;padding-left:0}
+.slide li{padding-left:1.5rem;position:relative;margin-top:.5rem}
+.slide li::before{content:'▸';position:absolute;left:0;color:var(--accent)}
+
+.subtitle{color:var(--text-dim);font-size:1.1rem;margin-bottom:2rem;max-width:900px}
+.lead{font-size:1.2rem;color:var(--text);max-width:980px;line-height:1.6}
+
+/* Slide typed variants */
+.slide.title{justify-content:center;text-align:center;align-items:center}
+.slide.title h1{font-size:clamp(2.5rem,6vw,4.5rem)}
+.slide.title .subtitle{max-width:700px;margin:0 auto 2rem}
+
+.slide.part-opener{background:linear-gradient(180deg,rgba(99,102,241,.06) 0%,transparent 60%)}
+.slide.part-opener h1{color:var(--accent-light)}
+.slide.part-closer{background:linear-gradient(0deg,rgba(34,197,94,.05) 0%,transparent 60%)}
+
+/* Cards */
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:1.2rem 1.4rem;margin-top:1rem;
+}
+.card h3{margin-bottom:.5rem}
+.card.accent{border-color:rgba(99,102,241,.35);background:rgba(99,102,241,.06)}
+.card.green{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.05)}
+.card.amber{border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.05)}
+
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem}
+
+/* Running example card */
+.re-card{
+  display:inline-flex;align-items:center;gap:.8rem;
+  background:var(--surface-2);border:1px dashed var(--accent);border-radius:10px;
+  padding:.6rem 1rem;font-family:var(--font-mono);font-size:.9rem;color:var(--accent-light);
+  margin-top:1rem;
+}
+.re-card::before{content:'example';font-size:.65rem;text-transform:uppercase;letter-spacing:.15em;color:var(--text-faint);font-family:var(--font-sans)}
+
+/* Bridge card (Groth16 ↔ Halo2) */
+.bridge{display:grid;grid-template-columns:1fr auto 1fr;gap:1rem;align-items:stretch;margin-top:1rem}
+.bridge .side{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem 1.2rem}
+.bridge .side.g{border-left:3px solid var(--text-dim)}
+.bridge .side.h{border-left:3px solid var(--accent)}
+.bridge .side h4{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-faint);margin-bottom:.5rem}
+.bridge .arrow{display:flex;align-items:center;color:var(--text-faint);font-size:1.5rem}
+
+/* Code */
+pre{
+  background:#f3f4f6;border:1px solid var(--border);border-radius:10px;
+  padding:1rem 1.2rem;margin-top:1rem;font-family:var(--font-mono);font-size:.88rem;
+  line-height:1.55;overflow-x:auto;max-width:980px;color:var(--text);
+}
+code.inline{font-family:var(--font-mono);font-size:.92em;background:var(--surface);padding:.1em .4em;border-radius:4px;color:var(--accent-light)}
+
+/* Flow diagram */
+.flow-wrap{margin-top:1rem;max-width:980px}
+.flow-svg{width:100%;height:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem}
+.flow-svg .node rect{fill:var(--surface-2);stroke:var(--border);stroke-width:1.5}
+.flow-svg .node.active rect{fill:var(--accent-glow);stroke:var(--accent);stroke-width:2.5}
+.flow-svg .node text{fill:var(--text);font-family:var(--font-sans);font-size:13px;font-weight:600}
+.flow-svg .node.active text{fill:var(--accent-light)}
+.flow-svg .edge{stroke:var(--text-faint);stroke-width:1.5;fill:none;marker-end:url(#arr)}
+
+/* Table */
+.tbl{width:100%;border-collapse:collapse;font-size:.9rem;margin-top:.8rem}
+.tbl th,.tbl td{text-align:left;padding:.5rem .7rem;border-bottom:1px solid var(--border);vertical-align:top}
+.tbl th{color:var(--text-faint);font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;font-weight:600;background:var(--surface-2)}
+.tbl td.mono,.tbl td code{font-family:var(--font-mono);font-size:.85rem;color:var(--accent-light)}
+
+/* Verbatim quote block (original-text citation from canonical papers) */
+.quote{
+  background:#fafbfd;border-left:4px solid var(--accent);border-radius:0 10px 10px 0;
+  padding:1rem 1.4rem;margin:1rem 0;max-width:980px;position:relative;
+}
+.quote::before{
+  content:'“';font-family:Georgia,serif;font-size:3.5rem;color:var(--accent);
+  position:absolute;top:-.3rem;left:.4rem;line-height:1;opacity:.25;
+}
+.quote p{font-style:italic;color:var(--text);font-size:1rem;line-height:1.65;margin:0}
+.quote .cite{display:block;margin-top:.6rem;font-size:.8rem;color:var(--text-dim);font-style:normal;font-family:var(--font-sans)}
+.quote .cite a{color:var(--accent);text-decoration:none;border-bottom:1px dotted var(--accent)}
+.quote .cite a:hover{border-bottom-style:solid}
+.quote.en p{font-family:'Inter',serif}
+
+/* Inline citation (superscript numeric) */
+sup.ref{color:var(--accent);font-weight:600;font-size:.7em;cursor:pointer;padding:0 .1em}
+sup.ref:hover{text-decoration:underline}
+
+/* Figure with caption */
+figure.fig{margin:1rem 0;max-width:980px}
+figure.fig img,figure.fig svg,figure.fig .mermaid{max-width:100%;display:block;margin:0 auto;background:#fff;border:1px solid var(--border);border-radius:10px;padding:.8rem}
+figure.fig figcaption{font-size:.82rem;color:var(--text-dim);margin-top:.5rem;text-align:center;line-height:1.5}
+figure.fig figcaption .src{color:var(--text-faint);font-size:.76rem}
+figure.fig figcaption strong{color:var(--text)}
+
+/* Mermaid host — make it look like our cards */
+.mermaid{background:#fff;border:1px solid var(--border);border-radius:10px;padding:1rem;margin:.8rem 0;max-width:980px;overflow-x:auto}
+
+/* Reference list */
+.reflist{list-style:none;padding-left:0;counter-reset:refnum;font-size:.88rem;max-width:980px}
+.reflist li{padding:.4rem 0 .4rem 2.2rem;position:relative;color:var(--text-dim);line-height:1.55;border-bottom:1px dashed var(--border)}
+.reflist li::before{
+  counter-increment:refnum;content:'['counter(refnum)']';
+  position:absolute;left:0;top:.4rem;color:var(--accent);font-weight:700;font-family:var(--font-mono);font-size:.82rem;
+}
+.reflist li strong{color:var(--text)}
+.reflist li a{color:var(--accent);text-decoration:none}
+.reflist li a:hover{text-decoration:underline}
+
+/* Pill tag */
+.tag{display:inline-block;font-size:.7rem;font-weight:600;padding:.15rem .5rem;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--text-dim);margin-right:.3rem}
+.tag.good{color:var(--green);border-color:rgba(34,197,94,.4)}
+.tag.warn{color:var(--amber);border-color:rgba(245,158,11,.4)}
+.tag.todo{color:var(--amber);border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.08)}
+
+/* --- Glossary drawer --- */
+.drawer-mask{
+  position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.drawer-mask.open{opacity:1;pointer-events:auto}
+.drawer{
+  position:fixed;top:0;right:0;bottom:0;width:min(520px,90vw);z-index:70;
+  background:var(--surface);border-left:1px solid var(--border);
+  transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;
+}
+.drawer.open{transform:translateX(0)}
+.drawer-head{padding:1.2rem 1.5rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.drawer-head h3{color:var(--text);margin:0;font-size:1.1rem}
+.drawer-close{background:none;border:none;color:var(--text-dim);font-size:1.5rem;cursor:pointer;line-height:1}
+.drawer-close:hover{color:var(--text)}
+.drawer-body{padding:1.2rem 1.5rem;overflow-y:auto;flex:1}
+.gtable{width:100%;border-collapse:collapse;font-size:.9rem}
+.gtable th,.gtable td{text-align:left;padding:.6rem .5rem;border-bottom:1px solid var(--border);vertical-align:top}
+.gtable th{color:var(--text-faint);font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;font-weight:600}
+.gtable td.t{color:var(--accent-light);font-family:var(--font-mono);font-size:.88rem;white-space:nowrap}
+.gtable td.g{color:var(--text-dim)}
+.gtable td.h{color:var(--text)}
+
+/* --- Footer hint --- */
+.hint{
+  position:fixed;bottom:1rem;left:1rem;z-index:30;
+  font-size:.7rem;color:var(--text-faint);font-family:var(--font-mono);
+  background:rgba(255,255,255,.85);border:1px solid var(--border);padding:.3rem .6rem;border-radius:6px;
+  pointer-events:none;opacity:.7;
+}
+
+/* Responsive */
+@media(max-width:900px){
+  .slide{padding:2.5rem 2rem}
+  .slide-meta{left:2rem}
+  .pills{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ TOP NAV ============ -->
+<nav class="topbar">
+  <div class="brand">ZK-Compliance<span class="tag">口試報告</span></div>
+  <div class="pills" id="pills">
+    <button class="pill" data-part="I">I 問題</button>
+    <button class="pill" data-part="II">II 協議</button>
+    <button class="pill" data-part="III">III Halo2</button>
+    <button class="pill" data-part="IV">IV Poseidon</button>
+    <button class="pill" data-part="V">V PF1 實作</button>
+    <button class="pill" data-part="VI">VI 實驗</button>
+    <button class="pill" data-part="VII">VII 限制</button>
+    <button class="pill" data-part="VIII">VIII 結論</button>
+  </div>
+  <div class="topbar-right">
+    <button class="glossary-btn" id="glossBtn">術語 Groth16↔Halo2</button>
+    <a class="home-link" href="index.html">← 返回首頁</a>
+  </div>
+</nav>
+
+<!-- ============ DOTS ============ -->
+<aside class="dots" id="dots"></aside>
+
+<!-- ============ DECK ============ -->
+<main class="deck" id="deck">
+
+<!-- ========== PART I: 問題與場景 ========== -->
+
+<section class="slide title" data-part="I" data-slide="1">
+  <div class="slide-meta"><span class="slide-num">01 / 87</span></div>
+  <h1>用零知識證明<br>證明金融合規</h1>
+  <p class="subtitle">以 Black-Scholes Delta 為例的 Halo2 電路實作</p>
+  <p style="color:var(--text-faint);font-size:.95rem">碩士論文口試 — 2026</p>
+</section>
+
+<section class="slide part-opener" data-part="I" data-slide="2">
+  <div class="slide-meta"><span class="part-label">PART I</span><span class="slide-num">02 / 87</span></div>
+  <h1>Part I — 問題與場景</h1>
+  <p class="lead">整個報告從「問題」開始。Part I 結束後你會知道：</p>
+  <ul>
+    <li>為什麼「合規 × 持倉隱私」是真實張力 — 單靠揭露或加密都解不掉</li>
+    <li>ZK 能提供什麼 (高階三性質)，本論文 PF1 的 scope 是什麼</li>
+    <li>為什麼 BS Delta 的 ln / erf / exp 是 ZK 電路裡的硬骨頭</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:1rem;font-size:.95rem">本報告共 8 Part、87 slides，約 90 分鐘。每個 Part 的重大概念會先用 Groth16 / R1CS 作為對照，右上「術語」按鈕可隨時呼叫對照表。</p>
+</section>
+
+<section class="slide" data-part="I" data-slide="3">
+  <div class="slide-meta"><span class="part-label">Motivation</span><span class="slide-num">03 / 87</span></div>
+  <h2>金融合規與持倉隱私的張力</h2>
+  <p class="lead">對沖基金必須向監管證明風險合規，但持倉本身是商業機密 — 公開 = 策略外洩、front-running。</p>
+  <div class="grid-2" style="margin-top:1rem">
+    <div class="card"><h3>傳統做法</h3><p>基金交出完整持倉 → 監管自己算 → <strong style="color:var(--red)">策略曝光</strong>，競爭對手可複製</p></div>
+    <div class="card accent"><h3>ZK 合規</h3><p>基金提交 proof → 監管毫秒驗證 → <strong style="color:var(--green)">持倉永遠保密</strong>，proof 存在 = 合規</p></div>
+  </div>
+  <p style="color:var(--text-dim);margin-top:1rem;font-size:.95rem">ZK 是唯一能同時做到「即時可驗證 + 永久隱私」的技術；MPC 需多方協作延遲高，FHE 在乘法深度下對超越函數過於昂貴。</p>
+</section>
+
+<section class="slide" data-part="I" data-slide="4">
+  <div class="slide-meta"><span class="part-label">Running Example</span><span class="slide-num">04 / 87</span></div>
+  <h2>一筆具體的 BS Delta 交易</h2>
+  <p>整個報告都會拉回這筆交易 — 代入看數字怎麼跑。</p>
+  <div class="re-card">S=100&nbsp; K=100&nbsp; σ=20%&nbsp; T=30 天&nbsp; r=5%&nbsp; q=0&nbsp; → Δ ≈ 0.523</div>
+  <div class="card" style="margin-top:1rem"><p>基金想向監管與 LP 證明「投組加權 Delta 絕對值 ≤ τ」，而不想揭露任何持倉明細（標的、數量、方向）。</p></div>
+  <pre>d1 = [ln(S/K) + (r - q + σ²/2) · T] / (σ · √T)
+   = [ln(1) + (0.05 + 0.02) · 30/365] / (0.20 · √(30/365))
+   ≈ 0.0577
+
+Δ_call = e^(-qT) · N(d1) = 1 · (0.5 + 0.5·erf(0.0577/√2))
+       ≈ 0.523</pre>
+</section>
+
+<section class="slide" data-part="I" data-slide="5">
+  <div class="slide-meta"><span class="part-label">Status Quo</span><span class="slide-num">05 / 87</span></div>
+  <h2>現有方案為什麼不夠</h2>
+  <ul>
+    <li><strong>全揭露</strong>：交完整持倉給監管 — 商業機密外洩，front-running 成本放大</li>
+    <li><strong>信任第三方</strong>：外部審計 — 單點信任、延遲數週、單筆成本數萬美元</li>
+    <li><strong>事後抽查 + 罰款</strong>：監管週期以季為單位 — 造假空間大</li>
+    <li><strong>MPC / FHE</strong>：需多方協作或乘法深度過高，超越函數實務不可行</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:1rem;font-size:.95rem">ZK 的獨特賣點：<strong>單次本地計算 + 毫秒驗證 + 永久隱私</strong>。</p>
+</section>
+
+<section class="slide" data-part="I" data-slide="6">
+  <div class="slide-meta"><span class="part-label">ZK Value</span><span class="slide-num">06 / 87</span></div>
+  <h2>ZK 能提供什麼</h2>
+  <p class="lead">「我能證明某件事是真的，但不透露為什麼是真的。」</p>
+  <ul>
+    <li><strong>Completeness</strong> — 誠實 prover 總能通過</li>
+    <li><strong>Knowledge Soundness</strong> — 惡意 prover 不能偽造通過（且真的「知道」witness）</li>
+    <li><strong>Zero-knowledge</strong> — 驗證者除了「命題為真」外什麼都學不到</li>
+  </ul>
+  <div class="card amber" style="margin-top:1rem"><p><strong>關鍵：</strong>ZK 電路裡只有有限域上的加法和乘法 — 沒有 <code class="inline">if</code>、沒有迴圈、沒有浮點。這是本論文要解決的核心工程問題。</p></div>
+  <div class="quote" style="margin-top:1rem">
+    <p>"Zero-knowledge proofs are defined as those proofs that convey no additional knowledge other than the correctness of the proposition in question."</p>
+    <span class="cite">— Goldwasser, Micali, Rackoff, <em>The Knowledge Complexity of Interactive Proof Systems</em>, SIAM J. Comput. 18(1):186–208 (1989), Abstract <sup class="ref">[1]</sup></span>
+  </div>
+  <div class="quote" style="margin-top:.6rem">
+    <p>"We say that V is a knowledge verifier for the relation R with knowledge error κ if … there exists a probabilistic oracle machine K such that … if p(x) &gt; κ(x) then, on input x and access to oracle P<sub>x</sub>, machine K outputs a string from the set R(x) within an expected number of steps bounded by |x|<sup>c</sup> / (p(x)−κ(x)). The oracle machine K is called a universal knowledge extractor, and κ is called the knowledge error function."</p>
+    <span class="cite">— Bellare, Goldreich, <em>On Defining Proofs of Knowledge</em>, CRYPTO '92, Definition 3.1 <sup class="ref">[2]</sup></span>
+  </div>
+  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">※ 這裡先講高階性質；Part III 會進 Halo2 內部看 soundness 怎麼被電路約束機制落地。</p>
+</section>
+
+<section class="slide" data-part="I" data-slide="7">
+  <div class="slide-meta"><span class="part-label">PF1 Scope</span><span class="slide-num">07 / 87</span></div>
+  <h2>PF1 — 本論文的核心 scope</h2>
+  <p>PF1：<strong>給定公開市場資料承諾與合規門檻 τ，證明 N 筆持倉的加權 BS Delta 絕對值 ≤ τ</strong>，不揭露任何持倉細節。</p>
+  <div class="grid-2" style="margin-top:.8rem">
+    <div class="card accent"><h3>Public (4 項)</h3><ul><li>state_root（持倉 Merkle root）</li><li>market_data_root（當日市場資料）</li><li>τ（合規門檻）</li><li>today（結算日）</li></ul></div>
+    <div class="card"><h3>Private witness</h3><ul><li>{持倉 p_i, Merkle paths}</li><li>{市場參數 S, r, q, settle_price}</li><li>{σ_i 隱含波動率}</li><li>所有 pp48 中間值、Horner 累加、segment 選擇</li></ul></div>
+  </div>
+  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">※ PF2（State Transition，與交易所簽章綁定）商業 IP 考量本次報告不展內部；僅說明 PF1 ↔ PF2 組合關係。</p>
+</section>
+
+<section class="slide" data-part="I" data-slide="8">
+  <div class="slide-meta"><span class="part-label">Contributions</span><span class="slide-num">08 / 87</span></div>
+  <h2>本論文四大貢獻</h2>
+  <ul>
+    <li><strong>Halo2 上首個 BS Delta 零知識電路</strong> — N=128 持倉、k=18（185,856 rows 實測）；scaling law <code class="inline">total(N) = N × (528 + 132·⌈log₂N⌉)</code>，O(N log N)</li>
+    <li><strong>pp=48 + Remez minimax + Per-step Horner 的 ln/erf/exp 管線</strong> — Delta_call 實測 7 ULP（~2×10⁻¹⁴）；kernel per-segment ~1.2 ULP、理論上界 57.6 ULP</li>
+    <li><strong>統一 Horner kernel（ln/erf/exp）+ A2 segment-selector gate</strong> — 封閉 saturation / segment 的 soundness 漏洞</li>
+    <li><strong>Rust ↔ Python bit-for-bit 雙實作驗證</strong> + 31 custom gates / 6 modules / 66 polynomial constraints 的形式化 ZK-POK 論證</li>
+  </ul>
+</section>
+
+<section class="slide part-closer" data-part="I" data-slide="9">
+  <div class="slide-meta"><span class="part-label">PART I · Recap</span><span class="slide-num">09 / 87</span></div>
+  <h2>Part I takeaways</h2>
+  <ul>
+    <li>合規 × 持倉隱私有真實張力，現有方案都有缺陷</li>
+    <li>ZK 給 completeness / soundness / zero-knowledge 三性質 — 但電路只有加法和乘法</li>
+    <li>本論文 PF1 = 證明加權 BS Delta 合規，PF2（State Transition）不在報告範圍</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:1.2rem">下一 Part：協議流程 — 誰在場、誰信誰、一筆交易怎麼跑。</p>
+</section>
+
+<!-- ========== PART II: 協議設計 ========== -->
+
+<section class="slide part-opener" data-part="II" data-slide="10">
+  <div class="slide-meta"><span class="part-label">PART II</span><span class="slide-num">10 / 87</span></div>
+  <h1>Part II — 協議設計</h1>
+  <p class="lead">Part II 結束後你會知道：</p>
+  <ul>
+    <li>誰在系統裡（基金、交易所、監管、LP）— 以及各自看得到什麼</li>
+    <li>四層信任架構（L1–L4）— 密碼學填哪些洞、制度填哪些洞</li>
+    <li>兩棵 Merkle tree（Position State + Market Data）與 8 條 cross-tree copy constraints</li>
+    <li>PF1 / PF2 分工：本論文精確展開哪部分</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="II" data-slide="11">
+  <div class="slide-meta"><span class="part-label">Actors</span><span class="slide-num">11 / 87</span></div>
+  <h2>參與者與視野</h2>
+  <table class="tbl">
+    <thead><tr><th>角色</th><th>知道</th><th>看不到</th></tr></thead>
+    <tbody>
+      <tr><td>基金（Prover）</td><td>自己的全部持倉</td><td>—</td></tr>
+      <tr><td>監管（Verifier）</td><td>合規 / 不合規（1 bit）+ 隨機抽查的 k 筆</td><td>標的、數量、方向、其他 N-k 筆</td></tr>
+      <tr><td>交易所（Signer）</td><td>各自執行的交易 + 簽章</td><td>基金在其他交易所的交易、完整組合</td></tr>
+      <tr><td>LP / 投資人</td><td>proof 通過 → 合規</td><td>任何持倉細節</td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem"><strong>沒有任何一方看到完整組合</strong> — 基金自己知道全貌，但不需要告訴任何人。</p>
+</section>
+
+<section class="slide" data-part="II" data-slide="12">
+  <div class="slide-meta"><span class="part-label">Flow</span><span class="slide-num">12 / 87</span></div>
+  <h2>完整流程 — 你在這張圖上</h2>
+  <div class="flow-wrap">
+    <svg class="flow-svg" id="mainFlow" viewBox="0 0 880 140">
+      <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#5a5a70"/></marker></defs>
+      <g class="node" data-node="md"><rect x="10" y="40" width="140" height="60" rx="10"/><text x="80" y="68" text-anchor="middle">Market Data</text><text x="80" y="86" text-anchor="middle" style="font-size:11px;fill:#8888a0">Merkle root</text></g>
+      <path class="edge" d="M150 70 H 190"/>
+      <g class="node" data-node="trade"><rect x="190" y="40" width="140" height="60" rx="10"/><text x="260" y="68" text-anchor="middle">Trade</text><text x="260" y="86" text-anchor="middle" style="font-size:11px;fill:#8888a0">(S,K,σ,T,r,q)</text></g>
+      <path class="edge" d="M330 70 H 370"/>
+      <g class="node" data-node="att"><rect x="370" y="40" width="140" height="60" rx="10"/><text x="440" y="68" text-anchor="middle">Attestation</text><text x="440" y="86" text-anchor="middle" style="font-size:11px;fill:#8888a0">EdDSA / Poseidon</text></g>
+      <path class="edge" d="M510 70 H 550"/>
+      <g class="node" data-node="proof"><rect x="550" y="40" width="140" height="60" rx="10"/><text x="620" y="68" text-anchor="middle">Proof</text><text x="620" y="86" text-anchor="middle" style="font-size:11px;fill:#8888a0">Halo2 (PF1)</text></g>
+      <path class="edge" d="M690 70 H 730"/>
+      <g class="node" data-node="verify"><rect x="730" y="40" width="140" height="60" rx="10"/><text x="800" y="68" text-anchor="middle">Verify</text><text x="800" y="86" text-anchor="middle" style="font-size:11px;fill:#8888a0">監管 / LP</text></g>
+    </svg>
+  </div>
+  <p style="color:var(--text-dim);margin-top:1rem;font-size:.95rem">每個 Part 開場都會回到這張圖，反白我們現在在討論哪個節點。</p>
+</section>
+
+<section class="slide" data-part="II" data-slide="13">
+  <div class="slide-meta"><span class="part-label">Trust Model</span><span class="slide-num">13 / 87</span></div>
+  <h2>四層信任架構</h2>
+  <table class="tbl">
+    <thead><tr><th>層</th><th>機制</th><th>填的洞</th></tr></thead>
+    <tbody>
+      <tr><td><strong>L4 Deterrence</strong></td><td>監管隨機抽查 k 筆 + 反向查核交易所</td><td>防交易所與基金串通</td></tr>
+      <tr><td><strong>L3 Computation</strong></td><td>PF1 零知識 Delta 合規證明（本研究）</td><td>計算正確性 + 持倉隱私</td></tr>
+      <tr><td><strong>L2 Crypto</strong></td><td>交易所 EdDSA 簽章 + PF2 State Transition</td><td>輸入真實性、狀態完整性</td></tr>
+      <tr><td><strong>L1 Trust Anchor</strong></td><td>監管一次性簽署 State(0)</td><td>信任鏈起點，如 TLS root CA</td></tr>
+    </tbody>
+  </table>
+  <div class="card amber" style="margin-top:1rem"><p><strong>關鍵：</strong>拿掉任何一層系統都會崩塌。ZK 不是銀彈 — 而是四層防線的其中一層。</p></div>
+</section>
+
+<section class="slide" data-part="II" data-slide="14">
+  <div class="slide-meta"><span class="part-label">Public / Private</span><span class="slide-num">14 / 87</span></div>
+  <h2>Public input 只有 4 個</h2>
+  <div class="grid-2">
+    <div class="card accent"><h3>Public (instance)</h3><ul><li><code class="inline">state_root</code> — Position Tree</li><li><code class="inline">market_data_root</code> — 當日 MDT</li><li><code class="inline">τ</code> — 合規門檻（pp=48）</li><li><code class="inline">today</code> — 結算日</li></ul></div>
+    <div class="card"><h3>Private (witness)</h3><ul><li>{asset_id, w, K, expiry, type}_i</li><li>{S, r, q, settle_price, σ}_i</li><li>Position / Market Merkle paths</li><li>所有 pp48 中間值、Horner 累加、segment 選擇、saturation flag</li></ul></div>
+  </div>
+  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">公開輸入越少 → 隱私性越強。Δ 本身的值永遠不公開 — proof 存在 = 合規。</p>
+</section>
+
+<section class="slide" data-part="II" data-slide="15">
+  <div class="slide-meta"><span class="part-label">PF1 Statement</span><span class="slide-num">15 / 87</span></div>
+  <h2>PF1 形式化陳述 — 5 條件</h2>
+  <p style="color:var(--text-dim);margin-top:.2rem;font-size:.95rem">∃ witness <em>w</em> s.t. 對所有 i ∈ [1, N]：</p>
+  <ul style="margin-top:.5rem">
+    <li>(a) <code class="inline">MerkleVerify(p_i, path_i, state_root) = true</code></li>
+    <li>(b) <code class="inline">MerkleVerify(mkt_i, mkt_path_i, market_data_root) = true</code></li>
+    <li>(c) <code class="inline">|BS(S,K_i,T_i,r,q,σ_i) − settle_price_i| ≤ ε_σ</code>（σ 正向驗證）</li>
+    <li>(d) <code class="inline">T_i × 365 = expiry_date_i − today</code>（T 電路內計算）</li>
+    <li>(e) <code class="inline">|Σ w_i · Δ_BS(S,K_i,T_i,r,q,σ_i)| ≤ τ</code>（合規）</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:1rem;font-size:.95rem">Part V 會把這 5 條件對應到 31 個 custom gate / 66 條多項式約束。</p>
+</section>
+
+<section class="slide" data-part="II" data-slide="16">
+  <div class="slide-meta"><span class="part-label">PF2 (out of scope)</span><span class="slide-num">16 / 87</span></div>
+  <h2>PF2 存在，本次報告不展內部</h2>
+  <p>PF2 負責「State Transition」：State(T) = State(T−1) + apply(Trades(T))，每筆交易有合法交易所 EdDSA 簽章。</p>
+  <div class="grid-2" style="margin-top:1rem">
+    <div class="card"><h3>PF1（本論文）</h3><p>證明「這組持倉的加權 Δ 合規」<br>涉及超越函數 ln / erf / exp</p></div>
+    <div class="card"><h3>PF2（介面定義，實作另案）</h3><p>證明「這組持倉是從已簽交易正確演化而來」<br>僅需 EdDSA 驗簽（Babyjubjub ~6K constraints/次）</p></div>
+  </div>
+  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">PF1 假設 State Tree 完整（Assumption 1）— 這個保證由 PF2 提供。兩個 proof 透過 <code class="inline">state_root</code> 綁定。</p>
+</section>
+
+<section class="slide" data-part="II" data-slide="17">
+  <div class="slide-meta"><span class="part-label">Two Trees</span><span class="slide-num">17 / 87</span></div>
+  <h2>兩棵 Merkle Tree</h2>
+  <div class="grid-2">
+    <div class="card"><h3>Position State Tree</h3><p>記錄當前持倉快照</p><ul><li><strong>5 欄位</strong>：asset_id, w, K, expiry_date, type</li><li>Depth 7（生產 N_max=128；測試 N=8）</li><li>不足 N_max 填 dummy 葉子（隱藏真實持倉數量）</li></ul></div>
+    <div class="card"><h3>Market Data Tree</h3><p>記錄當日市場資料</p><ul><li><strong>9 欄位</strong>：underlying_id, strike, expiry, asset_type, S (spot), r, q, settle_price, <strong>σ</strong></li><li>Depth ~20（涵蓋所有標的 × 合約）</li><li>每日由資料提供者重算並發布 root</li></ul></div>
+  </div>
+  <div class="card amber" style="margin-top:1rem"><p><strong>為什麼用 Merkle 而非 Halo2 lookup？</strong> Market data 每日變 — 若用 fixed column lookup 每日得重做 setup + VK。Merkle 讓電路結構一次 setup 永久有效，只有 root 值每日更新。</p></div>
+  <div class="quote" style="margin-top:.8rem">
+    <p>"we describe a method called 'tree authentication' which can be used to authenticate any Y<sub>i</sub> of any user quickly and easily, but which requires minimal storage."</p>
+    <span class="cite">— Merkle, <em>A Certified Digital Signature</em> (1979), §6 Tree Authentication <sup class="ref">[11]</sup></span>
+  </div>
+  <figure class="fig" style="margin-top:1rem">
+    <svg viewBox="0 0 900 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two Merkle trees">
+      <defs>
+        <style>
+          .t{font:600 12px 'Inter','Noto Sans TC',sans-serif;fill:#1a1a1f}
+          .sm{font:11px 'Inter',monospace;fill:#55596b}
+          .tl{font:600 13px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5}
+          .r{fill:#eef2ff;stroke:#4f46e5;stroke-width:1.5}
+          .p{fill:#e0e7ff;stroke:#4f46e5;stroke-width:1.2}
+          .l{fill:#fff;stroke:#55596b;stroke-width:1}
+          .m{fill:#fef3c7;stroke:#d97706;stroke-width:1.2}
+          .ml{fill:#fff;stroke:#d97706;stroke-width:1}
+          .bind{stroke:#dc2626;stroke-width:1.5;stroke-dasharray:4 3;fill:none}
+          .e{stroke:#55596b;stroke-width:1;fill:none}
+        </style>
+      </defs>
+
+      <!-- Position Tree (left) -->
+      <text x="110" y="22" class="tl">Position State Tree (depth 7)</text>
+      <rect x="150" y="35" width="120" height="28" rx="6" class="r"/>
+      <text x="210" y="54" text-anchor="middle" class="t">state_root</text>
+
+      <rect x="80"  y="80" width="80" height="24" rx="5" class="p"/><text x="120" y="96" text-anchor="middle" class="sm">h(L,R)</text>
+      <rect x="260" y="80" width="80" height="24" rx="5" class="p"/><text x="300" y="96" text-anchor="middle" class="sm">h(L,R)</text>
+
+      <rect x="40"  y="120" width="60" height="22" rx="5" class="p"/><text x="70"  y="136" text-anchor="middle" class="sm">…</text>
+      <rect x="140" y="120" width="60" height="22" rx="5" class="p"/><text x="170" y="136" text-anchor="middle" class="sm">…</text>
+      <rect x="220" y="120" width="60" height="22" rx="5" class="p"/><text x="250" y="136" text-anchor="middle" class="sm">…</text>
+      <rect x="320" y="120" width="60" height="22" rx="5" class="p"/><text x="350" y="136" text-anchor="middle" class="sm">…</text>
+
+      <rect x="40"  y="165" width="60" height="42" rx="5" class="l"/><text x="70"  y="181" text-anchor="middle" class="sm">pos leaf</text><text x="70" y="196" text-anchor="middle" class="sm">(5 fields)</text>
+      <rect x="140" y="165" width="60" height="42" rx="5" class="l"/><text x="170" y="181" text-anchor="middle" class="sm">pos leaf</text><text x="170" y="196" text-anchor="middle" class="sm">hi-lighted</text>
+      <rect x="220" y="165" width="60" height="42" rx="5" class="l"/><text x="250" y="181" text-anchor="middle" class="sm">dummy</text><text x="250" y="196" text-anchor="middle" class="sm">(padding)</text>
+      <rect x="320" y="165" width="60" height="42" rx="5" class="l"/><text x="350" y="181" text-anchor="middle" class="sm">dummy</text>
+
+      <path class="e" d="M210,63 L120,80"/><path class="e" d="M210,63 L300,80"/>
+      <path class="e" d="M120,104 L70,120"/><path class="e" d="M120,104 L170,120"/>
+      <path class="e" d="M300,104 L250,120"/><path class="e" d="M300,104 L350,120"/>
+      <path class="e" d="M70,142 L70,165"/><path class="e" d="M170,142 L170,165"/>
+      <path class="e" d="M250,142 L250,165"/><path class="e" d="M350,142 L350,165"/>
+
+      <!-- Market Data Tree (right) -->
+      <text x="530" y="22" class="tl">Market Data Tree (depth ~20)</text>
+      <rect x="620" y="35" width="140" height="28" rx="6" class="m"/>
+      <text x="690" y="54" text-anchor="middle" class="t">market_data_root</text>
+
+      <rect x="560" y="80" width="80" height="24" rx="5" class="m"/><text x="600" y="96" text-anchor="middle" class="sm">h(L,R)</text>
+      <rect x="740" y="80" width="80" height="24" rx="5" class="m"/><text x="780" y="96" text-anchor="middle" class="sm">h(L,R)</text>
+
+      <rect x="520" y="120" width="60" height="22" rx="5" class="m"/><text x="550" y="136" text-anchor="middle" class="sm">…</text>
+      <rect x="620" y="120" width="60" height="22" rx="5" class="m"/><text x="650" y="136" text-anchor="middle" class="sm">…</text>
+      <rect x="700" y="120" width="60" height="22" rx="5" class="m"/><text x="730" y="136" text-anchor="middle" class="sm">…</text>
+      <rect x="800" y="120" width="60" height="22" rx="5" class="m"/><text x="830" y="136" text-anchor="middle" class="sm">…</text>
+
+      <rect x="520" y="165" width="60" height="42" rx="5" class="ml"/><text x="550" y="181" text-anchor="middle" class="sm">md leaf</text><text x="550" y="196" text-anchor="middle" class="sm">(8 fields)</text>
+      <rect x="620" y="165" width="60" height="42" rx="5" class="ml"/><text x="650" y="181" text-anchor="middle" class="sm">md leaf</text><text x="650" y="196" text-anchor="middle" class="sm">matched</text>
+      <rect x="700" y="165" width="60" height="42" rx="5" class="ml"/><text x="730" y="181" text-anchor="middle" class="sm">md leaf</text>
+      <rect x="800" y="165" width="60" height="42" rx="5" class="ml"/><text x="830" y="181" text-anchor="middle" class="sm">md leaf</text>
+
+      <path class="e" d="M690,63 L600,80"/><path class="e" d="M690,63 L780,80"/>
+      <path class="e" d="M600,104 L550,120"/><path class="e" d="M600,104 L650,120"/>
+      <path class="e" d="M780,104 L730,120"/><path class="e" d="M780,104 L830,120"/>
+      <path class="e" d="M550,142 L550,165"/><path class="e" d="M650,142 L650,165"/>
+      <path class="e" d="M730,142 L730,165"/><path class="e" d="M830,142 L830,165"/>
+
+      <!-- cross-tree binding -->
+      <path class="bind" d="M200,186 C 350,220 500,220 620,186"/>
+      <text x="410" y="220" text-anchor="middle" class="t" fill="#dc2626">8 條 copy constraint</text>
+    </svg>
+    <figcaption>圖：兩棵 Merkle Tree — 藍樹（Position State，depth 7）+ 琥珀樹（Market Data，depth ~20）；紅虛線 = 8 條 cross-tree copy constraint（見 slide 18）</figcaption>
+  </figure>
+</section>
+
+<section class="slide" data-part="II" data-slide="18">
+  <div class="slide-meta"><span class="part-label">Cross-tree Binding</span><span class="slide-num">18 / 87</span></div>
+  <h2>Cross-tree 8 條 copy constraints</h2>
+  <p>Position leaf 和 Market Data leaf 透過 8 條 copy constraint 綁定 — 防資產錯配。</p>
+  <table class="tbl">
+    <thead><tr><th>Position leaf</th><th>約束</th><th>Market Data leaf</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">underlying_id</td><td>=</td><td class="mono">underlying_id</td></tr>
+      <tr><td class="mono">K</td><td>=</td><td class="mono">strike</td></tr>
+      <tr><td class="mono">expiry_date</td><td>=</td><td class="mono">expiry</td></tr>
+      <tr><td class="mono">asset_type</td><td>=</td><td class="mono">asset_type</td></tr>
+      <tr><td class="mono">K (input to Δ)</td><td>=</td><td class="mono">strike</td></tr>
+      <tr><td class="mono">S (input to Δ)</td><td>=</td><td class="mono">spot</td></tr>
+      <tr><td class="mono">r (input to Δ)</td><td>=</td><td class="mono">r</td></tr>
+      <tr><td class="mono">q (input to Δ)</td><td>=</td><td class="mono">q</td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">前 4 條 = 合約複合唯一鍵；後 4 條把市場參數直接綁進 Delta 管線。Copy constraint 用 PLONK 原生 permutation argument，<strong>零額外 gate 成本</strong>。</p>
+</section>
+
+<section class="slide" data-part="II" data-slide="19">
+  <div class="slide-meta"><span class="part-label">Summary</span><span class="slide-num">19 / 87</span></div>
+  <h2>協議 one-pager</h2>
+  <ul>
+    <li><strong>流程（6 步）</strong>：收交易 → 建 Trade Tree → 算 State(T) → 產 PF2 → 產 PF1 → 提交 {root, PF1, PF2}</li>
+    <li><strong>兩棵樹</strong>：Position（5 欄, depth 7）+ Market Data（8 欄, depth ~20）</li>
+    <li><strong>8 條 cross-tree copy constraint</strong>：鎖合約條款 + 市場參數，防資產錯配</li>
+    <li><strong>4 個 public input</strong>：state_root, market_data_root, τ, today</li>
+    <li><strong>四層信任</strong>：L1 genesis + L2 exchange sig + L3 PF1+PF2 + L4 抽查</li>
+  </ul>
+</section>
+
+<section class="slide part-closer" data-part="II" data-slide="20">
+  <div class="slide-meta"><span class="part-label">PART II · Recap</span><span class="slide-num">20 / 87</span></div>
+  <h2>Part II takeaways</h2>
+  <ul>
+    <li>4 類參與者，沒有任何一方看到完整組合</li>
+    <li>四層信任：密碼學（L2-L3）+ 制度（L1, L4），缺一不可</li>
+    <li>兩棵 Merkle tree + 8 條 cross-tree copy constraint = 合約條款與市場參數一致性</li>
+    <li>PF1 public 只有 4 項，Δ 值從不公開 — proof 存在 = 合規</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:1.2rem">下一 Part：把 proof 這個黑盒打開 — Halo2 的語言。</p>
+</section>
+
+<!-- ========== PART III: Halo2 基礎（最關鍵） ========== -->
+
+<section class="slide part-opener" data-part="III" data-slide="21">
+  <div class="slide-meta"><span class="part-label">PART III</span><span class="slide-num">21 / 87</span></div>
+  <h1>Part III — Halo2 基礎</h1>
+  <p class="lead">最關鍵的一段。Part III 結束後你會知道：</p>
+  <ul>
+    <li>Halo2 不是 Groth16 的改進版 — 是完全不同的 arithmetization</li>
+    <li>Plonkish 的 advice / fixed / instance / selector 怎麼對應到 R1CS</li>
+    <li>Custom gate / lookup / copy constraint 各自解決什麼問題</li>
+    <li>Universal SRS：一次 setup 所有 circuit 共用</li>
+  </ul>
+  <p style="color:var(--amber);margin-top:.8rem;font-size:.9rem">⚠ 每個新概念前先給 Groth16 / R1CS 對應物。右上「術語」按鈕可隨時呼叫對照表。</p>
+</section>
+
+<section class="slide" data-part="III" data-slide="22">
+  <div class="slide-meta"><span class="part-label">Recap: Groth16 / R1CS</span><span class="slide-num">22 / 87</span></div>
+  <h2>先回到大家熟悉的 — Groth16 / R1CS / QAP</h2>
+  <ul>
+    <li><strong>R1CS</strong>：constraint 形式固定為 <code class="inline">(A·z) ⊙ (B·z) = C·z</code>，每條 constraint 一個 row</li>
+    <li><strong>QAP</strong>：把 R1CS 轉成多項式 identity，用 pairing 一次驗證</li>
+    <li><strong>Trusted setup</strong>：<strong>每個 circuit</strong> 各做一次 ceremony（toxic waste），circuit 改了重做</li>
+    <li><strong>Proof size</strong>：~3 G1 元素（~200 B，非常小）</li>
+    <li><strong>沒有 lookup</strong>：range check 得一位一位拆</li>
+  </ul>
+  <div class="quote" style="margin-top:1rem">
+    <p>"We construct a pairing-based (preprocessing) SNARK for arithmetic circuit satisfiability, which is an NP-complete language, where a proof is only 3 group elements and verification consists of checking a single pairing product equation."</p>
+    <span class="cite">— Groth, <em>On the Size of Pairing-based Non-interactive Arguments</em>, EUROCRYPT 2016, Abstract <sup class="ref">[3]</sup></span>
+  </div>
+  <p style="color:var(--text-dim);margin-top:1rem;font-size:.95rem">這些是 Halo2 <strong>不一樣</strong>的地方的對照基準。</p>
+</section>
+
+<section class="slide" data-part="III" data-slide="23">
+  <div class="slide-meta"><span class="part-label">Plonkish</span><span class="slide-num">23 / 87</span></div>
+  <h2>Halo2 = Plonkish arithmetization</h2>
+  <p class="lead">整個電路是一張「表格」：列 = 一行計算、欄 = 不同類型的變數；gate 是欄之間的多項式關係。</p>
+  <div class="bridge">
+    <div class="side g"><h4>R1CS (Groth16)</h4><p>固定 <code class="inline">a·b=c</code> 形式</p><p>一條 constraint 一個 row</p><p>一個 row 只有一條 constraint</p></div>
+    <div class="arrow">→</div>
+    <div class="side h"><h4>Plonkish (Halo2)</h4><p>自訂高次多項式 gate</p><p>一個 gate 可跨多列多欄</p><p>一個 row 可同時啟用多條 constraint</p></div>
+  </div>
+  <div class="quote" style="margin-top:1rem">
+    <p>"PLONKish circuits are defined in terms of a rectangular matrix of values. (…) A PLONKish circuit configuration requires a sequence of polynomial constraints. These are multivariate polynomials over F that must evaluate to zero for each row." A gate is "a set of constraints controlled by a set of selector columns."</p>
+    <span class="cite">— <em>The halo2 Book</em>, §Concepts › Proof systems › Arithmetization <sup class="ref">[5]</sup></span>
+  </div>
+</section>
+
+<section class="slide" data-part="III" data-slide="24">
+  <div class="slide-meta"><span class="part-label">Columns</span><span class="slide-num">24 / 87</span></div>
+  <h2>四類欄：advice / fixed / instance / selector</h2>
+  <div class="bridge">
+    <div class="side g"><h4>R1CS</h4><ul><li>witness vector z</li><li>矩陣 A/B/C entry（係數）</li><li>public 部份：z 前綴</li><li>(沒明確 gate 開關)</li></ul></div>
+    <div class="arrow">↔</div>
+    <div class="side h"><h4>Halo2</h4><ul><li><strong>advice</strong>：prover 填，私密（被 blinding 保護）</li><li><strong>fixed</strong>：電路定義時寫死，例如多項式係數</li><li><strong>instance</strong>：public input，verifier 也看得到</li><li><strong>selector</strong>：打開 / 關閉 gate（fixed 的特例）</li></ul></div>
+  </div>
+</section>
+
+<section class="slide" data-part="III" data-slide="25">
+  <div class="slide-meta"><span class="part-label">Custom Gates</span><span class="slide-num">25 / 87</span></div>
+  <h2>Custom gate — 自訂高次多項式</h2>
+  <p>R1CS 的 gate 固定是 bilinear；Halo2 可以寫任意 degree 的 constraint。</p>
+  <pre>meta.create_gate("horner", |meta| {
+  let q    = meta.query_selector(q_horner);
+  let acc  = meta.query_advice(acc, Rotation::cur());
+  let next = meta.query_advice(acc, Rotation::next());
+  let c    = meta.query_fixed(coeff, Rotation::cur());
+  let x    = meta.query_advice(x, Rotation::cur());
+  vec![q * (next - (acc * x + c))]   // degree-3 約束
+});</pre>
+  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">白話：當 <code class="inline">q=1</code>，下一列的 acc = 這列 acc × x + coeff — Horner 一步到位。R1CS 要拆成兩條 constraint + 一個中間變數。</p>
+  <div class="quote" style="margin-top:.8rem;border-left-color:var(--text-dim)">
+    <p><strong>[Paraphrase — 非原文]</strong> PLONK 原論文定義的 gate 形式為 q<sub>L</sub>·a + q<sub>R</sub>·b + q<sub>O</sub>·c + q<sub>M</sub>·a·b + q<sub>C</sub> = 0（degree ≤ 2）。Halo2 將此推廣為任意多變數、任意 rotation 的多項式約束，本頁的 Horner gate 即為 degree-3 範例。</p>
+    <span class="cite">— 依 Gabizon, Williamson, Ciobotaru, <em>PLONK</em> (ePrint 2019/953) 通用 gate 形式改寫 <sup class="ref">[4]</sup></span>
+  </div>
+</section>
+
+<section class="slide" data-part="III" data-slide="26">
+  <div class="slide-meta"><span class="part-label">Why high degree</span><span class="slide-num">26 / 87</span></div>
+  <h2>為什麼 Halo2 能 degree 高？</h2>
+  <p>PLONK 最早只允許 degree-2。Halo2 靠更高次商多項式 + rotation + lookup，gate 實務 degree 可達 8–10。</p>
+  <ul>
+    <li><strong>好處</strong>：一條 constraint 幹以前 5–10 條 R1CS 的事</li>
+    <li><strong>代價</strong>：prover FFT 範圍放大到 ≥ 2·degree·n，但仍 quasi-linear</li>
+    <li><strong>Poseidon x⁵ S-box</strong> 就是高 degree 的直接受益者</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="III" data-slide="27">
+  <div class="slide-meta"><span class="part-label">Copy Constraints</span><span class="slide-num">27 / 87</span></div>
+  <h2>Copy constraint — permutation argument</h2>
+  <div class="bridge">
+    <div class="side g"><h4>R1CS</h4><p>同一變數在多條 constraint 用 — 天然「同一 z[i]」，不需要額外機制</p></div>
+    <div class="arrow">↔</div>
+    <div class="side h"><h4>Halo2</h4><p>不同 cell (row, col) 之間用 permutation argument 綁定 = 同值；<strong>零額外 gate 成本</strong></p></div>
+  </div>
+  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">Part V 的 Sigma-to-MDT 8 條約束、pipeline 中間值的銜接，本質都是 copy constraint。</p>
+</section>
+
+<section class="slide" data-part="III" data-slide="28">
+  <div class="slide-meta"><span class="part-label">Lookup</span><span class="slide-num">28 / 87</span></div>
+  <h2>Lookup argument — R1CS 沒有的東西</h2>
+  <p>「我這個 advice 值一定落在這張預定義表裡。」</p>
+  <ul>
+    <li><strong>用途</strong>：range check (0 ≤ x &lt; 2⁸)、S-box、非線性查表</li>
+    <li><strong>R1CS</strong> 要做 8-bit range check 得拆 8 個位元 = 8 條 constraint</li>
+    <li><strong>Halo2</strong> 一次 lookup 就好，表可由多 circuit 共用</li>
+    <li>本 PF1 的 <strong>ByteTable</strong>（256 entries）是整個電路 range check 的萬能工具</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="III" data-slide="29">
+  <div class="slide-meta"><span class="part-label">Universal SRS</span><span class="slide-num">29 / 87</span></div>
+  <h2>Universal SRS — 不是 per-circuit ceremony</h2>
+  <div class="bridge">
+    <div class="side g"><h4>Groth16</h4><p>每個 circuit 各做一次 ceremony，VK 不同；circuit 改了重做</p></div>
+    <div class="arrow">↔</div>
+    <div class="side h"><h4>Halo2 + KZG</h4><p>一次 univariate SRS 所有 circuit 共用；circuit 換了只換 VK，不需新 ceremony</p></div>
+  </div>
+  <div class="quote" style="margin-top:1rem">
+    <p>"The polynomial commitments in our schemes are of constant size (single elements). The overhead of opening a commitment is also constant; even opening multiple evaluations requires only a constant amount of communication overhead."</p>
+    <span class="cite">— Kate, Zaverucha, Goldberg, <em>Constant-Size Commitments to Polynomials and Their Applications</em>, ASIACRYPT 2010, §1 (Introduction) <sup class="ref">[6]</sup></span>
+  </div>
+  <p style="color:var(--amber);margin-top:.8rem;font-size:.9rem">⚠ 仍需 structured reference（toxic waste 問題存在）— 只是「一次搞定，多 circuit 共用」。對金融應用（每日 MDT root 變動）這是 critical feature。</p>
+</section>
+
+<section class="slide" data-part="III" data-slide="30">
+  <div class="slide-meta"><span class="part-label">Prove/Verify</span><span class="slide-num">30 / 87</span></div>
+  <h2>Prover / Verifier 流程（Plonk-style）</h2>
+  <ol style="padding-left:1.2rem;margin-top:.5rem">
+    <li style="list-style:decimal">Prover：填 advice → FFT 得多項式 → KZG <strong>commit</strong> 各 column polynomial</li>
+    <li style="list-style:decimal">Verifier：Fiat-Shamir 生 <strong>random challenge</strong> ζ</li>
+    <li style="list-style:decimal">Prover：在 ζ 點 <strong>evaluate</strong> 所有多項式 + 建 quotient poly commitment</li>
+    <li style="list-style:decimal">Prover：送 <strong>opening proof</strong>（KZG proof of evaluation）</li>
+    <li style="list-style:decimal">Verifier：一對 pairing 檢查 gate identity、permutation、lookup 全部成立</li>
+  </ol>
+  <p style="color:var(--text-dim);margin-top:1rem;font-size:.95rem">驗證者 work 是常數級（幾個 pairing）— 這是 KZG 的甜蜜點。Proof 大小 ~KB 級。</p>
+  <div class="quote" style="margin-top:.8rem;border-left-color:var(--text-dim)">
+    <p><strong>[Paraphrase — 非原文]</strong> Fiat-Shamir 啟發法把「verifier 擲隨機挑戰」替換為「用 hash(transcript) 當挑戰」，將任何 public-coin 互動式證明轉為非互動，只要在 random oracle model 下安全。</p>
+    <span class="cite">— 依 Fiat, Shamir, <em>How to Prove Yourself: Practical Solutions to Identification and Signature Problems</em>, CRYPTO '86 的啟發法精神改寫 <sup class="ref">[13]</sup></span>
+  </div>
+</section>
+
+<section class="slide" data-part="III" data-slide="31">
+  <div class="slide-meta"><span class="part-label">Rows & k</span><span class="slide-num">31 / 87</span></div>
+  <h2>Row / Column / k</h2>
+  <ul>
+    <li>k = 2 的幾次方的指數 — 總列數 = 2ᵏ</li>
+    <li>PF1 N=128 production：<strong>k=18 → 262,144 rows budget，實測使用 185,856 rows（71% utilization）</strong></li>
+    <li>PF1 N=8 test：<strong>k=13 → 8,192 budget，實測 7,392 rows</strong>（90%）</li>
+    <li>PF1 N=32 mid：<strong>k=16 → 65,536 budget，實測 38,016 rows</strong>（58%）</li>
+    <li>Scaling law：<code class="inline">total(N) = N × (528 + 132·⌈log₂N⌉)</code> — O(N log N)，三點零誤差擬合</li>
+    <li>欄數 94 advice / 16 fixed / 1 instance / 34 selectors / 83 lookup args（固定）</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">每增 k 1 — rows budget 翻倍，proving time 約翻倍。選 k 是「夠用就好」的最小冪次；production tight-k 選擇能顯著壓低 keygen + prove 時間。</p>
+</section>
+
+<section class="slide" data-part="III" data-slide="32">
+  <div class="slide-meta"><span class="part-label">MockProver</span><span class="slide-num">32 / 87</span></div>
+  <h2>MockProver vs release proving</h2>
+  <ul>
+    <li><strong>MockProver</strong>：不做密碼學，只檢查約束滿足 — 開發階段用、秒級</li>
+    <li><strong>Release (KZG)</strong>：實際 commitment + FFT + Fiat-Shamir — benchmark 用</li>
+    <li>兩者語義相同（約束通過 ⟺ proof 可產出）、但效能差幾個量級</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">本研究的 B1-B14 copy constraint 審計、negative tests 都先用 MockProver 快速迭代。</p>
+</section>
+
+<section class="slide" data-part="III" data-slide="33">
+  <div class="slide-meta"><span class="part-label">Implications</span><span class="slide-num">33 / 87</span></div>
+  <h2>這些特性如何影響 PF1 電路設計</h2>
+  <ul>
+    <li><strong>Custom gate 高 degree</strong> → Horner、A2 segment-selector、BS price 一條搞定</li>
+    <li><strong>Lookup</strong> → ByteTable 256 entries 服務所有 pp48 range check（fp_mul 6-byte rem、fp_div 8-byte gap、Horner 6-byte 截斷、wide_range 7-byte）</li>
+    <li><strong>Copy constraint</strong> → 8 條 Sigma-to-MDT + pipeline 中介值銜接，零 gate 成本</li>
+    <li><strong>Universal SRS</strong> → Market data 每日變 root 不用重做 ceremony</li>
+  </ul>
+</section>
+
+<section class="slide part-closer" data-part="III" data-slide="34">
+  <div class="slide-meta"><span class="part-label">PART III · Recap</span><span class="slide-num">34 / 87</span></div>
+  <h2>Part III takeaways</h2>
+  <ul>
+    <li>Plonkish ≠ R1CS：表格 + custom gate（可高 degree） + lookup</li>
+    <li>advice / fixed / instance / selector — 四類欄各司其職</li>
+    <li>Universal SRS 取代 per-circuit ceremony（金融每日更新 root 的 enabler）</li>
+    <li>Copy constraint + lookup = PF1 soundness 的兩大支柱</li>
+    <li>PF1 N=128: <strong>k=18 → 262K rows budget / 185,856 實測（71%）</strong></li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:1.2rem">下一 Part：電路裡的 hash — Poseidon。</p>
+</section>
+
+<!-- ========== PART IV: Poseidon ========== -->
+
+<section class="slide part-opener" data-part="IV" data-slide="35">
+  <div class="slide-meta"><span class="part-label">PART IV</span><span class="slide-num">35 / 87</span></div>
+  <h1>Part IV — Poseidon</h1>
+  <p class="lead">Part IV 結束後你會知道：</p>
+  <ul>
+    <li>為什麼電路裡不用 SHA / Keccak — 兩個數量級成本差</li>
+    <li>Poseidon sponge + S-box x⁵ 的形狀</li>
+    <li>8 full + 57 partial rounds = 65 rows/permutation 的代價拆解</li>
+    <li>PF1 的 Merkle 驗證（85% 的電路成本）為什麼被 Poseidon 定義</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="IV" data-slide="36">
+  <div class="slide-meta"><span class="part-label">Why not SHA</span><span class="slide-num">36 / 87</span></div>
+  <h2>為何不用 SHA / Keccak</h2>
+  <ul>
+    <li><strong>SHA-256 在 ZK 電路中</strong> ~25,000 約束 / hash（位元邏輯拆成布林）</li>
+    <li><strong>Poseidon ~64 約束 / row × 65 rows/permutation</strong> — 代數層運算，直接在有限域上</li>
+    <li>Zcash / Filecoin / Polygon 生產驗證、業界標準</li>
+    <li>兩者差約 <strong>兩個數量級</strong> — 這個選擇決定整個系統是否可行</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">PF1 的 Merkle 驗證（Part A + A'）佔總 rows 85%。如果用 SHA，整個電路直接爆表。</p>
+</section>
+
+<section class="slide" data-part="IV" data-slide="37">
+  <div class="slide-meta"><span class="part-label">Sponge</span><span class="slide-num">37 / 87</span></div>
+  <h2>Sponge 結構</h2>
+  <p>Poseidon 是固定長度的 permutation（t=3）。任意長度輸入透過 sponge 封裝：</p>
+  <ul>
+    <li><strong>State vector</strong>：t=3 個 field element，分為 rate=2 + capacity=1</li>
+    <li><strong>Absorb</strong>：把輸入 chunk 加到 rate 部分 → 跑一次 permutation</li>
+    <li><strong>Squeeze</strong>：從 rate 讀 output chunk → 跑一次 permutation</li>
+  </ul>
+  <div class="card" style="margin-top:.8rem"><p><strong>PF1 使用</strong>：Position leaf（5 欄位 → 3 次 permutation）、Market Data leaf（<strong>9 欄位 → 5 次 permutation</strong>，zero-padding on odd tail）。Merkle 每層 hash(left, right) = 1 次 permutation。</p></div>
+  <div class="quote" style="margin-top:.8rem">
+    <p>"In the absorbing phase, the r-bit input message blocks are XORed into the first r bits of the state, interleaved with applications of the function f. When all message blocks are processed, the sponge construction switches to the squeezing phase."</p>
+    <span class="cite">— Bertoni, Daemen, Peeters, Van Assche, <em>Cryptographic Sponge Functions</em> (CSF v0.1, 2011), §1.2 <sup class="ref">[8]</sup></span>
+  </div>
+  <figure class="fig" style="margin-top:1rem">
+    <svg viewBox="0 0 880 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Poseidon sponge diagram">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#4f46e5"/>
+        </marker>
+        <style>
+          .lbl{font:600 13px 'Inter','Noto Sans TC',sans-serif;fill:#1a1a1f}
+          .sm{font:12px 'Inter','Noto Sans TC',sans-serif;fill:#55596b}
+          .sml{font:11px 'Inter',monospace;fill:#55596b}
+          .tag{font:600 11px 'Inter',sans-serif;fill:#4f46e5}
+          .r{fill:#eef2ff;stroke:#4f46e5;stroke-width:1.5}
+          .c{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}
+          .f{fill:#fff;stroke:#1a1a1f;stroke-width:1.5}
+          .in{fill:#d1fae5;stroke:#059669;stroke-width:1.5}
+          .out{fill:#fee2e2;stroke:#dc2626;stroke-width:1.5}
+          .arr{stroke:#4f46e5;stroke-width:1.8;fill:none;marker-end:url(#arr)}
+        </style>
+      </defs>
+
+      <text x="40" y="22" class="lbl">Absorb</text>
+      <text x="560" y="22" class="lbl">Squeeze</text>
+
+      <!-- inputs -->
+      <rect x="20"  y="40" width="70" height="36" rx="6" class="in"/><text x="55"  y="63" text-anchor="middle" class="sm">m₁ (rate)</text>
+      <rect x="170" y="40" width="70" height="36" rx="6" class="in"/><text x="205" y="63" text-anchor="middle" class="sm">m₂ (rate)</text>
+
+      <!-- XOR + state blocks (rate) -->
+      <circle cx="140" cy="98" r="14" class="f"/><text x="140" y="103" text-anchor="middle" class="lbl">⊕</text>
+      <circle cx="290" cy="98" r="14" class="f"/><text x="290" y="103" text-anchor="middle" class="lbl">⊕</text>
+
+      <rect x="100" y="130" width="80" height="32" rx="6" class="r"/><text x="140" y="151" text-anchor="middle" class="sm">r-bit (2)</text>
+      <rect x="250" y="130" width="80" height="32" rx="6" class="r"/><text x="290" y="151" text-anchor="middle" class="sm">r-bit (2)</text>
+
+      <!-- capacity blocks -->
+      <rect x="100" y="170" width="80" height="28" rx="6" class="c"/><text x="140" y="189" text-anchor="middle" class="sml">c (cap=1)</text>
+      <rect x="250" y="170" width="80" height="28" rx="6" class="c"/><text x="290" y="189" text-anchor="middle" class="sml">c (cap=1)</text>
+
+      <!-- f permutations -->
+      <rect x="200" y="120" width="50" height="70" rx="6" class="f"/><text x="225" y="160" text-anchor="middle" class="lbl">f</text>
+      <text x="225" y="178" text-anchor="middle" class="tag">65 rows</text>
+      <rect x="350" y="120" width="50" height="70" rx="6" class="f"/><text x="375" y="160" text-anchor="middle" class="lbl">f</text>
+      <rect x="500" y="120" width="50" height="70" rx="6" class="f"/><text x="525" y="160" text-anchor="middle" class="lbl">f</text>
+
+      <!-- state blocks squeeze phase -->
+      <rect x="420" y="130" width="80" height="32" rx="6" class="r"/><text x="460" y="151" text-anchor="middle" class="sm">r-bit</text>
+      <rect x="420" y="170" width="80" height="28" rx="6" class="c"/><text x="460" y="189" text-anchor="middle" class="sml">c</text>
+
+      <rect x="570" y="130" width="80" height="32" rx="6" class="r"/><text x="610" y="151" text-anchor="middle" class="sm">r-bit</text>
+      <rect x="570" y="170" width="80" height="28" rx="6" class="c"/><text x="610" y="189" text-anchor="middle" class="sml">c</text>
+
+      <!-- outputs -->
+      <rect x="690" y="130" width="70" height="36" rx="6" class="out"/><text x="725" y="153" text-anchor="middle" class="sm">z₁</text>
+      <rect x="780" y="130" width="70" height="36" rx="6" class="out"/><text x="815" y="153" text-anchor="middle" class="sm">z₂</text>
+
+      <!-- arrows -->
+      <path class="arr" d="M55,76 L 140,92"/>
+      <path class="arr" d="M205,76 L 290,92"/>
+      <path class="arr" d="M140,112 L 140,128"/>
+      <path class="arr" d="M180,145 L 198,145"/>
+      <path class="arr" d="M180,184 L 198,184"/>
+      <path class="arr" d="M250,145 L 270,98 L 276,96"/>
+      <path class="arr" d="M250,184 L 270,184"/>
+      <path class="arr" d="M290,112 L 290,128"/>
+      <path class="arr" d="M330,145 L 348,145"/>
+      <path class="arr" d="M330,184 L 348,184"/>
+      <path class="arr" d="M400,145 L 418,145"/>
+      <path class="arr" d="M400,184 L 418,184"/>
+      <path class="arr" d="M500,145 L 498,145"/>
+      <path class="arr" d="M550,145 L 568,145"/>
+      <path class="arr" d="M550,184 L 568,184"/>
+      <path class="arr" d="M460,130 L 460,115 L 725,115 L 725,128"/>
+      <path class="arr" d="M610,130 L 610,100 L 815,100 L 815,128"/>
+    </svg>
+    <figcaption>圖：Sponge 結構 — 藍（rate r=2）吸收 m₁, m₂ 後 squeeze 輸出 z₁, z₂；每個 f = Poseidon permutation (t=3)，在 PF1 中佔 65 rows / 357 constraints</figcaption>
+  </figure>
+</section>
+
+<section class="slide" data-part="IV" data-slide="38">
+  <div class="slide-meta"><span class="part-label">S-box</span><span class="slide-num">38 / 87</span></div>
+  <h2>S-box：x ↦ x⁵</h2>
+  <p>Halo2 允許高 degree gate → S-box 直接用 x⁵（而非 x⁻¹ 反逆或 bit-split）。</p>
+  <ul>
+    <li>degree 5 足以抵抗差分 / 線性分析（Poseidon 論文證明）</li>
+    <li>一條 custom gate 直接寫：<code class="inline">sq = a·a; p = sq·sq·a</code>（兩條約束）</li>
+    <li>相容 BLS12-381 base field（gcd(5, p−1) = 1 → x⁵ 是 permutation）</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="IV" data-slide="39">
+  <div class="slide-meta"><span class="part-label">Rounds</span><span class="slide-num">39 / 87</span></div>
+  <h2>Full vs Partial rounds</h2>
+  <ul>
+    <li><strong>Full rounds</strong>：所有 t=3 state element 都過 S-box + MDS — 安全邊界</li>
+    <li><strong>Partial rounds</strong>：只有第一個 element 過 S-box，其餘線性 — 省約束</li>
+    <li><strong>PF1 實作 (BLS12-381, t=3)</strong>：<strong>8 full + 57 partial = 65 rows / permutation</strong></li>
+  </ul>
+  <table class="tbl" style="margin-top:.8rem">
+    <thead><tr><th>Round type</th><th>Constraints / row</th><th>Rows</th><th>總 constraints</th></tr></thead>
+    <tbody>
+      <tr><td>Full</td><td>9 (3 × sq + 3 × p + 3 × MDS)</td><td>8</td><td>72</td></tr>
+      <tr><td>Partial</td><td>5</td><td>57</td><td>285</td></tr>
+      <tr><td><strong>Total</strong></td><td>—</td><td><strong>65</strong></td><td><strong>357</strong></td></tr>
+    </tbody>
+  </table>
+  <div class="quote" style="margin-top:.8rem">
+    <p>"In HADES we consider different round functions within the same construction. More precisely, we mix rounds with full S-box layers and rounds with partial S-box layers. … The HADES design strategy consists of R<sub>f</sub> rounds in the beginning, in which S-boxes are applied to the full state, followed by R<sub>P</sub> rounds in the middle, in which S-boxes are applied only to one element of the state, and finally R<sub>f</sub> rounds at the end with full S-box layers."</p>
+    <span class="cite">— Grassi, Khovratovich, Rechberger, Roy, Schofnegger, <em>Poseidon: A New Hash Function for Zero-Knowledge Proof Systems</em>, USENIX Security 2021, §2.2 HADES Strategy <sup class="ref">[7]</sup></span>
+  </div>
+</section>
+
+<section class="slide part-closer" data-part="IV" data-slide="40">
+  <div class="slide-meta"><span class="part-label">PART IV · Recap</span><span class="slide-num">40 / 87</span></div>
+  <h2>Part IV takeaways</h2>
+  <ul>
+    <li>Poseidon = 電路友善 hash，比 SHA-256 省 ~100×</li>
+    <li>x⁵ S-box + sponge (t=3, rate=2, capacity=1) + 8 full + 57 partial rounds</li>
+    <li>每次 permutation = 65 rows / 357 constraints</li>
+    <li>PF1 的 Merkle 驗證 85% 成本由 Poseidon 定義 — 這個選擇讓整個系統可行</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:1.2rem">下一 Part：最重磅 — PF1 實作內部，ln/erf/exp 如何在電路裡跑起來。</p>
+</section>
+
+<!-- ========== PART V: PF1 實作 ========== -->
+
+<section class="slide part-opener" data-part="V" data-slide="41">
+  <div class="slide-meta"><span class="part-label">PART V</span><span class="slide-num">41 / 87</span></div>
+  <h1>Part V — PF1 實作</h1>
+  <p class="lead">Part V 結束後你會知道：</p>
+  <ul>
+    <li>PF1 電路的 5 部分架構（A / A' / A'' / B / C）與 rows 占比</li>
+    <li>BS Delta 如何分解成 17 步 ln / erf / exp 管線</li>
+    <li>pp=48 定點、Remez minimax、Per-step Horner kernel 的設計</li>
+    <li>A2 segment-selector gate 封閉 saturation 的 soundness 故事</li>
+    <li>31 custom gates / 6 modules / 66 polynomial constraints 的完整審計</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">本 Part 所有數字都對應 Running Example：S=100, K=100, σ=20%, T=30d, r=5%, q=0 → Δ≈0.523。</p>
+</section>
+
+<section class="slide" data-part="V" data-slide="42">
+  <div class="slide-meta"><span class="part-label">Architecture</span><span class="slide-num">42 / 87</span></div>
+  <h2>PF1 架構 — Merkle column 獨占 rows，Δ 免費疊入</h2>
+  <p>實測發現：<strong>halo2 SimpleFloorPlanner 做 column packing</strong> — Merkle Poseidon 3 columns 是 row bottleneck，Delta/A''/bs_price 用不同 columns 平行塞同 row 範圍，<strong>rows-wise 貢獻 0</strong>。</p>
+  <table class="tbl">
+    <thead><tr><th>Part</th><th>職責</th><th>rows / 持倉</th><th>對 total rows 貢獻</th></tr></thead>
+    <tbody>
+      <tr><td><strong>A</strong></td><td>Position Merkle（5 欄位 leaf，3 perm + depth×1 perm）</td><td>intrinsic 396<sup>*</sup></td><td rowspan="2" style="vertical-align:middle"><strong>獨占</strong><br/>(Merkle column)</td></tr>
+      <tr><td><strong>A'</strong></td><td>Market Data Merkle（9 欄位 leaf，5 perm + depth×1 perm）</td><td>intrinsic 528<sup>*</sup></td></tr>
+      <tr><td><strong>A''</strong></td><td>σ 正向驗證（BS price 加法形式）</td><td>intrinsic ~32</td><td rowspan="3" style="vertical-align:middle"><strong>0</strong><br/>(平行塞入)</td></tr>
+      <tr><td><strong>B</strong></td><td>Delta 計算管線（本論文核心，17 步）</td><td>intrinsic 61</td></tr>
+      <tr><td><strong>C</strong></td><td>帶符號累加 + 雙向合規 range check</td><td>intrinsic ~5</td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.9rem"><sup>*</sup> depth=3（N=8）；depth=7（N=128）。scaling law：<strong><code class="inline">total(N) = N × (528 + 132·⌈log₂N⌉)</code></strong>，三點（N=8/32/128）零誤差擬合。</p>
+  <p style="color:var(--text-dim);margin-top:.3rem;font-size:.9rem"><strong>實測（CircuitCost API）</strong>：N=8 → 7,392 rows（k=13）；N=128 → 185,856 rows（k=18）。<strong>caveat</strong>：column-packing 依賴當前 layout（94 advice cols）；rows-only 免費 ≠ prove time 免費（94 cols × rows 仍 scale prove time）。</p>
+  <figure class="fig" style="margin-top:1rem">
+    <svg viewBox="0 0 960 110" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PF1 column packing">
+      <!-- Merkle column row range -->
+      <rect x="0" y="25" width="960" height="40" fill="#6366f1"/>
+      <text x="480" y="43" text-anchor="middle" style="font:600 13px 'Inter','Noto Sans TC',sans-serif" fill="#ffffff">Merkle column（獨占 rows）= A + A' + A''(leaf hash)</text>
+      <text x="480" y="58" text-anchor="middle" style="font:10px 'Inter',monospace" fill="#ffffff" fill-opacity="0.9">N × (528 + 132·⌈log₂N⌉) rows</text>
+      <!-- Parallel columns for Delta/bs_price inside -->
+      <rect x="120" y="32" width="120" height="26" fill="#10b981" opacity="0.85"/>
+      <text x="180" y="48" text-anchor="middle" style="font:600 10px 'Inter',monospace" fill="#ffffff">B: Δ 61 rows</text>
+      <rect x="260" y="32" width="90" height="26" fill="#a5b4fc" opacity="0.85"/>
+      <text x="305" y="48" text-anchor="middle" style="font:600 10px 'Inter',monospace" fill="#1a1a1f">A'' ~32</text>
+      <rect x="370" y="32" width="60" height="26" fill="#64748b" opacity="0.85"/>
+      <text x="400" y="48" text-anchor="middle" style="font:600 10px 'Inter',monospace" fill="#ffffff">C ~5</text>
+      <text x="580" y="48" text-anchor="start" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#ffffff">↑ 全部塞進同 row 範圍（不同 columns）</text>
+
+      <text x="0"   y="18" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">94 advice columns 平行利用 — rows-wise Δ / bs_price / 累加 對 total 貢獻 0</text>
+      <text x="0"   y="85" style="font:10px 'Inter','Noto Sans TC',sans-serif" fill="#55596b">N=8 → 7,392 rows (k=13)</text>
+      <text x="380" y="85" text-anchor="middle" style="font:10px 'Inter','Noto Sans TC',sans-serif" fill="#55596b">N=32 → 38,016 rows (k=16)</text>
+      <text x="960" y="85" text-anchor="end" style="font:10px 'Inter','Noto Sans TC',sans-serif" fill="#55596b">N=128 → 185,856 rows (k=18)</text>
+    </svg>
+    <figcaption>圖：column-packing 下 Merkle 獨占 rows；Δ / bs_price / 累加 平行塞入同 row 範圍（不同 advice columns），對 total rows 貢獻 0。本研究的價值：讓 Δ 不只<strong>可行</strong>，而是 <strong>rows-wise 免費</strong>（caveat：prove time 仍 scale 94 columns × rows）。</figcaption>
+  </figure>
+</section>
+
+<section class="slide" data-part="V" data-slide="43">
+  <div class="slide-meta"><span class="part-label">BS Delta</span><span class="slide-num">43 / 87</span></div>
+  <h2>BS Delta → 三個超越函數</h2>
+  <pre>d1 = [ln(S/K) + (r - q + σ²/2) · T] / (σ · √T)
+Δ_call = e^(-qT) · N(d1)
+N(x)   = 0.5 + 0.5 · erf(x / √2)</pre>
+  <ul style="margin-top:.5rem">
+    <li><strong>ln(S/K)</strong> — piecewise Remez 4 segments × width 0.25</li>
+    <li><strong>erf(d1/√2)</strong> → N(d1) — piecewise Remez 12 segments × width 0.5 + saturation</li>
+    <li><strong>exp(−qT)</strong> — range reduction + Remez d=12 Horner on [0, ln2)（與 ln/erf 共用 kernel）</li>
+    <li>σ√T、σ²/2 — fp_mul + sqrt_verify (Newton)</li>
+  </ul>
+  <p style="color:var(--amber);margin-top:.5rem;font-size:.9rem">⚠ Δ_put 由 put-call parity：Δ_put = Δ_call − e^(-qT)，只需一個減法閘。</p>
+  <div class="quote" style="margin-top:.8rem">
+    <p>"The partial derivative w₁ of the valuation formula is of interest, because it determines the ratio of shares of stock to options in the hedged position. … In equation (13), N(d) is the cumulative normal density function."</p>
+    <span class="cite">— Black, Scholes, <em>The Pricing of Options and Corporate Liabilities</em>, J. Political Economy 81(3):637–654 (1973), eq. (13) 及相關段落 <sup class="ref">[12]</sup></span>
+  </div>
+</section>
+
+<section class="slide" data-part="V" data-slide="44">
+  <div class="slide-meta"><span class="part-label">Fixed-point</span><span class="slide-num">44 / 87</span></div>
+  <h2>Fixed-point pp=48</h2>
+  <p>所有中間值 = integer × 2⁻⁴⁸。S = 2⁴⁸ ≈ 281 兆（14.4 位十進位精度）。</p>
+  <ul>
+    <li><strong>加法</strong> ↔ 整數加法（field element）</li>
+    <li><strong>乘法</strong> → a·b = w·S + rem，rem 右移 48 位（6-byte decomposition + ByteTable lookup）</li>
+    <li><strong>除法</strong> → w·b + rem = a·S，rem 做 8-byte 分解（除數可能 &gt; 2⁴⁸）</li>
+    <li><strong>sqrt</strong> → Newton 迭代，電路內 sqrt_verify: d·(d−1) = 0 where d = a − b（1 ULP）</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">端到端絕對誤差 ~2×10⁻¹⁴ — 遠超任何金融應用的精度需求。</p>
+</section>
+
+<section class="slide" data-part="V" data-slide="45">
+  <div class="slide-meta"><span class="part-label">Pipeline</span><span class="slide-num">45 / 87</span></div>
+  <h2>Delta 17 步管線</h2>
+  <table class="tbl">
+    <thead><tr><th>#</th><th>操作</th><th>技術</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>S/K（定點除）</td><td>witness + fp_div</td></tr>
+      <tr><td>2</td><td>Range reduction → [1, 2)</td><td>lead_bit + ByteTable</td></tr>
+      <tr><td>3-4</td><td>ln(r) piecewise Remez (4 seg)</td><td>Per-step Horner</td></tr>
+      <tr><td>5</td><td>ln(S/K) = ln(r) + e·ln(2)</td><td>ln_recon</td></tr>
+      <tr><td>6-7</td><td>d₁ 分子 / 分母</td><td>fp_mul + arith_add</td></tr>
+      <tr><td>8</td><td>d₁ = 分子 / 分母</td><td>fp_div</td></tr>
+      <tr><td>9</td><td>|d₁/√2| range reduction</td><td>sign_extend + ByteTable</td></tr>
+      <tr><td>10-11</td><td>erf(x) piecewise Remez (12 seg)</td><td>Per-step Horner</td></tr>
+      <tr><td>12</td><td>N(d₁) = 0.5 + 0.5 · erf</td><td>arith_add + erf_flip</td></tr>
+      <tr><td>13</td><td>qT = q × T</td><td>fp_mul</td></tr>
+      <tr><td>14</td><td>exp(−qT) range reduction</td><td>int_div (qT ÷ ln2) → (k, r)</td></tr>
+      <tr><td>15-16</td><td>Horner exp(r)−1 on [0, ln2) d=12<br/>→ 2^k × (w + S) = exp(qT)</td><td>Per-step Horner + q_exp_recon</td></tr>
+      <tr><td>17</td><td>Δ = e^(−qT) × N(d₁)</td><td>fp_mul</td></tr>
+    </tbody>
+  </table>
+  <figure class="fig" style="margin-top:1rem">
+    <div class="mermaid">
+flowchart LR
+  S([S]):::in --> div1["① S/K<br/>fp_div"]
+  K([K]):::in --> div1
+  div1 --> rr1["② lead_bit<br/>→ r∈[1,2)"]
+  rr1 --> ln1["③-④ ln(r)<br/>Remez×4"]
+  ln1 --> ln2["⑤ ln(S/K)<br/>= ln(r)+e·ln2"]
+  sig([σ]):::in --> num["⑥-⑦ d₁ 分子/分母"]
+  r([r]):::in --> num
+  q([q]):::in --> num
+  T([T]):::in --> num
+  ln2 --> num
+  num --> d1["⑧ d₁ = 分子/分母"]
+  d1 --> rr2["⑨ |d₁/√2|<br/>sign_extend"]
+  rr2 --> erf["⑩-⑪ erf<br/>Remez×12"]
+  erf --> n["⑫ N(d₁)<br/>=0.5+0.5·erf"]
+  q --> qT["⑬ qT"]
+  T --> qT
+  qT --> exprr["⑭ qT÷ln2"]
+  exprr --> expc["⑮-⑯ Horner exp(r)−1<br/>d=12 on [0,ln2)"]
+  n --> out["⑰ Δ = e^{−qT}·N(d₁)"]
+  expc --> out
+  out --> final([Δ]):::out
+  classDef in fill:#eef2ff,stroke:#4f46e5,color:#1a1a1f;
+  classDef out fill:#d1fae5,stroke:#059669,color:#064e3b;
+    </div>
+    <figcaption>圖：Delta pipeline 17 步 DAG — 綠色節點為輸出 Δ，藍色節點為 public/witness 輸入</figcaption>
+  </figure>
+</section>
+
+<section class="slide" data-part="V" data-slide="46">
+  <div class="slide-meta"><span class="part-label">Horner</span><span class="slide-num">46 / 87</span></div>
+  <h2>Per-step Horner kernel</h2>
+  <p>P(x) = c_n xⁿ + ... + c_0，巢狀寫法：P(x) = c_0 + x(c_1 + x(c_2 + ...))</p>
+  <pre>// 每一步約束：acc_next · S + rem = acc · x + coeff
+// S=2^48 為截斷（右移 48 位），rem 由 ByteTable 驗證 ∈ [0, S)
+meta.create_gate("horner_per_step", |meta| {
+  let q    = meta.query_selector(q_horner);
+  let acc  = meta.query_advice(acc_col, cur);
+  let next = meta.query_advice(acc_col, next);
+  let c    = meta.query_fixed(coeff_col, cur);
+  let x    = meta.query_advice(x_col, cur);
+  let rem  = meta.query_advice(rem_col, cur);
+  vec![q * (next * S + rem - acc * x - c)]
+});</pre>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">d=12 多項式 → 12 rows；kernel 精度 ~1.2 ULP / segment。</p>
+</section>
+
+<section class="slide" data-part="V" data-slide="47">
+  <div class="slide-meta"><span class="part-label">Why polynomial</span><span class="slide-num">47 / 87</span></div>
+  <h2>為何用多項式逼近？</h2>
+  <ul>
+    <li>ln / erf / exp 在有限域上沒有 closed form — 電路只有 + 和 ×</li>
+    <li><strong>Taylor</strong>：展開點附近好，離開急速發散 — 需要極多項</li>
+    <li><strong>Minimax (Remez)</strong>：等紋波誤差、最壞誤差最小 — 由 Chebyshev 等振盪定理保證最優</li>
+    <li>pp=48 d=14 相同次數下：<strong>erf Minimax 比 Taylor 準 2.6×10⁸ 倍、ln 準 6.8×10¹⁰ 倍</strong></li>
+  </ul>
+</section>
+
+<section class="slide" data-part="V" data-slide="48">
+  <div class="slide-meta"><span class="part-label">Remez</span><span class="slide-num">48 / 87</span></div>
+  <h2>Remez minimax — 精度實測</h2>
+  <table class="tbl">
+    <thead><tr><th>層級</th><th>精度</th><th>來源</th></tr></thead>
+    <tbody>
+      <tr><td>Kernel per-segment</td><td>~1.2 ULP</td><td>d=12 Minimax（degree sweep 最優）</td></tr>
+      <tr><td>端到端 實測（ATM）</td><td><strong>~7 ULP</strong></td><td>ATM 向量 S=K=100,σ=0.20 P1 實測 Δ_call / N(d₁)；上游 d₁ 15 ULP</td></tr>
+      <tr><td>端到端 理論上界</td><td>57.6 ULP</td><td>區間算術累積</td></tr>
+      <tr><td>絕對誤差</td><td>~2×10⁻¹⁴</td><td>pp=48 scale 下</td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">N=20 持倉典型情境累積偏差 ≤ 4×10⁻¹² — 比任何合理門檻 τ ≥ 0.01 小 10 個數量級。</p>
+  <figure class="fig" style="margin-top:.8rem">
+    <svg viewBox="0 0 820 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ULP comparison">
+      <defs>
+        <style>
+          .ax{stroke:#c7c9d3;stroke-width:1}
+          .tk{font:10px 'Inter',monospace;fill:#55596b}
+          .lbl{font:600 12px 'Inter','Noto Sans TC',sans-serif;fill:#1a1a1f}
+          .val{font:700 12px 'Inter',monospace;fill:#1a1a1f}
+          .ttl{font:600 12px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5}
+        </style>
+      </defs>
+      <text x="200" y="18" class="ttl">Delta pipeline ULP 誤差（對數比較）</text>
+      <!-- axis -->
+      <line class="ax" x1="200" y1="155" x2="680" y2="155"/>
+      <!-- log scale: 1 → x=200, 100 → x=680; pixel per log10 = 240 -->
+      <!-- ticks at 1, 10, 100 -->
+      <line class="ax" x1="200" y1="155" x2="200" y2="160"/><text x="200" y="172" text-anchor="middle" class="tk">1</text>
+      <line class="ax" x1="440" y1="155" x2="440" y2="160"/><text x="440" y="172" text-anchor="middle" class="tk">10</text>
+      <line class="ax" x1="680" y1="155" x2="680" y2="160"/><text x="680" y="172" text-anchor="middle" class="tk">100</text>
+      <text x="440" y="150" text-anchor="middle" class="tk" style="font-size:9px">ULP</text>
+
+      <!-- bars: log(x) pixels, log10(1.2)≈0.079 -->
+      <!-- Kernel 1.2 ULP -->
+      <text x="195" y="50" text-anchor="end" class="lbl">Kernel per-segment</text>
+      <rect x="200" y="38" width="19"  height="20" fill="#10b981"/>
+      <text x="225" y="53" class="val">1.2</text>
+
+      <!-- Measured 7 ULP, log10(7)≈0.845 -->
+      <text x="195" y="82" text-anchor="end" class="lbl">端到端 實測（ATM）</text>
+      <rect x="200" y="70" width="203" height="20" fill="#4f46e5"/>
+      <text x="409" y="85" class="val">7</text>
+
+      <!-- Worst-case 57.6 ULP, log10(57.6)≈1.760 -->
+      <text x="195" y="114" text-anchor="end" class="lbl">端到端 理論上界</text>
+      <rect x="200" y="102" width="422" height="20" fill="#f59e0b"/>
+      <text x="628" y="117" class="val">57.6</text>
+
+      <!-- τ line at 100 -->
+      <line x1="680" y1="30" x2="680" y2="150" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3 2"/>
+      <text x="683" y="40" class="tk" fill="#dc2626">金融門檻</text>
+      <text x="683" y="52" class="tk" fill="#dc2626">τ ≥ 0.01</text>
+      <text x="683" y="64" class="tk" fill="#dc2626">≈ 10¹² ULP</text>
+    </svg>
+    <figcaption>圖：pp=48 定點下 Δ 計算的 ULP 誤差（對數軸）— ATM 向量實測 7 ULP（上游中介 d₁ 15 ULP），遠低於理論上界 57.6，而任何合理合規門檻 τ ≥ 0.01 換算後高達 ~10¹² ULP，仍有 10 個數量級的安全餘裕。</figcaption>
+  </figure>
+  <div class="quote" style="margin-top:.8rem;border-left-color:var(--text-dim)">
+    <p><strong>[Paraphrase — 非原文]</strong> Remez 1934 交替演算法求一連續函數在閉區間上的最佳一致逼近多項式；由 Chebyshev 等振盪定理保證「誤差曲線在至少 d+2 個點上以相等絕對值交替取極值」即為最佳解，因此 minimax 多項式的最壞誤差理論上無法再小。</p>
+    <span class="cite">— 依 Remez, <em>Sur la détermination des polynômes d'approximation de degré donnée</em> (1934) 及 Chebyshev equi-oscillation theorem 改寫 <sup class="ref">[14]</sup></span>
+  </div>
+</section>
+
+<section class="slide" data-part="V" data-slide="49">
+  <div class="slide-meta"><span class="part-label">Piecewise</span><span class="slide-num">49 / 87</span></div>
+  <h2>Piecewise — ln 4 段、erf 12 段</h2>
+  <p>單一多項式在寬區間會遇到「量化飽和」— 高次係數的定點量化誤差被放大。切窄段後每段 d=12 足夠。</p>
+  <ul>
+    <li><strong>ln</strong>：[1, 2) 等分 4 段 × width 0.25 + leading-bit decomposition</li>
+    <li><strong>erf</strong>：[0, 4] × 等分 12 段 × width 0.5 + saturation tail（|x| &gt; 4 夾到 S）</li>
+    <li>d=12 是經過 degree sweep 找到的最優點（逼近誤差 + 截斷累積的 U 曲線最低點）</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="V" data-slide="50">
+  <div class="slide-meta"><span class="part-label">Lead-bit</span><span class="slide-num">50 / 87</span></div>
+  <h2>ln 的 leading-bit decomposition</h2>
+  <p>把 x &gt; 0 寫成 x = 2ᵉ · m, m ∈ [1, 2)；ln(x) = e·ln(2) + ln(m)。</p>
+  <pre>// lead_bit gate (3 constraints):
+//   v = (S + r) · 2^e + low       // v = (S+r)·2^e + low
+//   low 做 3-byte decomposition   // 確保 low &lt; 2^e
+//   gap 做 3-byte decomposition   // 確保 r+S 在 [S, 2S)</pre>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">exp 用類似結構的 int_div gate：qT ÷ ln(2) → (k, r)，r ∈ [0, ln2)；Horner 算 w = exp(r) − 1（單段 Remez d=12，max 2.81 ULP），重建 exp(qT) = 2ᵏ × (w + S)，S = 2⁴⁸。與 ln/erf 共用 kernel。</p>
+</section>
+
+<section class="slide" data-part="V" data-slide="51">
+  <div class="slide-meta"><span class="part-label">Saturation</span><span class="slide-num">51 / 87</span></div>
+  <h2>Saturation 處理</h2>
+  <p>erf(x) → 1 當 |x| 很大；x &gt; 4 直接夾到 S。電路要能「雙向」保證：</p>
+  <ul>
+    <li><code class="inline">sat=1</code> ⇒ abs_in ≥ (N−1)·SEG_WIDTH（否則惡意 prover 可提前飽和）</li>
+    <li><code class="inline">sat=0</code> ⇒ seg_idx &lt; N−1（否則可能繞過 saturation 直接套錯段）</li>
+  </ul>
+  <div class="card amber" style="margin-top:.8rem"><p><strong>惡意 prover 故事：</strong> 想讓 d₁ 很負時偽造 erf → −1（過飽和），或想繞過 segment 選擇套錯係數 — 這些都被 A2 gate 封閉。</p></div>
+</section>
+
+<section class="slide" data-part="V" data-slide="52">
+  <div class="slide-meta"><span class="part-label">A2 Gate</span><span class="slide-num">52 / 87</span></div>
+  <h2>Segment-selector gate (A2)</h2>
+  <p>A2 gate 把 (seg_idx, coeff_slot, abs_in, sat_flag) 四件事綁在一起：</p>
+  <ul>
+    <li><strong>seg_idx ↔ coeff</strong>：fixed column 係數 slot 由 seg_idx 選，錯配會使 horner_per_step 約束失敗</li>
+    <li><strong>sat flag 雙向綁定</strong>：sat_excess = abs_in − (N−1)·W，sat=1 ⇒ sat_excess ≥ 0；sat=0 ⇒ seg_idx &lt; N−1</li>
+    <li>透過 byte decomposition 強制 sat_excess 與 seg_idx 的 non-negativity — 任何方向的偽造都失敗</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">這是 PF1 的 soundness 封閉的關鍵 — 把「選段」這個看似無害的控制流鎖死在一條 gate 裡。</p>
+</section>
+
+<section class="slide" data-part="V" data-slide="53">
+  <div class="slide-meta"><span class="part-label">Unified exp kernel</span><span class="slide-num">53 / 87</span></div>
+  <h2>exp 統一 Horner kernel（Method B 已退役）</h2>
+  <p>exp(−qT) 不再走 byte chunk lookup，改以 <strong>range reduction + 單段 Remez d=12 Horner</strong>，與 ln/erf 共用同一個 <code class="inline">kernel::PSCoeffSet</code> + <code class="inline">assign_horner</code>：</p>
+  <pre>// 步驟：
+// ① int_div:  qT ÷ ln(2) → (k, r)     where r ∈ [0, ln2)
+// ② Horner:   w = exp(r) − 1          (Remez d=12, 單段, max 2.81 ULP)
+// ③ q_exp_recon:  exp(qT) = 2^k × (w + S),  S = 2^48
+// ④ discount: exp(−qT) = S² / exp(qT)  (fp_div)</pre>
+  <ul style="margin-top:.4rem">
+    <li><strong>單段 Remez</strong>（非 piecewise）—— r ∈ [0, ln2) 窄區間，1 段已夠；<code class="inline">EXP_PP48_HORNER</code> in <code class="inline">coefficients/exp_pp48.rs</code></li>
+    <li><strong>Horner 算 </strong><code class="inline">exp(r) − 1</code>（非直接 exp(r)）：fp48 表示下 w 已 ≪ S，加 S 還原為 fp48；避免域極值處的截斷誤差放大</li>
+    <li><strong>全電路 ln/erf/exp 共用 kernel</strong> — 31 gates 中沒有 exp 專屬 gate；Method B 原 <code class="inline">src/method_b.rs</code> 已 dead code（commit <code class="inline">53b3cdd</code>, 2026-04-19）</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.88rem">好處：（1）soundness 跟 ln/erf 同一套形式化論證即可覆蓋；（2）無函數專用查表，複雜度降；（3）`53b3cdd` 同時修了 3 處 copy constraint gap（B14→B15、B15→exp_recon、B15→B16）。</p>
+</section>
+
+<section class="slide" data-part="V" data-slide="54">
+  <div class="slide-meta"><span class="part-label">Sigma → MDT</span><span class="slide-num">54 / 87</span></div>
+  <h2>σ 從 MDT 直接提供 + bs_price 雙重容差驗證</h2>
+  <p>σ 作為 Market Data leaf 第 9 欄（index 8），經 Merkle + copy constraint 綁進 <code class="inline">delta.sigma_cell</code>，不再是 prover free witness。<code class="inline">bs_price</code> gate 仍跑完整 BS 公式（exp(-rT)、N(d2)、Horner）做 settle 價格 cross-check：</p>
+  <pre>// 加法形式（避免有限域 wrap）:
+// bs + is_put·s_disc_q + term2 = term1 + is_put·k_disc_r
+// σV18: |bs − settle| ≤ ABS_TOL           (0.02 × 2^48)
+// σV19: |bs − settle| ≤ REL_TOL·settle/S  (0.5% × 2^48)
+// AND 兩閘：min(ABS, REL) 才通過 — 保守語意</pre>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">另有 8 條 cross-tree copy constraint（Part II slide 18），把 (underlying_id, K, expiry, type) + (S, r, q) + K 鎖進 state_root 和 market_data_root — 零 gate 成本。σ 由 MDT copy 進電路是額外的內部 copy constraint，不算入跨樹 8 條。</p>
+  <div class="card amber" style="margin-top:.6rem"><p><strong>惡意 prover 故事：</strong> 改 σ → MDT root 對不上（Merkle 先拒）；若同時改 MDT 與 settle 配合假 σ，bs_price forward-compute 與 settle 的 |bs−settle| gap 仍會被 σV18/σV19 偵測。</p></div>
+</section>
+
+<section class="slide" data-part="V" data-slide="55">
+  <div class="slide-meta"><span class="part-label">31 Gates / 66 Constraints</span><span class="slide-num">55 / 87</span></div>
+  <h2>31 custom gates / 6 modules / 66 constraints</h2>
+  <table class="tbl">
+    <thead><tr><th>模組</th><th># gates</th><th>職責</th></tr></thead>
+    <tbody>
+      <tr><td>poseidon.rs</td><td>2</td><td>full/partial rounds</td></tr>
+      <tr><td>proof1/merkle.rs</td><td>2</td><td>sponge_absorb, merkle_swap</td></tr>
+      <tr><td>kernel.rs</td><td>3</td><td>horner_per_step, r/w_byte_decomp</td></tr>
+      <tr><td>gadgets/</td><td>3</td><td>lead_bit, int_div, sign_extend</td></tr>
+      <tr><td>proof1/delta.rs</td><td><strong>13</strong></td><td>fp_mul/div, arith, exp/ln/erf recon, mux, signed, phi</td></tr>
+      <tr><td>proof1/portfolio.rs</td><td>8</td><td>type_decomp, time_verify, d2_sub, bs_price, route_accum, range</td></tr>
+      <tr><td><strong>Total</strong></td><td><strong>31</strong></td><td>66 polynomial constraints</td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.92rem">Gate = 1 row 的多項式約束；Gadget = 多 row 的邏輯操作（Poseidon 65 rows, Horner d=12 per function 12 rows，ln/erf/exp 共用）。</p>
+</section>
+
+<section class="slide" data-part="V" data-slide="56">
+  <div class="slide-meta"><span class="part-label">Negative Tests</span><span class="slide-num">56 / 87</span></div>
+  <h2>Negative tests — 讓惡意 prover 講故事</h2>
+  <ul>
+    <li><strong>翻 seg_idx</strong> → 係數 slot 錯配，horner 約束失敗</li>
+    <li><strong>偽造 sat=1 而 abs_in 很小</strong> → sat_excess non-negativity 失敗</li>
+    <li><strong>抽換 Horner 中間 acc</strong> → 下一 row 的 acc_next·S+rem ≠ acc·x+coeff</li>
+    <li><strong>偽造 S, σ 等 market 參數</strong> → cross-tree copy constraint 斷裂，root 重建失敗</li>
+    <li><strong>重複計入同一持倉</strong> → PF1 不防（by design），PF2 的 State Tree 完整性保證</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">10 個攻擊向量全覆蓋（Section 12.4.5）— Part V 結束會再列一次。</p>
+</section>
+
+<section class="slide" data-part="V" data-slide="57">
+  <div class="slide-meta"><span class="part-label">Mock vs Release</span><span class="slide-num">57 / 87</span></div>
+  <h2>MockProver vs release — 我們兩個都跑</h2>
+  <ul>
+    <li><strong>MockProver</strong>：開發期間 positive + negative tests 全覆蓋、秒級迭代</li>
+    <li><strong>Release (KZG BLS12-381)</strong>：benchmark & proof-size 量測</li>
+    <li>Rust ↔ Python 雙實作跑同一 witness：每個中間值 bit-for-bit 相等</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">Bit-for-bit 雙實作是 PF1 soundness 落地的工程背書 — 任何計算誤差都會在跨語言差異處被發現。</p>
+</section>
+
+<section class="slide" data-part="V" data-slide="58">
+  <div class="slide-meta"><span class="part-label">Circuit Size</span><span class="slide-num">58 / 87</span></div>
+  <h2>電路規模 — k=18 (N=128)，O(N log N) scaling</h2>
+  <table class="tbl">
+    <thead><tr><th>指標</th><th>N=8 test</th><th>N=32 mid</th><th>N=128 production</th></tr></thead>
+    <tbody>
+      <tr><td>Merkle depth</td><td>3</td><td>5</td><td>7</td></tr>
+      <tr><td>Rows / position</td><td>924</td><td>1,188</td><td>1,452</td></tr>
+      <tr><td><strong>Total rows (實測)</strong></td><td><strong>7,392</strong></td><td><strong>38,016</strong></td><td><strong>185,856</strong></td></tr>
+      <tr><td>tight k</td><td>13</td><td>16</td><td><strong>18</strong></td></tr>
+      <tr><td>k budget utilization</td><td>90%</td><td>58%</td><td>71%</td></tr>
+      <tr><td>Custom gates</td><td colspan="3" style="text-align:center">31（6 modules）</td></tr>
+      <tr><td>Polynomial constraints</td><td colspan="3" style="text-align:center">66</td></tr>
+      <tr><td>Scaling law</td><td colspan="3" style="text-align:center"><code class="inline">total(N) = N × (528 + 132·⌈log₂N⌉)</code> · 三點零誤差</td></tr>
+      <tr><td>Column packing</td><td colspan="3" style="text-align:center">Merkle 獨占 rows；Δ / bs_price / 累加 平行塞入貢獻 0</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="slide" data-part="V" data-slide="59">
+  <div class="slide-meta"><span class="part-label">Implementation</span><span class="slide-num">59 / 87</span></div>
+  <h2>實作摘要</h2>
+  <ul>
+    <li><strong>Rust (halo2_proofs + halo2curves)</strong>：電路、witness 生成、MockProver + release prover</li>
+    <li><strong>Python</strong>：reference implementation（純 int、無 halo2 依賴）、Remez 係數產生、測試向量生成</li>
+    <li><strong>Bit-for-bit 對齊</strong>：每個 pp48 中間值 Rust ↔ Python diff == 0</li>
+    <li><strong>測試涵蓋</strong>：positive（含 call / put / equity / deep ITM / OTM）+ negative（seg_idx 翻轉、sat 偽造、copy 斷裂）</li>
+    <li><strong>可重現</strong>：測試向量、Remez 係數、Poseidon round constants 全部可從 Python 重建</li>
+  </ul>
+</section>
+
+<section class="slide part-closer" data-part="V" data-slide="60">
+  <div class="slide-meta"><span class="part-label">PART V · Recap</span><span class="slide-num">60 / 87</span></div>
+  <h2>Part V takeaways</h2>
+  <ul>
+    <li>PF1 = 5 部分管線（A / A' / A'' / B / C），Merkle 85% + Delta 13% + 其他 2%</li>
+    <li>17 步 pipeline，全程 pp=48 定點；ln/erf/exp 共用 Remez + Per-step Horner kernel</li>
+    <li>A2 segment-selector gate 封閉 saturation + segment 的 soundness</li>
+    <li>31 custom gates / 66 constraints / 6 modules — 形式化 ZK-POK 三層論證</li>
+    <li>實測 7 ULP（ATM 向量 N(d₁)/Δ_call；上游 d₁ 15 ULP），理論上界 57.6 ULP — 比任何合理 τ 小 10 個數量級</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:1.2rem">下一 Part：數字說話 — benchmark & 精度實測。</p>
+</section>
+
+<!-- ========== PART VI: 實驗結果 ========== -->
+
+<section class="slide part-opener" data-part="VI" data-slide="61">
+  <div class="slide-meta"><span class="part-label">PART VI</span><span class="slide-num">61 / 87</span></div>
+  <h1>Part VI — 實驗結果</h1>
+  <p class="lead">Part VI 結束後你會看到：</p>
+  <ul>
+    <li>proving / verification time、proof size — 哪些 release benchmark 已跑、哪些待測</li>
+    <li>Rust ↔ Python bit-for-bit 一致性</li>
+    <li>端到端精度 vs 理論 BS（ATM 實測 7 ULP，上界 57.6 ULP）</li>
+    <li>電路成本拆解（A 23% / A' 61% / A'' 1% / B 13% / C &lt;1%）</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="VI" data-slide="62">
+  <div class="slide-meta"><span class="part-label">Setup</span><span class="slide-num">62 / 87</span></div>
+  <h2>Benchmark 環境</h2>
+  <ul>
+    <li><strong>Rust</strong>：halo2_proofs / halo2curves（BLS12-381 via KZG）</li>
+    <li><strong>Python</strong>：reference 純 int 實作，用於 witness 驗證與 Remez 係數生成</li>
+    <li><strong>Curve</strong>：BLS12-381（prime field ~254-bit，gcd(5, p−1)=1，x⁵ 可當 Poseidon S-box）</li>
+    <li><strong>Commitment</strong>：KZG (SHPLONK) — 常數 proof size、毫秒級 verify</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">Release build（`cargo bench --release`）, wall-clock 3-run median；SRS 採 tight k per N（N=8 k=13 / N=32 k=16 / N=128 k=18）。實測 commit hash / CPU / RAM 請見 zkmm-pf2 repo `benches/p1_results.md`。</p>
+</section>
+
+<section class="slide" data-part="VI" data-slide="63">
+  <div class="slide-meta"><span class="part-label">Proving time</span><span class="slide-num">63 / 87</span></div>
+  <h2>Proving time（scenario_a_full，tight k per N）</h2>
+  <table class="tbl">
+    <thead><tr><th>配置</th><th>k</th><th>Rows (實測)</th><th>Proving time (median of 3)</th></tr></thead>
+    <tbody>
+      <tr><td>N=8 持倉 (test)</td><td>13</td><td>7,392</td><td><strong>3,567 ms</strong></td></tr>
+      <tr><td>N=32 持倉 (mid)</td><td>16</td><td>38,016</td><td><strong>21,234 ms</strong></td></tr>
+      <tr><td>N=128 持倉 (production)</td><td>18</td><td>185,856</td><td><strong>88,891 ms (~1.5 min)</strong></td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">Wall-clock 3-run median, release build。FFT 主導（2ᵏ 規模），proving time 隨 k 約翻倍（k 13→16 ~6×，16→18 ~4×）。不同 N 用 tight k 反映實際部署情境。</p>
+</section>
+
+<section class="slide" data-part="VI" data-slide="64">
+  <div class="slide-meta"><span class="part-label">Verify time</span><span class="slide-num">64 / 87</span></div>
+  <h2>Verification time — near-constant across N</h2>
+  <table class="tbl" style="max-width:560px">
+    <thead><tr><th>配置</th><th>k</th><th>Verify time</th></tr></thead>
+    <tbody>
+      <tr><td>N=8</td><td>13</td><td><strong>8.6 ms</strong></td></tr>
+      <tr><td>N=32</td><td>16</td><td><strong>8.4 ms</strong></td></tr>
+      <tr><td>N=128</td><td>18</td><td><strong>8.3 ms</strong></td></tr>
+    </tbody>
+  </table>
+  <ul style="margin-top:.6rem">
+    <li>KZG + SHPLONK 驗證 = 常數 pairing 操作數</li>
+    <li><strong>O(columns) 非 O(rows)</strong> — 94 advice 固定，verify cost 幾乎不隨 N 改變</li>
+    <li>實測 8.3–8.6 ms，符合「commodity hardware 毫秒級 verify」承諾</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="VI" data-slide="65">
+  <div class="slide-meta"><span class="part-label">Proof size</span><span class="slide-num">65 / 87</span></div>
+  <h2>Proof size — N-invariant 31,872 bytes</h2>
+  <table class="tbl" style="max-width:560px">
+    <thead><tr><th>配置</th><th>k</th><th>Proof size</th></tr></thead>
+    <tbody>
+      <tr><td>N=8</td><td>13</td><td><strong>31,872 bytes</strong></td></tr>
+      <tr><td>N=32</td><td>16</td><td><strong>31,872 bytes</strong></td></tr>
+      <tr><td>N=128</td><td>18</td><td><strong>31,872 bytes</strong></td></tr>
+    </tbody>
+  </table>
+  <ul style="margin-top:.6rem">
+    <li>KZG + SHPLONK 是 <strong>O(columns)</strong>，不是 O(rows)</li>
+    <li>94 advice + 16 fixed + 1 instance 固定 → proof size 跨 N 完全不變</li>
+    <li>31,872 bytes ≈ 31 KB — 可放進單一 blockchain tx calldata</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.9rem">這是 KZG+SHPLONK 的內建特性（vs STARK/FRI 的 O(log² rows)），對大 portfolio 無額外 bandwidth 成本。</p>
+</section>
+
+<section class="slide" data-part="VI" data-slide="66">
+  <div class="slide-meta"><span class="part-label">Bit-for-bit</span><span class="slide-num">66 / 87</span></div>
+  <h2>Rust ↔ Python 一致性</h2>
+  <p>Python reference implementation 與 Rust Halo2 witness 每個中間值 bit-for-bit 對齊：</p>
+  <ul>
+    <li>pp48 fixed-point 算術：fp_mul / fp_div 完全一致</li>
+    <li>Remez 係數由 Python mpmath + Remez 演算法生成，Rust 直接嵌入 fixed column</li>
+    <li>Poseidon round constants 同一份 rust/python 共用</li>
+    <li>N 組測試向量（含 call / put / equity / deep ITM / OTM）<strong>diff = 0</strong></li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">雙實作是工程背書 — 任何計算偏差會在跨語言比對時爆出。</p>
+</section>
+
+<section class="slide" data-part="VI" data-slide="67">
+  <div class="slide-meta"><span class="part-label">E2E Accuracy</span><span class="slide-num">67 / 87</span></div>
+  <h2>端到端精度 — Running Example（實測）</h2>
+  <p style="font-size:.92rem">Input: S=100, K=100, σ=0.20, r=0.05, q=0, T=30/365</p>
+  <table class="tbl">
+    <thead><tr><th>值</th><th>理論 BS (f64)</th><th>電路輸出 (pp48)</th><th>ULP 誤差</th></tr></thead>
+    <tbody>
+      <tr><td>d₁</td><td>+0.100341881339</td><td>+28,243,728,713,032 / 2⁴⁸</td><td><strong>15 ULP</strong></td></tr>
+      <tr><td>N(d₁)</td><td>+0.539963545623</td><td>+151,986,226,428,854 / 2⁴⁸</td><td><strong>7 ULP</strong></td></tr>
+      <tr><td>Δ_call</td><td>+0.539963545623</td><td>+151,986,226,428,854 / 2⁴⁸</td><td><strong>7 ULP</strong></td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.9rem">Δ_call = N(d₁) exactly（因 q=0 → e^(−qT)=1）。d₁ 經過 <code class="inline">ln + FpMul×3 + FpDiv + FpAdd</code> 多步鏈，累積 15 ULP 屬預期；N(d₁) 和 Δ_call 作為最終輸出 7 ULP，符合「Remez kernel ~2.81 ULP + 鏈式累積」理論上界 57.6 ULP。</p>
+  <p style="color:var(--text-dim);margin-top:.3rem;font-size:.88rem">絕對誤差 ~2×10⁻¹⁴；任何合理金融合規門檻（τ ≥ 0.01 = ~10¹² ULP）都留 10 個數量級安全餘裕。</p>
+</section>
+
+<section class="slide" data-part="VI" data-slide="68">
+  <div class="slide-meta"><span class="part-label">Comparison</span><span class="slide-num">68 / 87</span></div>
+  <h2>橫向比較 — 為何這些選擇關鍵</h2>
+  <table class="tbl">
+    <thead><tr><th>元件</th><th>本研究</th><th>替代方案</th><th>成本差</th></tr></thead>
+    <tbody>
+      <tr><td>Hash</td><td>Poseidon (~65 rows/permutation)</td><td>SHA-256 (~25K constraints)</td><td>~100×</td></tr>
+      <tr><td>SNARK</td><td>Halo2 + KZG (universal SRS)</td><td>Groth16 (per-circuit ceremony)</td><td>MDT 每日更新可行性</td></tr>
+      <tr><td>Signature (PF2)</td><td>EdDSA Babyjubjub (~6K)</td><td>ECDSA (~30K)</td><td>~5×</td></tr>
+      <tr><td>ln/erf 逼近</td><td>Remez minimax d=12</td><td>Taylor d=14</td><td>準 2.6×10⁸ – 6.8×10¹⁰ 倍</td></tr>
+      <tr><td>exp 逼近</td><td>Range reduction + 單段 Remez d=12 Horner（與 ln/erf 共用 kernel, max 2.81 ULP）</td><td>大查表 (50M entries) 或 byte-chunk lookup (11 rows but 函數專用表)</td><td>工具鏈／設計簡化</td></tr>
+    </tbody>
+  </table>
+  <figure class="fig" style="margin-top:.8rem">
+    <svg viewBox="0 0 820 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cost gap log scale">
+      <text x="410" y="16" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif" fill="#4f46e5">量化成本差 — log₁₀ 軸（越右越大）</text>
+      <!-- axis 200→780, log 0..11 -->
+      <line x1="200" y1="128" x2="780" y2="128" stroke="#c7c9d3" stroke-width="1"/>
+      <!-- ticks at 1, 10, 100, 10^5, 10^8, 10^10, 10^11 -->
+      <g style="font:10px 'Inter',monospace;fill:#55596b">
+        <line x1="200" y1="128" x2="200" y2="132" stroke="#c7c9d3"/><text x="200" y="144" text-anchor="middle">1×</text>
+        <line x1="252" y1="128" x2="252" y2="132" stroke="#c7c9d3"/><text x="252" y="144" text-anchor="middle">10×</text>
+        <line x1="305" y1="128" x2="305" y2="132" stroke="#c7c9d3"/><text x="305" y="144" text-anchor="middle">100×</text>
+        <line x1="463" y1="128" x2="463" y2="132" stroke="#c7c9d3"/><text x="463" y="144" text-anchor="middle">10⁵</text>
+        <line x1="621" y1="128" x2="621" y2="132" stroke="#c7c9d3"/><text x="621" y="144" text-anchor="middle">10⁸</text>
+        <line x1="726" y1="128" x2="726" y2="132" stroke="#c7c9d3"/><text x="726" y="144" text-anchor="middle">10¹⁰</text>
+      </g>
+      <!-- Signature ~5x: log10(5)=0.699, +52.6 per decade, x=200+52.6*0.699=236.8 -->
+      <text x="195" y="42" text-anchor="end" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">Signature (EdDSA vs ECDSA)</text>
+      <rect x="200" y="30" width="37" height="16" fill="#10b981"/>
+      <text x="243" y="42" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">~5×</text>
+      <!-- Hash 100x: log10(100)=2, x=200+52.6*2=305 -->
+      <text x="195" y="68" text-anchor="end" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">Hash (Poseidon vs SHA-256)</text>
+      <rect x="200" y="56" width="105" height="16" fill="#4f46e5"/>
+      <text x="312" y="68" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">~100×</text>
+      <!-- ln 6.8e10: log10=10.833, x=200+52.6*10.833=770 -->
+      <text x="195" y="94" text-anchor="end" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">ln 逼近 (Remez vs Taylor)</text>
+      <rect x="200" y="82" width="570" height="16" fill="#d97706"/>
+      <text x="777" y="94" text-anchor="end" style="font:700 11px 'Inter',monospace" fill="#ffffff">6.8 × 10¹⁰</text>
+      <!-- erf 2.6e8: log10=8.415, x=200+52.6*8.415=643 -->
+      <text x="195" y="120" text-anchor="end" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">erf 逼近 (Remez vs Taylor)</text>
+      <rect x="200" y="108" width="443" height="16" fill="#dc2626"/>
+      <text x="650" y="120" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">2.6 × 10⁸</text>
+    </svg>
+    <figcaption>圖：四個可量化的成本差（對數軸）— Signature 5× 與 Hash 100× 是工程級優化，但 ln / erf 的 Minimax 比 Taylor 準 8–10 個數量級 — 是「做不出來」和「做得出來」的差距。</figcaption>
+  </figure>
+</section>
+
+<section class="slide" data-part="VI" data-slide="69">
+  <div class="slide-meta"><span class="part-label">Plonkish metrics</span><span class="slide-num">69 / 87</span></div>
+  <h2>Plonkish 指標（實測 from halo2 ConstraintSystem）</h2>
+  <table class="tbl" style="max-width:640px">
+    <thead><tr><th>類別</th><th>數量</th><th>說明</th></tr></thead>
+    <tbody>
+      <tr><td>Advice columns</td><td><strong>94</strong></td><td>State Merkle / Δ pipeline / bs_price / 累加 等平行塞入</td></tr>
+      <tr><td>Fixed columns</td><td><strong>16</strong></td><td>Remez 係數、Poseidon round constants、Lookup tables</td></tr>
+      <tr><td>Instance columns</td><td><strong>1</strong></td><td>4 public inputs（state roots、batch commitment 等）</td></tr>
+      <tr><td>Selector 欄</td><td><strong>34</strong></td><td>每個 custom gate 一個 selector</td></tr>
+      <tr><td>Lookup arguments</td><td><strong>83</strong></td><td>ByteTable 256 entries 被 6-byte / 7-byte / 8-byte 分解複用</td></tr>
+      <tr><td>Max gate degree</td><td><strong>6</strong></td><td>多元高 degree 約束（Poseidon x⁵ + selector 乘數）</td></tr>
+      <tr><td>Min k</td><td><strong>8</strong></td><td>lookup 表 pad 到 2ᵏ−6 的 minimum 保留</td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.9rem">94 advice 看似多，其實是 column-packing 策略 — 平行安排讓 rows-intensive 的 Merkle 不被 Δ pipeline 擠兌。Proof size O(columns) 固定 31,872 bytes（slide 65）。</p>
+</section>
+
+<section class="slide" data-part="VI" data-slide="70">
+  <div class="slide-meta"><span class="part-label">Scalability</span><span class="slide-num">70 / 87</span></div>
+  <h2>N-position 可擴展性</h2>
+  <table class="tbl">
+    <thead><tr><th>N (持倉)</th><th>Merkle depth</th><th>Total rows</th><th>k</th></tr></thead>
+    <tbody>
+      <tr><td>8 (test)</td><td>3</td><td><strong>7,392</strong></td><td><strong>13</strong></td></tr>
+      <tr><td>32 (mid)</td><td>5</td><td><strong>38,016</strong></td><td><strong>16</strong></td></tr>
+      <tr><td>128 (production)</td><td>7</td><td><strong>185,856</strong></td><td><strong>18</strong></td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">Scaling law：<code class="inline">total(N) = N × (528 + 132·⌈log₂N⌉)</code> — <strong>O(N log N)</strong>（非線性；per-position 成本隨 Merkle depth 增長）。三點實測零誤差擬合。</p>
+  <p style="color:var(--text-dim);margin-top:.3rem;font-size:.92rem">不足 N_max 填 dummy leaf（隱藏真實持倉數量，隱私保護）。</p>
+  <figure class="fig" style="margin-top:.6rem">
+    <svg viewBox="0 0 820 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="N-position scaling">
+      <text x="410" y="16" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif" fill="#4f46e5">Total rows vs N — O(N log N) 實測擬合 · 三點零誤差</text>
+      <line x1="100" y1="148" x2="780" y2="148" stroke="#c7c9d3" stroke-width="1"/>
+      <line x1="100" y1="30" x2="100" y2="148" stroke="#c7c9d3" stroke-width="1"/>
+      <g style="font:10px 'Inter',monospace;fill:#55596b">
+        <text x="94" y="152" text-anchor="end">0</text>
+        <line x1="96" y1="110" x2="100" y2="110" stroke="#c7c9d3"/><text x="94" y="114" text-anchor="end">60K</text>
+        <line x1="96" y1="71" x2="100" y2="71" stroke="#c7c9d3"/><text x="94" y="75" text-anchor="end">120K</text>
+        <line x1="96" y1="32" x2="100" y2="32" stroke="#c7c9d3"/><text x="94" y="36" text-anchor="end">180K</text>
+      </g>
+      <!-- bars (total rows) scale: 200K = 118px height -->
+      <!-- N=8 → 7392 rows: h = 7.392/200*118 = 4.36, y = 148-4 = 144 -->
+      <rect x="180" y="144" width="100" height="4" fill="#a5b4fc"/>
+      <text x="230" y="138" text-anchor="middle" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">7,392</text>
+      <text x="230" y="163" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">N=8 · depth 3 · k=13</text>
+      <!-- N=32 → 38016 rows: h = 38/200*118 = 22.4, y = 148-22 = 126 -->
+      <rect x="360" y="126" width="100" height="22" fill="#6366f1"/>
+      <text x="410" y="120" text-anchor="middle" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">38,016</text>
+      <text x="410" y="163" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">N=32 · depth 5 · k=16</text>
+      <!-- N=128 → 185856 rows: h = 186/200*118 = 109.7, y = 148-110 = 38 -->
+      <rect x="540" y="38" width="100" height="110" fill="#4f46e5"/>
+      <text x="590" y="32" text-anchor="middle" style="font:700 11px 'Inter',monospace" fill="#1a1a1f">185,856</text>
+      <text x="590" y="163" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#1a1a1f">N=128 · depth 7 · k=18</text>
+      <path d="M280,144 Q420,90 540,54" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3 2" fill="none"/>
+      <text x="680" y="55" style="font:600 11px 'Inter','Noto Sans TC',sans-serif" fill="#dc2626">O(N log N)</text>
+      <text x="680" y="69" style="font:9px 'Inter',monospace" fill="#dc2626">N·(528+132·⌈log₂N⌉)</text>
+      <text x="680" y="84" style="font:10px 'Inter','Noto Sans TC',sans-serif" fill="#dc2626">16× N → 25× rows</text>
+      <text x="680" y="98" style="font:10px 'Inter','Noto Sans TC',sans-serif" fill="#dc2626">k 僅 +5（log₂N）</text>
+    </svg>
+    <figcaption>圖：Total rows vs N 實測（`halo2 CircuitCost` API）— 曲線為 <code class="inline">N × (528 + 132·⌈log₂N⌉)</code>，三點零誤差。rows 成 O(N log N) 因 per-position 成本含 Merkle depth log(N)；k 只隨 log₂N 上升（SNARK 對大 portfolio 友善）。</figcaption>
+  </figure>
+</section>
+
+<section class="slide" data-part="VI" data-slide="71">
+  <div class="slide-meta"><span class="part-label">Cost breakdown</span><span class="slide-num">71 / 87</span></div>
+  <h2>Cost breakdown</h2>
+  <table class="tbl">
+    <thead><tr><th>Part</th><th>Rows / 持倉</th><th>占比</th><th>瓶頸</th></tr></thead>
+    <tbody>
+      <tr><td>Part A  (State Merkle)</td><td>~528</td><td>23%</td><td>7 層 Poseidon permutation</td></tr>
+      <tr><td>Part A' (Market Data Merkle)</td><td>~1,444</td><td><strong>62%</strong></td><td>9 欄位 hash（5 perm）+ depth ~20</td></tr>
+      <tr><td>Part A'' (σ 驗證)</td><td>~32</td><td>1%</td><td>BS price 加法形式</td></tr>
+      <tr><td>Part B  (Delta 管線)</td><td>~298</td><td>13%</td><td>本論文核心 — ln/erf/exp 共用 d=12 Horner kernel</td></tr>
+      <tr><td>Part C  (累加 + range)</td><td>~5</td><td>&lt;1%</td><td>帶符號分流 + 7-byte range check</td></tr>
+      <tr><td>其他 (type, time verify, MUX)</td><td>~8</td><td>&lt;1%</td><td>—</td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem"><strong>關鍵觀察：</strong> Delta 管線只占 13%，Merkle 占 85% — 本研究讓超越函數不再是瓶頸。</p>
+</section>
+
+<section class="slide part-closer" data-part="VI" data-slide="72">
+  <div class="slide-meta"><span class="part-label">PART VI · Recap</span><span class="slide-num">72 / 87</span></div>
+  <h2>Part VI takeaways</h2>
+  <ul>
+    <li>Running example 可實際 prove / verify、端到端 ATM 實測 7 ULP（理論上界 57.6）</li>
+    <li>Rust ↔ Python bit-for-bit 雙實作驗證通過</li>
+    <li>電路主要成本在 Merkle (85%)，Delta 管線僅 13%</li>
+    <li>Proving / verify / proof-size 具體 release 數字 <span class="tag todo">待補</span></li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:1.2rem">下一 Part：誠實面對 — 限制與未來工作。</p>
+</section>
+
+<!-- ========== PART VII: 限制與未來 ========== -->
+
+<section class="slide part-opener" data-part="VII" data-slide="73">
+  <div class="slide-meta"><span class="part-label">PART VII</span><span class="slide-num">73 / 87</span></div>
+  <h1>Part VII — 限制與未來</h1>
+  <p class="lead">Part VII 結束後你會知道本論文的邊界在哪，以及三項已落地的工程強化。</p>
+</section>
+
+<section class="slide" data-part="VII" data-slide="74">
+  <div class="slide-meta"><span class="part-label">erf domain</span><span class="slide-num">74 / 87</span></div>
+  <h2>erf domain 邊界 |x| = 4</h2>
+  <ul>
+    <li>目前 erf piecewise 覆蓋 |x| ≤ 4，以外夾到 ±S（saturation）</li>
+    <li>對應 N(d₁)：|d₁| ≤ 5.66，1 − N(5.66) ≈ 10⁻⁸ 級</li>
+    <li>Deep OTM tail 的 Delta（&lt; 10⁻⁸）被 floor 成 0 — 對一般金融應用夠</li>
+    <li>未來可延伸至 |x| = 6（N-1 tail ~10⁻¹⁸）若有需要</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="VII" data-slide="75">
+  <div class="slide-meta"><span class="part-label">Portfolio</span><span class="slide-num">75 / 87</span></div>
+  <h2>Portfolio N-position — N=8 test → N=128 production</h2>
+  <ul>
+    <li>當前實作：N=8（Merkle depth 3），開發驗證加速</li>
+    <li>生產目標：N=128（Merkle depth 7，k ≈ 19）</li>
+    <li>不足 N_max 的持倉填 dummy leaf — 隱藏真實持倉數量</li>
+    <li>CLAUDE1.2 portfolio 電路分工進行中</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="VII" data-slide="76">
+  <div class="slide-meta"><span class="part-label">PF2</span><span class="slide-num">76 / 87</span></div>
+  <h2>PF2 — 商業 IP 考量</h2>
+  <p>PF2 負責 State Transition + 交易所 EdDSA 驗簽，論文中保留介面定義與 relation，實作細節另案。</p>
+  <ul>
+    <li>EdDSA Babyjubjub ~6K constraints/簽章 — 已驗證可行</li>
+    <li>與 PF1 透過 state_root 綁定 — 論文敘述完整協議</li>
+    <li>PF1 的 Assumption 1（State Tree 完整性）= PF2 的 soundness</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="VII" data-slide="77">
+  <div class="slide-meta"><span class="part-label">Open Qs</span><span class="slide-num">77 / 87</span></div>
+  <h2>Open questions</h2>
+  <ul>
+    <li><strong>MDT 去中心化</strong>：可否用 oracle threshold signature 取代 administrator 簽署？</li>
+    <li><strong>Intra-day 增量</strong>：用 Nova / IVC 做 T(t), T(t+1) 的 folded proof，避免每次重算全部 persistence？</li>
+    <li><strong>其他 Greeks</strong>：Gamma / Vega / Theta 共用 ln/erf 管線的比例？Vega 跟 Delta 共用 d₁ 與 N' (φ pdf)，重用率高</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="VII" data-slide="78">
+  <div class="slide-meta"><span class="part-label">Future work</span><span class="slide-num">78 / 87</span></div>
+  <h2>三項工程強化（✅ 已於 2026-04-17 實作）</h2>
+  <ol style="padding-left:1.2rem;font-size:.95rem">
+    <li style="list-style:decimal;margin-bottom:.35rem"><strong>bs_price 雙重容差（AND 語意 = min-bound）</strong>：同時要求 <code class="inline">|bs−settle| ≤ ABS_TOL</code>（0.02）<em>且</em> <code class="inline">|bs−settle| ≤ REL_TOL·settle/S</code>（0.5%）— 兩 gate 同時成立才通過。效果上由較緊者綁：昂貴期權 ABS 綁、便宜期權 REL 綁，採「任一違反即拒絕」的壓力測試精神。<span style="color:var(--amber)">trade-off：極便宜期權（settle &lt; $0.02）REL 門檻可能拒絕合理 market noise，已知保守代價。</span></li>
+    <li style="list-style:decimal;margin-bottom:.35rem"><strong>T_min 7 日硬下限</strong>：非股票部位強制 <code class="inline">t_days − 7 ≥ 0</code>（2-byte 分解 + byte lookup），排除短期 pin risk 與流動性陷阱</li>
+    <li style="list-style:decimal;margin-bottom:.35rem"><strong>σ 由 MDT 直接提供</strong>：Market Data leaf 由 8 → 9 欄位（新增 σ 於 index 8），Poseidon 5 次 permutation（zero-padding on odd tail）；σ 以 copy constraint 綁進 delta pipeline，<em>bs_price 未退役</em>，仍做完整 BS 反解驗證與 settle cross-check</li>
+  </ol>
+  <p style="color:var(--text-dim);margin-top:.4rem;font-size:.88rem">Commits <code class="inline">9cf6f45</code> / <code class="inline">bf6bf8d</code>（容差）、<code class="inline">bbc9eaa</code>（T_min）、<code class="inline">43310f6</code>（σ）；以上皆為工程精進，<strong>不影響</strong>核心 ZK-POK 數學 soundness。</p>
+</section>
+
+<section class="slide part-closer" data-part="VII" data-slide="79">
+  <div class="slide-meta"><span class="part-label">PART VII · Recap</span><span class="slide-num">79 / 87</span></div>
+  <h2>Part VII takeaways</h2>
+  <ul>
+    <li>邊界誠實說：erf tail |x|=4、N=8 → N=128 scaling、PF2 另案</li>
+    <li>研究方向：去中心化 MDT、IVC 增量、Greeks 集合</li>
+    <li>三項已落地工程強化：雙重容差 AND、T_min 7 日硬下限、σ 由 MDT 直供 — 不影響核心 soundness</li>
+  </ul>
+</section>
+
+<!-- ========== PART VIII: 結論 ========== -->
+
+<section class="slide part-opener" data-part="VIII" data-slide="80">
+  <div class="slide-meta"><span class="part-label">PART VIII</span><span class="slide-num">80 / 87</span></div>
+  <h1>Part VIII — 結論</h1>
+  <p class="lead">五分鐘內把整場報告收斂成一張心智樹 + Q&amp;A。</p>
+</section>
+
+<section class="slide" data-part="VIII" data-slide="81">
+  <div class="slide-meta"><span class="part-label">Recap</span><span class="slide-num">81 / 87</span></div>
+  <h2>貢獻 recap</h2>
+  <ul>
+    <li>Halo2 上首個 BS Delta 零知識電路，N=128、<strong>k=18（185,856 rows 實測）</strong>；scaling law O(N log N)；column-packing 讓 Δ rows-wise 免費</li>
+    <li>pp=48 + Remez minimax d=12 + Per-step Horner，Delta_call 實測 7 ULP（理論上界 57.6）</li>
+    <li>A2 segment-selector gate + 統一 Horner kernel（ln/erf/exp 共用）封閉 saturation 與 segment soundness</li>
+    <li>31 custom gates / 6 modules / 66 constraints，ZK-POK 三層論證 + 10 攻擊向量全覆蓋</li>
+    <li>Rust ↔ Python bit-for-bit 雙實作</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="VIII" data-slide="82">
+  <div class="slide-meta"><span class="part-label">Concept Tree</span><span class="slide-num">82 / 87</span></div>
+  <h2>全景概念樹</h2>
+  <p>你剛才學到的依賴鏈 — 每一層都是下一層的前提：</p>
+  <figure class="fig" style="margin-top:.4rem">
+    <div class="mermaid">
+%%{init: {'flowchart':{'nodeSpacing':30,'rankSpacing':45,'curve':'basis'}, 'themeVariables':{'fontSize':'12px'}}}%%
+flowchart LR
+  A["早期 ZK<br/>R1CS+QAP<br/>per-circuit ceremony"]:::era1
+  B["Halo2<br/>Plonkish + SRS<br/>Lookup + hi-deg"]:::era2
+  C["PF1 架構<br/>5 parts<br/>Merkle×2/σ/Δ/C"]:::arch
+  D["Delta 核心<br/>pp=48 定點<br/>17 step pipeline"]:::core
+  E1["Per-step<br/>Horner kernel<br/>ln/erf/exp 共用"]:::tech
+  E2["Remez<br/>minimax d=12"]:::tech
+  E3["Piecewise<br/>ln 4 / erf 12<br/>+ exp 單段"]:::tech
+  F["A2 gate<br/>soundness<br/>封閉"]:::sound
+  H(["<b>31 gates / 66 constraints</b><br/><b>3-layer ZK-POK</b>"]):::final
+  A --> B --> C --> D
+  D --> E1 --> F
+  D --> E2 --> F
+  D --> E3 --> F
+  F --> H
+  classDef era1 fill:#f1f5f9,stroke:#64748b,color:#1a1a1f,stroke-width:1.5px;
+  classDef era2 fill:#eef2ff,stroke:#4f46e5,color:#1a1a1f,stroke-width:1.5px;
+  classDef arch fill:#fef3c7,stroke:#d97706,color:#1a1a1f,stroke-width:1.5px;
+  classDef core fill:#dbeafe,stroke:#2563eb,color:#1a1a1f,stroke-width:1.5px;
+  classDef tech fill:#ede9fe,stroke:#7c3aed,color:#1a1a1f,stroke-width:1.5px;
+  classDef sound fill:#fee2e2,stroke:#dc2626,color:#1a1a1f,stroke-width:1.5px;
+  classDef final fill:#d1fae5,stroke:#059669,color:#064e3b,stroke-width:2px;
+    </div>
+    <figcaption>圖：概念依賴樹（左 → 右）— 灰（早期 ZK）→ 藍（Halo2）→ 琥珀（PF1 架構）→ 深藍（Delta 核心）→ 紫（三個逼近技術並行）→ 紅（soundness gate）→ 綠（最終 ZK-POK）。每條箭頭 = 「沒有上層就做不出下層」。</figcaption>
+  </figure>
+</section>
+
+<section class="slide" data-part="VIII" data-slide="83">
+  <div class="slide-meta"><span class="part-label">Thesis Index</span><span class="slide-num">83 / 87</span></div>
+  <h2>論文章節索引</h2>
+  <table class="tbl">
+    <thead><tr><th>Ch</th><th>標題</th><th>對應 Part</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Introduction — 合規 × 隱私動機</td><td>Part I</td></tr>
+      <tr><td>2</td><td>Background — ZK / Halo2 / Poseidon</td><td>Part III, IV</td></tr>
+      <tr><td>3</td><td>Protocol — 四層信任、雙 Merkle、cross-tree 綁定</td><td>Part II</td></tr>
+      <tr><td>4</td><td>Delta Pipeline — pp=48, Remez, Per-step Horner（ln/erf/exp 共用）</td><td>Part V §1-4</td></tr>
+      <tr><td>5</td><td>Soundness — A2 gate, 31 gates/66 constraints, 10 attacks</td><td>Part V §5-6</td></tr>
+      <tr><td>6</td><td>Experiments — bit-for-bit, accuracy, benchmarks</td><td>Part VI</td></tr>
+      <tr><td>7</td><td>Discussion & Future Work</td><td>Part VII</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="slide" data-part="VIII" data-slide="84">
+  <div class="slide-meta"><span class="part-label">Acknowledgments</span><span class="slide-num">84 / 87</span></div>
+  <h2>致謝</h2>
+  <ul>
+    <li>指導教授</li>
+    <li>實驗室同仁</li>
+    <li>Open-source 社群：<strong>halo2_proofs</strong>, <strong>halo2curves</strong>（PSE）、<strong>poseidon-hash</strong>、<strong>bellman</strong></li>
+    <li>學術社群：Gabizon / Williamson / Ciobotaru (PLONK)、Grassi et al. (Poseidon)、Bünz et al. (KZG)</li>
+    <li>Zcash / Filecoin / Polygon 的生產驗證讓 Halo2 + Poseidon 可信賴</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="VIII" data-slide="85">
+  <div class="slide-meta"><span class="part-label">Q &amp; A</span><span class="slide-num">85 / 87</span></div>
+  <h1 style="text-align:center">Q &amp; A</h1>
+  <p class="subtitle" style="text-align:center;margin:0 auto">歡迎提問</p>
+  <p style="color:var(--text-dim);text-align:center;margin-top:2rem;font-size:.92rem">Running Example 可供參考：S=100, K=100, σ=20%, T=30d, r=5%, q=0 → Δ ≈ 0.523</p>
+</section>
+
+<section class="slide" data-part="VIII" data-slide="86" id="references">
+  <div class="slide-meta"><span class="part-label">References</span><span class="slide-num">86 / 87</span></div>
+  <h2>References — 關鍵引用原文</h2>
+  <p style="color:var(--text-dim);font-size:.92rem">本報告所有技術定義皆直接引用原論文；完整列表如下，括號中為本報告中引用處的 slide 編號。</p>
+  <ol class="reflist" id="refs-ol">
+    <li><strong>Goldwasser, Micali, Rackoff (1989)</strong>. The knowledge complexity of interactive proof systems. <em>SIAM J. Comput.</em>, 18(1):186–208. <span style="color:var(--text-faint)">[ZK 原始定義]</span></li>
+    <li><strong>Bellare, Goldreich (1992)</strong>. On defining proofs of knowledge. <em>CRYPTO '92</em>. <span style="color:var(--text-faint)">[knowledge soundness]</span></li>
+    <li><strong>Groth, J. (2016)</strong>. On the size of pairing-based non-interactive arguments. <em>EUROCRYPT 2016</em>. <a href="https://eprint.iacr.org/2016/260">eprint/2016/260</a>. <span style="color:var(--text-faint)">[Groth16 SNARK]</span></li>
+    <li><strong>Gabizon, Williamson, Ciobotaru (2019)</strong>. PlonK: Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of Knowledge. <a href="https://eprint.iacr.org/2019/953">eprint/2019/953</a>. <span style="color:var(--text-faint)">[custom gates + copy constraints]</span></li>
+    <li><strong>Zcash Foundation (2022–)</strong>. The halo2 Book. <a href="https://zcash.github.io/halo2/">zcash.github.io/halo2</a>. <span style="color:var(--text-faint)">[Plonkish arithmetization]</span></li>
+    <li><strong>Kate, Zaverucha, Goldberg (2010)</strong>. Constant-size commitments to polynomials and their applications. <em>ASIACRYPT 2010</em>. <span style="color:var(--text-faint)">[KZG commitment]</span></li>
+    <li><strong>Grassi, Khovratovich, Rechberger, Roy, Schofnegger (2021)</strong>. Poseidon: A New Hash Function for Zero-Knowledge Proof Systems. <em>USENIX Security 2021</em>. <a href="https://eprint.iacr.org/2019/458">eprint/2019/458</a>. <span style="color:var(--text-faint)">[sponge + round function]</span></li>
+    <li><strong>Bertoni, Daemen, Peeters, Van Assche (2011)</strong>. Cryptographic sponge functions. <a href="https://keccak.team/files/CSF-0.1.pdf">keccak.team/CSF-0.1</a>. <span style="color:var(--text-faint)">[sponge construction]</span></li>
+    <li><strong>Bernstein, Duif, Lange, Schwabe, Yang (2012)</strong>. High-speed high-security signatures. <em>J. Cryptographic Engineering</em>, 2(2):77–89. <a href="https://ed25519.cr.yp.to/ed25519-20110705.pdf">ed25519.cr.yp.to</a>. <span style="color:var(--text-faint)">[EdDSA — §4 簽章方程：<code>S = (r + H(R, A, M)·a) mod ℓ</code>，驗證式 <code>8·S·B = 8·R + 8·H(R, A, M)·A</code>]</span></li>
+    <li><strong>Whitehat, Baylina, Bellés (2020)</strong>. Baby Jubjub Elliptic Curve. ERC-2494. <a href="https://eips.ethereum.org/EIPS/eip-2494">eips.ethereum.org/EIPS/eip-2494</a>. <span style="color:var(--text-faint)">[Baby Jubjub — Twisted Edwards 方程：<code>168700·x² + y² = 1 + 168696·x²y²</code> over F<sub>r</sub>, r = BN254 scalar field]</span></li>
+    <li><strong>Merkle, R. C. (1988)</strong>. A digital signature based on a conventional encryption function. <em>CRYPTO '87</em>. <span style="color:var(--text-faint)">[Merkle tree]</span></li>
+    <li><strong>Black, F., Scholes, M. (1973)</strong>. The pricing of options and corporate liabilities. <em>J. Political Economy</em>, 81(3):637–654. <span style="color:var(--text-faint)">[BS formula, Delta]</span></li>
+    <li><strong>Fiat, A., Shamir, A. (1986)</strong>. How to prove yourself: Practical solutions to identification and signature problems. <em>CRYPTO '86</em>. <span style="color:var(--text-faint)">[Fiat-Shamir]</span></li>
+    <li><strong>Remez, E. Y. (1934)</strong>. Sur la détermination des polynômes d'approximation de degré donnée. <em>Comm. Soc. Math. Kharkov</em>. <span style="color:var(--text-faint)">[minimax approximation]</span></li>
+  </ol>
+  <p style="color:var(--text-faint);font-size:.78rem;margin-top:1rem">每張技術 slide 的引用以 <sup class="ref">[n]</sup> 上標連結至此表；Part III–V 的標準技術圖若取自原論文，會在 figcaption 中標註 source。</p>
+</section>
+
+<section class="slide title" data-part="VIII" data-slide="87">
+  <div class="slide-meta"><span class="slide-num">87 / 87</span></div>
+  <h1>謝謝聆聽</h1>
+  <p class="subtitle">Zero-Knowledge Compliance for Fund Operations</p>
+  <p style="color:var(--text-faint);font-size:.9rem;margin-top:2rem">~/.claude/projects/畢業論文v4 · 2026</p>
+</section>
+
+</main>
+
+<!-- ============ GLOSSARY DRAWER ============ -->
+<div class="drawer-mask" id="mask"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <h3>術語對照 — Groth16 ↔ Halo2</h3>
+    <button class="drawer-close" id="drawerClose" aria-label="關閉">×</button>
+  </div>
+  <div class="drawer-body">
+    <table class="gtable">
+      <thead><tr><th>概念</th><th>Groth16 / R1CS</th><th>Halo2 / Plonkish</th></tr></thead>
+      <tbody>
+        <tr><td class="t">witness</td><td class="g">vector z 中的 private 元素</td><td class="h">advice column 的 cell</td></tr>
+        <tr><td class="t">係數</td><td class="g">矩陣 A/B/C 的 entry</td><td class="h">fixed column</td></tr>
+        <tr><td class="t">public input</td><td class="g">z 的 public 前綴</td><td class="h">instance column</td></tr>
+        <tr><td class="t">啟用 constraint</td><td class="g">(沒明確開關)</td><td class="h">selector column</td></tr>
+        <tr><td class="t">gate 形式</td><td class="g">固定 (A·z)·(B·z)=C·z</td><td class="h">任意 degree 多項式</td></tr>
+        <tr><td class="t">同值綁定</td><td class="g">同一 z[i] 出現多次</td><td class="h">permutation argument (copy constraint)</td></tr>
+        <tr><td class="t">查表 / range</td><td class="g">沒有；bit 分解模擬</td><td class="h">lookup argument</td></tr>
+        <tr><td class="t">trusted setup</td><td class="g">每個 circuit 一次 ceremony</td><td class="h">universal SRS，跨 circuit 共用</td></tr>
+        <tr><td class="t">proof size</td><td class="g">~3 G1 (~200 B)</td><td class="h">~KB 級（KZG commitments + opening）</td></tr>
+        <tr><td class="t">prove time</td><td class="g">~線性 (constraints)</td><td class="h">FFT-heavy，但常數項較大</td></tr>
+      </tbody>
+    </table>
+    <p style="color:var(--text-faint);font-size:.85rem;margin-top:1rem">按 Esc 或點擊遮罩關閉</p>
+  </div>
+</aside>
+
+<!-- ============ HINT ============ -->
+<div class="hint">↑ ↓ PgUp PgDn Space &nbsp;|&nbsp; g: glossary &nbsp;|&nbsp; Home/End</div>
+
+<script>
+// ---------- Running example (canonical) ----------
+window.RE = { S:100, K:100, sigma:0.20, T:30/365, r:0.05, q:0, d1:0.0577, delta:0.523 };
+
+// ---------- Build dots ----------
+const slides = document.querySelectorAll('.slide');
+const dotsEl = document.getElementById('dots');
+slides.forEach((s,i)=>{
+  const d = document.createElement('div');
+  d.className = 'dot';
+  d.dataset.idx = i;
+  const part = s.dataset.part;
+  const prev = i>0 ? slides[i-1].dataset.part : null;
+  if(part && part !== prev){
+    d.classList.add('part-start');
+    d.dataset.part = part;
+  }
+  d.addEventListener('click', ()=>{
+    s.scrollIntoView({behavior:'smooth'});
+  });
+  dotsEl.appendChild(d);
+});
+const dotList = dotsEl.querySelectorAll('.dot');
+
+// ---------- IntersectionObserver for active state ----------
+const pillBtns = document.querySelectorAll('.pill');
+const deck = document.getElementById('deck');
+let currentIdx = 0;
+
+const io = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting && e.intersectionRatio > 0.55){
+      const idx = Array.from(slides).indexOf(e.target);
+      currentIdx = idx;
+      dotList.forEach(d=>d.classList.remove('active'));
+      dotList[idx]?.classList.add('active');
+      const part = e.target.dataset.part;
+      pillBtns.forEach(b=>b.classList.toggle('active', b.dataset.part === part));
+      // ensure active dot visible
+      dotList[idx]?.scrollIntoView({block:'nearest',behavior:'smooth'});
+    }
+  });
+},{root:deck, threshold:[0.55]});
+slides.forEach(s=>io.observe(s));
+
+// ---------- Pill click → first slide of that Part ----------
+pillBtns.forEach(b=>{
+  b.addEventListener('click', ()=>{
+    const target = Array.from(slides).find(s=>s.dataset.part === b.dataset.part);
+    target?.scrollIntoView({behavior:'smooth'});
+  });
+});
+
+// ---------- Keyboard ----------
+function go(delta){
+  const next = Math.max(0, Math.min(slides.length-1, currentIdx + delta));
+  slides[next].scrollIntoView({behavior:'smooth'});
+}
+document.addEventListener('keydown', (e)=>{
+  if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if(drawer.classList.contains('open')){
+    if(e.key === 'Escape'){ closeDrawer(); e.preventDefault(); }
+    return;
+  }
+  switch(e.key){
+    case 'ArrowDown': case 'PageDown': case ' ':
+      go(1); e.preventDefault(); break;
+    case 'ArrowUp': case 'PageUp':
+      go(-1); e.preventDefault(); break;
+    case 'Home':
+      slides[0].scrollIntoView({behavior:'smooth'}); e.preventDefault(); break;
+    case 'End':
+      slides[slides.length-1].scrollIntoView({behavior:'smooth'}); e.preventDefault(); break;
+    case 'g': case 'G':
+      openDrawer(); e.preventDefault(); break;
+  }
+});
+
+// ---------- Glossary drawer ----------
+const drawer = document.getElementById('drawer');
+const mask = document.getElementById('mask');
+function openDrawer(){
+  drawer.classList.add('open'); mask.classList.add('open');
+  drawer.setAttribute('aria-hidden','false');
+}
+function closeDrawer(){
+  drawer.classList.remove('open'); mask.classList.remove('open');
+  drawer.setAttribute('aria-hidden','true');
+}
+document.getElementById('glossBtn').addEventListener('click', openDrawer);
+document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+mask.addEventListener('click', closeDrawer);
+</script>
+</body>
+</html>
