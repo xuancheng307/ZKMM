@@ -1377,7 +1377,7 @@ meta.create_gate("horner_per_step", |meta| {
     <li>Proving time（N=8/32/128 實測）、verify ~8.3-8.6 ms 常數、proof size N-invariant 31,872 bytes</li>
     <li>Rust ↔ Python bit-for-bit 一致性</li>
     <li>端到端精度 vs 理論 BS（ATM 實測 7 ULP，上界 57.6 ULP）</li>
-    <li>電路成本拆解（A 23% / A' 61% / A'' 1% / B 13% / C &lt;1%）</li>
+    <li>電路成本：<strong>Merkle column 獨占 row budget</strong>（A 位置 45% / A' Market Data 55%）；Delta 管線 + A'' + C 經 column-packing 對 rows <em>貢獻 0</em></li>
   </ul>
 </section>
 
@@ -1588,19 +1588,39 @@ meta.create_gate("horner_per_step", |meta| {
 
 <section class="slide" data-part="VI" data-slide="71">
   <div class="slide-meta"><span class="part-label">Cost breakdown</span><span class="slide-num">71 / 87</span></div>
-  <h2>Cost breakdown</h2>
-  <table class="tbl">
-    <thead><tr><th>Part</th><th>Rows / 持倉</th><th>占比</th><th>瓶頸</th></tr></thead>
+  <h2>Cost breakdown — 兩種視角</h2>
+  <p style="font-size:.93rem;margin-bottom:.4rem"><strong>實測 rows/持倉 = 1,452（N=128）</strong>；下表拆成「gadget 獨立視角」與「column-packed 實際視角」。</p>
+  <table class="tbl" style="font-size:.88rem">
+    <thead><tr><th>Part</th><th>Gadget 獨立 rows</th><th>Packed 貢獻</th><th>瓶頸</th></tr></thead>
     <tbody>
-      <tr><td>Part A  (State Merkle)</td><td>~528</td><td>23%</td><td>7 層 Poseidon permutation</td></tr>
-      <tr><td>Part A' (Market Data Merkle)</td><td>~1,444</td><td><strong>62%</strong></td><td>9 欄位 hash（5 perm）+ depth ~20</td></tr>
-      <tr><td>Part A'' (σ 驗證)</td><td>~32</td><td>1%</td><td>BS price 加法形式</td></tr>
-      <tr><td>Part B  (Delta 管線)</td><td>~298</td><td>13%</td><td>本論文核心 — ln/erf/exp 共用 d=12 Horner kernel</td></tr>
-      <tr><td>Part C  (累加 + range)</td><td>~5</td><td>&lt;1%</td><td>帶符號分流 + 7-byte range check</td></tr>
-      <tr><td>其他 (type, time verify, MUX)</td><td>~8</td><td>&lt;1%</td><td>—</td></tr>
+      <tr><td>Part A (Position Merkle)</td><td>660</td><td><strong>660（45%）</strong></td><td>5-field × 3 perm + depth 7 × 2 perm</td></tr>
+      <tr><td>Part A' (Market Data Merkle)</td><td>792</td><td><strong>792（55%）</strong></td><td>9-field × 5 perm + depth 7 × 2 perm</td></tr>
+      <tr><td>Part A'' (σ 驗證 / bs_price)</td><td>~32</td><td style="color:#10b981">0（packed）</td><td>獨立 column，塞進 Merkle row 範圍</td></tr>
+      <tr><td>Part B (Delta 管線 + Horner)</td><td>61</td><td style="color:#10b981">0（packed）</td><td><strong>本論文核心</strong> — ln/erf/exp 共用 d=12 Horner</td></tr>
+      <tr><td>Part C (累加 + range)</td><td>~5</td><td style="color:#10b981">0（packed）</td><td>帶符號分流 + byte range check</td></tr>
+      <tr><td>其他 (type / time / MUX)</td><td>~8</td><td style="color:#10b981">0（packed）</td><td>—</td></tr>
+      <tr style="background:#eef2ff;font-weight:600"><td>Total rows/持倉 @ N=128</td><td>~1,558（sum）</td><td><strong>1,452（measured）</strong></td><td>— 差即 packing 節省</td></tr>
     </tbody>
   </table>
-  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem"><strong>關鍵觀察：</strong> Delta 管線只占 13%，Merkle 占 85% — 本研究讓超越函數不再是瓶頸。</p>
+  <figure class="fig" style="margin-top:.7rem">
+    <svg viewBox="0 0 820 110" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Column-packing bar">
+      <text x="10" y="16" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">Row budget — Merkle column 獨占（N=128，實測 1,452 rows/pos）</text>
+      <!-- Position Merkle bar -->
+      <rect x="10" y="30" width="325" height="30" fill="#93c5fd" stroke="#2563eb" stroke-width="1"/>
+      <text x="172" y="49" text-anchor="middle" style="font:600 12px 'Inter',sans-serif;fill:#1e3a8a">Part A · Position Merkle · 660 rows (45%)</text>
+      <!-- Market Data Merkle bar -->
+      <rect x="335" y="30" width="390" height="30" fill="#fde68a" stroke="#d97706" stroke-width="1"/>
+      <text x="530" y="49" text-anchor="middle" style="font:600 12px 'Inter',sans-serif;fill:#78350f">Part A' · Market Data Merkle · 792 rows (55%)</text>
+      <!-- Delta/A''/C packed indicator -->
+      <rect x="10" y="70" width="715" height="18" fill="#dcfce7" stroke="#10b981" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="367" y="84" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#065f46">Part A'' + B (Delta) + C — 平行 column 塞進上方 row 範圍 · rows 貢獻 <tspan style="font-weight:800">0</tspan></text>
+      <!-- Axis -->
+      <text x="10" y="104" style="font:10px 'Inter',monospace;fill:#55596b">0</text>
+      <text x="725" y="104" style="font:10px 'Inter',monospace;fill:#55596b" text-anchor="end">1,452 rows</text>
+    </svg>
+    <figcaption>圖：N=128 的 row budget 被 Merkle 兩棵樹獨占。Δ 管線（Part B 61 rows/pos）/ bs_price（A'' ~32）/ 累加（C）雖然各自需要工作，但用不同 advice columns，<strong>同 row 範圍內 parallel 塞下</strong> → 對 total rows 貢獻 0。</figcaption>
+  </figure>
+  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.88rem"><strong>關鍵觀察：</strong> Delta 不只「可行」而是 row-wise <strong>免費</strong>（caveat：依 SimpleFloorPlanner + 94 cols；prove time 仍隨 cols × rows scale）。</p>
 </section>
 
 <section class="slide part-closer" data-part="VI" data-slide="72">
@@ -1820,6 +1840,133 @@ flowchart LR
   <h1>謝謝聆聽</h1>
   <p class="subtitle">Zero-Knowledge Compliance for Fund Operations</p>
   <p style="color:var(--text-faint);font-size:.9rem;margin-top:2rem">~/.claude/projects/畢業論文v4 · 2026</p>
+  <p style="color:var(--text-dim);font-size:.88rem;margin-top:1.6rem">↓ 以下為 Q&amp;A 附錄（10 題常見口試問題預備）</p>
+</section>
+
+<!-- ========== APPENDIX: Q&A ========== -->
+
+<section class="slide part-opener" data-part="QA" data-slide="A0">
+  <div class="slide-meta"><span class="part-label">APPENDIX</span><span class="slide-num">Q&amp;A · 附錄</span></div>
+  <h1>附錄 — 口試 Q&amp;A 預備</h1>
+  <p class="lead">10 題常見刁難 + 簡答骨架；細節回論文章節。</p>
+</section>
+
+<section class="slide" data-part="QA" data-slide="A1">
+  <div class="slide-meta"><span class="part-label">Q1</span><span class="slide-num">A1 / A10</span></div>
+  <h2>Q1：為什麼不用 lookup table 直接做 exp/ln/erf？</h2>
+  <ul>
+    <li><strong>Lookup 的代價</strong>：每個函數都要建 65K+ 專用表，setup / verification key 隨函數改</li>
+    <li><strong>Poly 的優勢</strong>：<span style="color:#4f46e5">一套 256-entry ByteTable 通吃所有函數</span>，換函數只換 Remez 係數（&lt; 200 Fr），circuit 不變</li>
+    <li><strong>Scale 可控</strong>：精度要求提高，lookup table 指數爆炸；多項式 d 加幾項就夠</li>
+    <li>不 claim 更快 prove time — claim 的是<strong>工具鏈簡化 + function-independent circuit</strong></li>
+  </ul>
+  <p style="color:var(--text-dim);font-size:.88rem;margin-top:.6rem">細節：Part V slide 46-48。</p>
+</section>
+
+<section class="slide" data-part="QA" data-slide="A2">
+  <div class="slide-meta"><span class="part-label">Q2</span><span class="slide-num">A2 / A10</span></div>
+  <h2>Q2：N(d₁) 實測 7 ULP 超過 claim 6.04 ULP 16%，怎麼說？</h2>
+  <ul>
+    <li>6.04 是 <strong>per-transcendental conservative bound</strong>：exp 2.81 + erf 2.81 + rounding = 5.62 ≈ 6.04</li>
+    <li>實測 7 ULP 是 <strong>single erf call 後的 bit-for-bit 量測</strong>，落在 conservative bound ±1 ULP 之內（rounding 方向影響）</li>
+    <li>d₁ 15 ULP 是 <strong>多步鏈</strong>（ln + FpMul×3 + FpDiv + FpAdd），per-transcendental claim 本來就不直接適用；鏈式累積理論上界 57.6 ULP，實測 15 = 26% of bound，合理</li>
+    <li>合規意義：7 ULP ≈ 2×10⁻¹⁴，離任何合理門檻 τ ≥ 0.01 有 12 個數量級餘裕</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="QA" data-slide="A3">
+  <div class="slide-meta"><span class="part-label">Q3</span><span class="slide-num">A3 / A10</span></div>
+  <h2>Q3：N=128 持倉太小，真實基金有 1000+ 怎辦？</h2>
+  <ul>
+    <li><strong>本論文 scope</strong>：single-batch per-fund primitive，N=128 是 Halo2 stub k=18 的 sweet spot（proof 89s / verify 8 ms / 31 KB）</li>
+    <li><strong>Scaling 路徑</strong>：recursive SNARK aggregation（Halo2 verifier-in-circuit）或 folding scheme（Nova / SuperNova / HyperNova）</li>
+    <li><strong>分區（sharding）</strong>：N=1024 = 8 × N=128 分片 + aggregator，proof 線性疊但 verify 還是常數</li>
+    <li>Recursive aggregation 不在論文主 contribution，屬 Future Work</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="QA" data-slide="A4">
+  <div class="slide-meta"><span class="part-label">Q4</span><span class="slide-num">A4 / A10</span></div>
+  <h2>Q4：為什麼選 Halo2 而不是 Plonky2 / Jolt / STARK？</h2>
+  <ul>
+    <li><strong>Universal SRS</strong>：MDT 每日更新，每日換 setup 不可行；Halo2 KZG 是 universal</li>
+    <li><strong>Lookup + hi-degree gates 都要</strong>：ByteTable lookup（83 lookups）+ degree 6 gates（Poseidon, subgroup check）— Plonkish 是最省的</li>
+    <li><strong>Proof size & verify</strong>：31 KB / 8 ms — STARK 是 O(log² rows)，小 portfolio 吃虧</li>
+    <li><strong>工程成熟度</strong>：halo2_proofs v0.3.0 穩定，Jolt 還在快速演化 API 常動</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="QA" data-slide="A5">
+  <div class="slide-meta"><span class="part-label">Q5</span><span class="slide-num">A5 / A10</span></div>
+  <h2>Q5：PF2 不在論文實作，這算完整協議嗎？</h2>
+  <ul>
+    <li>論文範圍：<strong>Delta 計算電路（PF1）+ 多項式逼近方法論</strong>，是主 contribution</li>
+    <li>PF2（State Transition + EdDSA 驗簽）屬協議配套，介面定義與 soundness 論述在 §3</li>
+    <li>實作在 private repo（`xuancheng307/zkmm-pf2`）— 已驗 47+33 tests pass，7 攻擊向量擋完</li>
+    <li>PF1 Assumption 1（State Tree 完整性）⇐ PF2 soundness — 論文邏輯 self-contained</li>
+    <li>商業 IP 考量，不影響 thesis 理論完備性</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="QA" data-slide="A6">
+  <div class="slide-meta"><span class="part-label">Q6</span><span class="slide-num">A6 / A10</span></div>
+  <h2>Q6：Column-packing 讓 Δ 變免費，是 planner 機制還是你的設計？</h2>
+  <ul>
+    <li><strong>機制層</strong>：Halo2 `SimpleFloorPlanner` 做水平 column packing — 這是既有機制</li>
+    <li><strong>本論文貢獻</strong>：(1) 實測發現 Merkle column 是 row bottleneck（T1 獨立 harness）(2) 驗證 Δ pipeline 61 rows/pos 可塞進同 row 範圍對 total rows 貢獻 0</li>
+    <li><strong>Caveat</strong>：依賴當前 layout（94 advice cols）；若換 V1Planner 或 column 減少則不成立</li>
+    <li>「rows-only 免費」≠ prove time 免費 — 94 cols × N rows 仍 scale</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="QA" data-slide="A7">
+  <div class="slide-meta"><span class="part-label">Q7</span><span class="slide-num">A7 / A10</span></div>
+  <h2>Q7：Proof size N-invariant 31,872 B，是你做的還是 KZG 內建？</h2>
+  <ul>
+    <li><strong>KZG + SHPLONK 內建</strong>：proof size = O(columns)，非 O(rows)</li>
+    <li><strong>本論文貢獻</strong>：(1) 選擇 SHPLONK（vs 其他 multi-open scheme）(2) 實測跨 N=8/32/128 <strong>精確 31,872 bytes 相同</strong>，bit-for-bit 驗證 N-invariant</li>
+    <li>對大 portfolio 是 non-trivial 特性：STARK/FRI 會隨 N 增長 O(log² rows)，KZG 不會</li>
+    <li>不 claim 發明，claim 是「實測驗證 + 正確引用」</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="QA" data-slide="A8">
+  <div class="slide-meta"><span class="part-label">Q8</span><span class="slide-num">A8 / A10</span></div>
+  <h2>Q8：4 個 external trust assumption，還算 zero-knowledge 嗎？</h2>
+  <ul>
+    <li><strong>ZK 性質 ≠ trust model</strong>：ZK 三性質（completeness / soundness / zero-knowledge）對 <em>circuit</em> 成立；trust assumption 是 <em>protocol 層</em></li>
+    <li>本電路的 ZK：prove Δ ≤ τ 不洩持倉具體 w / K / σ — 這層成立</li>
+    <li>4 項 out-of-circuit assumption（event_root / position registry / trade completeness / inter-batch ordering）是 <strong>操作信任</strong>，由 fund administrator / exchange 提供</li>
+    <li>所有實用 ZK 系統都有 trust layer — ceremony / administrator / oracle — 論文誠實列出即可</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="QA" data-slide="A9">
+  <div class="slide-meta"><span class="part-label">Q9</span><span class="slide-num">A9 / A10</span></div>
+  <h2>Q9：MDT 每日更新靠 administrator，能去中心化嗎？</h2>
+  <ul>
+    <li>當前：fund administrator 每日發布 MDT_root + EdDSA 簽章，LP 驗簽</li>
+    <li><strong>去中心化路徑</strong>：
+      <ul>
+        <li>Threshold signature：n 家 data provider（Bloomberg / Refinitiv / Xignite）m-of-n 共簽</li>
+        <li>Price oracle（Chainlink-style）：各 provider 個別簽，LP 取 median</li>
+        <li>ZK commitment scheme：data feed 層加 ZK proof 來源正確性</li>
+      </ul>
+    </li>
+    <li>這屬 Open question，論文列為 Future Work</li>
+  </ul>
+</section>
+
+<section class="slide" data-part="QA" data-slide="A10">
+  <div class="slide-meta"><span class="part-label">Q10</span><span class="slide-num">A10 / A10</span></div>
+  <h2>Q10：能擴展到 Gamma / Vega / Theta 嗎？</h2>
+  <ul>
+    <li><strong>共用 kernel 復用率高</strong>：Delta 用 <code class="inline">N(d₁)</code>，Vega 用 <code class="inline">φ(d₁) = exp(−d₁²/2)</code>，Theta/Gamma 用 <code class="inline">φ(d₁)</code> — <strong>全共用 exp/ln/erf</strong></li>
+    <li><strong>估工作量</strong>：Vega 加 ~80 rows/pos（exp 一次 + FpMul）、Gamma 加 ~30 rows/pos（已有 φ 重用）、Theta 加 ~120 rows/pos（再算 T 相關項）</li>
+    <li>四個 Greeks 共用的電路總 rows ≈ 1.5× 當前 — 可行</li>
+    <li>論文專注 Delta 是為了深度，不為廣度</li>
+  </ul>
+  <p style="color:var(--text-dim);margin-top:.7rem;font-size:.88rem">本論文完畢。感謝口委時間。</p>
 </section>
 
 </main>
