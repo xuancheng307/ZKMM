@@ -820,14 +820,40 @@ figure.fig figcaption strong{color:var(--text)}
 </section>
 
 <section class="slide" data-part="III" data-slide="33">
-  <div class="slide-meta"><span class="part-label">Implications</span><span class="slide-num">33 / 87</span></div>
-  <h2>這些特性如何影響 PF1 電路設計</h2>
-  <ul>
-    <li><strong>Custom gate 高 degree</strong> → Horner、A2 segment-selector、BS price 一條搞定</li>
-    <li><strong>Lookup</strong> → ByteTable 256 entries 服務所有 pp48 range check（fp_mul 6-byte rem、fp_div 8-byte gap、Horner 6-byte 截斷、wide_range 7-byte）</li>
-    <li><strong>Copy constraint</strong> → 8 條 Sigma-to-MDT + pipeline 中介值銜接，零 gate 成本</li>
-    <li><strong>Universal SRS</strong> → Market data 每日變 root 不用重做 ceremony</li>
-  </ul>
+  <div class="slide-meta"><span class="part-label">Expressiveness</span><span class="slide-num">33 / 87</span></div>
+  <h2>Halo2 能表達什麼 · 不能表達什麼</h2>
+  <div class="defn">
+    <span class="dt">DEF.</span> <em>Halo2 circuit trace</em> = (rows × columns) 矩陣 T ∈ 𝔽<sub>p</sub><sup>2<sup>k</sup>×w</sup>，w = advice + fixed + instance 總欄數；electrical 語義 = 對每個 row r 與啟用 selector 的 gate，對應 multivariate polynomial <code>P(T[r−1,*], T[r,*], T[r+1,*], ...) = 0 ∈ 𝔽<sub>p</sub></code>。<em>合法 witness</em> 即所有啟用 constraint 皆為 0。
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-top:.5rem">
+    <div style="background:#ecfdf5;border-left:3px solid #10b981;padding:.55rem .75rem;border-radius:3px">
+      <div style="font-weight:700;color:#065f46;font-size:.88rem;margin-bottom:.3rem">✅ 能直接表達</div>
+      <ul style="margin:0;padding-left:1rem;font-size:.83rem;line-height:1.5">
+        <li><strong>Arithmetic over 𝔽<sub>p</sub></strong>：加 / 乘 / 多項式 identity（任意 multivariate）</li>
+        <li><strong>Custom gate</strong>：degree ≤ <em>J</em>（預設 5，本電路用到 6）的 polynomial constraint 跨 <em>cur / next / prev</em> rotation 均可</li>
+        <li><strong>Lookup</strong>：advice cell ∈ fixed / 共用 preprocessed table（256-entry ByteTable 通吃 range check + S-box）</li>
+        <li><strong>Copy constraint</strong>：任意兩 cell 綁 same-value 透過 permutation argument（+1 column 代價 at prover）</li>
+        <li><strong>Conditional logic</strong>：<code>sel·(A − B) + (1 − sel)·(C − D) = 0</code> — selector 做 2-way MUX</li>
+        <li><strong>Rotation ±k</strong>：同 column 跨 k 列 query（|k| 大 → prover FFT 重算成本）</li>
+        <li><strong>Padded variable-length input</strong>：用 sponge + zero padding（本電路 Poseidon sponge 做 5 / 9 field absorb）</li>
+      </ul>
+    </div>
+    <div style="background:#fef2f2;border-left:3px solid #dc2626;padding:.55rem .75rem;border-radius:3px">
+      <div style="font-weight:700;color:#991b1b;font-size:.88rem;margin-bottom:.3rem">⚠️ 不能 / 需 gadget / 有硬限制</div>
+      <ul style="margin:0;padding-left:1rem;font-size:.83rem;line-height:1.5">
+        <li><strong>硬限制 k ≲ 28</strong>：rows ≤ 2<sup>k</sup>，prover FFT 需要 O(2<sup>k</sup>·J) 記憶體，k=28 約需 30 GB RAM</li>
+        <li><strong>硬限制 degree</strong>：gate degree J 決定 prover FFT 放大倍數（2J×n），實務 J ≤ 9-10</li>
+        <li><strong>硬限制 lookup table 大小</strong>：table entries ≤ 2<sup>k</sup>（dynamic lookup 不支援，preprocessing 固定）</li>
+        <li><strong>Bit-level 運算</strong>：XOR / AND / rotate 需 boolean decomposition <code>b·(1−b)=0</code>，成本高 — SHA / Keccak arithmetization 貴 2 orders</li>
+        <li><strong>除法 / modular inverse</strong>：必須 prover 提供 quotient / inverse 作 witness 再驗證 <code>a·b=1</code>；不能在電路內「算」</li>
+        <li><strong>Foreign field（非 native 𝔽<sub>p</sub>）</strong>：如 BLS scalar field 下做 secp256k1 ECDSA 需 non-native field arithmetic gadget，~30× 慢</li>
+        <li><strong>Floating point</strong>：無原生支援 → pp=48 fixed-point encoding（本研究核心）</li>
+        <li><strong>Data-dependent control flow</strong>：trace 在 preprocessing 就固定，所有 branch 必須 static（全走完、用 selector 取結果）</li>
+        <li><strong>Dynamic length loop</strong>：必須上界固定（本電路 T_MAX=4, N_MAX=128 皆 static）</li>
+      </ul>
+    </div>
+  </div>
+  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.85rem"><strong>PF1 對應</strong>：Horner 用 degree-3 custom gate；ByteTable lookup 服務 83 個 range check；8 條 Sigma-to-MDT copy constraint；pp48 fixed-point 解 floating-point 問題；fp_div / erf saturation 用 witness 提供 quotient / flag 再驗證。Universal SRS 讓市場資料每日更新只換 commitment 不換 setup。</p>
 </section>
 
 <section class="slide part-closer" data-part="III" data-slide="34">
@@ -1477,7 +1503,10 @@ meta.create_gate("horner_per_step", |meta| {
     <li>94 advice + 16 fixed + 1 instance 固定 → proof size 跨 N 完全不變</li>
     <li>31,872 bytes ≈ 31 KB — 可放進單一 blockchain tx calldata</li>
   </ul>
-  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.9rem">這是 KZG+SHPLONK 的內建特性（vs STARK/FRI 的 O(log² rows)），對大 portfolio 無額外 bandwidth 成本。</p>
+  <div class="defn" style="margin-top:.4rem">
+    <span class="dt">DEF.</span> <em>SHPLONK</em>（Gabizon &amp; Williamson 2021, ePrint 2021/1244）：batched polynomial commitment opening scheme — 對 k 個 commitment <code>c<sub>1</sub>,...,c<sub>k</sub></code> 在 <em>不同 evaluation points</em> 的 openings，產生<strong>單一</strong> constant-size proof（2 G<sub>1</sub> + k field elements），而非 k 個 independent KZG openings。技術：用 random linear combination + quotient polynomial，單次 pairing 驗證全部 openings。對比 PLONK 原始 multi-point KZG 需 O(k) 個 proof，SHPLONK 讓 proof 長度只隨 columns（不隨 rows）scale。
+  </div>
+  <p style="color:var(--text-dim);margin-top:.4rem;font-size:.88rem">對比 STARK / FRI 的 proof size O(log² rows)：當 rows 從 2¹³ 增到 2¹⁸（16×），FRI 約增 ~2×；KZG+SHPLONK 不變。</p>
 </section>
 
 <section class="slide" data-part="VI" data-slide="66">
