@@ -449,16 +449,41 @@ figure.fig figcaption strong{color:var(--text)}
 <section class="slide" data-part="II" data-slide="13">
   <div class="slide-meta"><span class="part-label">Trust Model</span><span class="slide-num">13 / 87</span></div>
   <h2>四層信任架構</h2>
-  <table class="tbl">
-    <thead><tr><th>層</th><th>機制</th><th>填的洞</th></tr></thead>
-    <tbody>
-      <tr><td><strong>L4 Deterrence</strong></td><td>監管隨機抽查 k 筆 + 反向查核交易所</td><td>防交易所與基金串通</td></tr>
-      <tr><td><strong>L3 Computation</strong></td><td>PF1 零知識 Delta 合規證明（本研究）</td><td>計算正確性 + 持倉隱私</td></tr>
-      <tr><td><strong>L2 Crypto</strong></td><td>交易所 EdDSA 簽章 + PF2 State Transition</td><td>輸入真實性、狀態完整性</td></tr>
-      <tr><td><strong>L1 Trust Anchor</strong></td><td>監管一次性簽署 State(0)</td><td>信任鏈起點，如 TLS root CA</td></tr>
-    </tbody>
-  </table>
-  <div class="card amber" style="margin-top:1rem"><p><strong>關鍵：</strong>拿掉任何一層系統都會崩塌。ZK 不是銀彈 — 而是四層防線的其中一層。</p></div>
+  <figure class="fig" style="margin:.3rem 0 .5rem 0">
+    <svg viewBox="0 0 820 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four-layer trust stack">
+      <text x="410" y="14" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">由下而上：信任鏈 — 上層依賴下層 soundness</text>
+      <!-- L1 Trust Anchor (bottom, gray) -->
+      <rect x="60" y="190" width="700" height="42" rx="6" fill="#e5e7eb" stroke="#6b7280" stroke-width="1.5"/>
+      <text x="80" y="208" style="font:700 13px 'Inter',sans-serif;fill:#1f2937">L1 · Trust Anchor</text>
+      <text x="80" y="224" style="font:11px 'Inter',sans-serif;fill:#374151">監管 / 法律 一次性簽署 <tspan style="font-family:monospace">State(0)</tspan> + 註冊交易所 pubkey · 類比 TLS Root CA / 制度層</text>
+      <text x="730" y="216" text-anchor="end" style="font:600 11px 'Inter',sans-serif;fill:#6b7280">制度</text>
+      <!-- L2 Crypto (signature + state transition) -->
+      <rect x="60" y="142" width="700" height="42" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+      <text x="80" y="160" style="font:700 13px 'Inter',sans-serif;fill:#1e3a8a">L2 · Crypto Primitives</text>
+      <text x="80" y="176" style="font:11px 'Inter',sans-serif;fill:#1e40af">交易所 EdDSA over Baby Jubjub · PF2 State Transition Proof · Poseidon Merkle commitment</text>
+      <text x="730" y="168" text-anchor="end" style="font:600 11px 'Inter',sans-serif;fill:#2563eb">填：輸入真實性 + 狀態完整性</text>
+      <!-- L3 Computation (zk Delta proof) -->
+      <rect x="60" y="94" width="700" height="42" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="80" y="112" style="font:700 13px 'Inter',sans-serif;fill:#5b21b6">L3 · Computation Integrity（本論文）</text>
+      <text x="80" y="128" style="font:11px 'Inter',sans-serif;fill:#6d28d9">PF1 zk-SNARK：證明 |Σ w<tspan style="font-size:8.5px">i</tspan> · Δ<tspan style="font-size:8.5px">BS</tspan>| ≤ τ · 計算正確 + 持倉隱私（zero-knowledge）</text>
+      <text x="730" y="120" text-anchor="end" style="font:600 11px 'Inter',sans-serif;fill:#7c3aed">填：計算正確 + 隱私</text>
+      <!-- L4 Deterrence -->
+      <rect x="60" y="46" width="700" height="42" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+      <text x="80" y="64" style="font:700 13px 'Inter',sans-serif;fill:#78350f">L4 · Deterrence</text>
+      <text x="80" y="80" style="font:11px 'Inter',sans-serif;fill:#92400e">監管隨機抽查 k 筆部位、反向查核交易所、刑事追訴</text>
+      <text x="730" y="72" text-anchor="end" style="font:600 11px 'Inter',sans-serif;fill:#d97706">填：防交易所 ↔ 基金串通</text>
+      <!-- Stacking arrows -->
+      <path d="M30 232 V 46" stroke="#9ca3af" stroke-width="1.4" stroke-dasharray="3 3" marker-end="url(#trArr)"/>
+      <text x="22" y="142" transform="rotate(-90,22,142)" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#6b7280">每層依賴下層</text>
+      <defs>
+        <marker id="trArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,0 L10,5 L0,10 Z" fill="#9ca3af"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>圖：四層信任堆疊（下而上）— L1 制度層為信任根；L2 密碼學原語綁定輸入；L3 zk-SNARK 證明計算 + 隱私；L4 抽查嚇阻防共謀。</figcaption>
+  </figure>
+  <div class="card amber" style="margin-top:.4rem"><p style="font-size:.9rem"><strong>關鍵：</strong>拿掉任何一層系統都會崩塌。ZK 不是銀彈 — 而是四層防線的其中一層。L3 (本論文) 解「計算 + 隱私」，L1+L2+L4 由協議與制度提供。</p></div>
 </section>
 
 <section class="slide" data-part="II" data-slide="14">
@@ -612,10 +637,67 @@ figure.fig figcaption strong{color:var(--text)}
 
 <section class="slide" data-part="II" data-slide="19">
   <div class="slide-meta"><span class="part-label">Summary</span><span class="slide-num">19 / 87</span></div>
-  <h2>協議 one-pager</h2>
-  <ul>
-    <li><strong>流程（6 步）</strong>：收交易 → 建 Trade Tree → 算 State(T) → 產 PF2 → 產 PF1 → 提交 {root, PF1, PF2}</li>
-    <li><strong>兩棵樹</strong>：Position（5 欄, depth 7）+ Market Data（8 欄, depth ~20）</li>
+  <h2>協議 one-pager — 6 步流程</h2>
+  <figure class="fig" style="margin:.3rem 0 .4rem 0">
+    <svg viewBox="0 0 820 175" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Six-step protocol flow">
+      <text x="410" y="14" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">基金每日結算流程（T = 結算日）</text>
+      <!-- Step boxes -->
+      <g style="font-family:'Inter','Noto Sans TC',sans-serif">
+        <!-- Step 1: 收交易 -->
+        <rect x="20" y="42" width="120" height="58" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.4"/>
+        <text x="80" y="58" text-anchor="middle" style="font:700 11px sans-serif;fill:#78350f">① 收交易</text>
+        <text x="80" y="74" text-anchor="middle" style="font:10px sans-serif;fill:#78350f">Trades(T)</text>
+        <text x="80" y="88" text-anchor="middle" style="font:9.5px sans-serif;fill:#92400e">{op, idx, leaf, σ<tspan style="font-size:8px">EdDSA</tspan>}</text>
+        <!-- Step 2: 建 Trade Tree -->
+        <rect x="155" y="42" width="120" height="58" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.4"/>
+        <text x="215" y="58" text-anchor="middle" style="font:700 11px sans-serif;fill:#1e3a8a">② Batch root</text>
+        <text x="215" y="74" text-anchor="middle" style="font:10px sans-serif;fill:#1e40af">Poseidon(c<tspan style="font-size:8.5px">1</tspan>...c<tspan style="font-size:8.5px">T</tspan>)</text>
+        <text x="215" y="88" text-anchor="middle" style="font:9.5px sans-serif;fill:#1e40af">commit 4 trades</text>
+        <!-- Step 3: 算 State(T) -->
+        <rect x="290" y="42" width="120" height="58" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.4"/>
+        <text x="350" y="58" text-anchor="middle" style="font:700 11px sans-serif;fill:#5b21b6">③ State(T)</text>
+        <text x="350" y="74" text-anchor="middle" style="font:10px sans-serif;fill:#6d28d9">apply trades</text>
+        <text x="350" y="88" text-anchor="middle" style="font:9.5px sans-serif;fill:#6d28d9">old_root → new_root</text>
+        <!-- Step 4: 產 PF2 -->
+        <rect x="425" y="42" width="120" height="58" rx="6" fill="#fee2e2" stroke="#dc2626" stroke-width="1.4"/>
+        <text x="485" y="58" text-anchor="middle" style="font:700 11px sans-serif;fill:#991b1b">④ Prove PF2</text>
+        <text x="485" y="74" text-anchor="middle" style="font:10px sans-serif;fill:#991b1b">state transition</text>
+        <text x="485" y="88" text-anchor="middle" style="font:9.5px sans-serif;fill:#b91c1c">+ EdDSA verify</text>
+        <!-- Step 5: 產 PF1 -->
+        <rect x="560" y="42" width="120" height="58" rx="6" fill="#dcfce7" stroke="#10b981" stroke-width="1.4"/>
+        <text x="620" y="58" text-anchor="middle" style="font:700 11px sans-serif;fill:#065f46">⑤ Prove PF1 ★</text>
+        <text x="620" y="74" text-anchor="middle" style="font:10px sans-serif;fill:#047857">|Σ w·Δ| ≤ τ</text>
+        <text x="620" y="88" text-anchor="middle" style="font:9.5px sans-serif;fill:#047857">本論文核心</text>
+        <!-- Step 6: 提交 -->
+        <rect x="695" y="42" width="105" height="58" rx="6" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.4"/>
+        <text x="747" y="58" text-anchor="middle" style="font:700 11px sans-serif;fill:#5b21b6">⑥ Submit</text>
+        <text x="747" y="74" text-anchor="middle" style="font:10px sans-serif;fill:#5b21b6">{state_root,</text>
+        <text x="747" y="88" text-anchor="middle" style="font:10px sans-serif;fill:#5b21b6">PF1, PF2}</text>
+        <!-- Arrows -->
+        <line x1="140" y1="71" x2="153" y2="71" stroke="#5a5a70" stroke-width="1.5" marker-end="url(#a19)"/>
+        <line x1="275" y1="71" x2="288" y2="71" stroke="#5a5a70" stroke-width="1.5" marker-end="url(#a19)"/>
+        <line x1="410" y1="71" x2="423" y2="71" stroke="#5a5a70" stroke-width="1.5" marker-end="url(#a19)"/>
+        <line x1="545" y1="71" x2="558" y2="71" stroke="#5a5a70" stroke-width="1.5" marker-end="url(#a19)"/>
+        <line x1="680" y1="71" x2="693" y2="71" stroke="#5a5a70" stroke-width="1.5" marker-end="url(#a19)"/>
+        <!-- Inputs row -->
+        <text x="80" y="118" text-anchor="middle" style="font:9.5px sans-serif;fill:#55596b">交易所簽名 σ</text>
+        <text x="350" y="118" text-anchor="middle" style="font:9.5px sans-serif;fill:#55596b">witness leaves</text>
+        <text x="620" y="118" text-anchor="middle" style="font:9.5px sans-serif;fill:#55596b">+ MDT commitment</text>
+        <!-- Verifier row -->
+        <rect x="200" y="138" width="420" height="28" rx="4" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1"/>
+        <text x="410" y="156" text-anchor="middle" style="font:600 11px sans-serif;fill:#374151">監管 / LP：驗 PF1 ✓ + PF2 ✓ + state_root chain ✓ → 1 bit「合規 / 不合規」</text>
+        <line x1="747" y1="100" x2="465" y2="138" stroke="#9ca3af" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#a19)"/>
+      </g>
+      <defs>
+        <marker id="a19" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,0 L10,5 L0,10 Z" fill="#5a5a70"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>圖：每日結算 6 步流程 — ★ 為本論文核心（PF1 zk-SNARK）；其餘步驟由協議規範或 PF2 提供。Verifier 接收 {state_root, PF1, PF2} 三件後常數時間驗證。</figcaption>
+  </figure>
+  <ul style="font-size:.9rem;margin-top:.3rem">
+    <li><strong>兩棵樹</strong>：Position State (5 欄, depth 7, N<sub>max</sub>=128) + Market Data (9 欄, depth ~20)</li>
     <li><strong>8 條 cross-tree copy constraint</strong>：鎖合約條款 + 市場參數，防資產錯配</li>
     <li><strong>4 個 public input</strong>：state_root, market_data_root, τ, today</li>
     <li><strong>四層信任</strong>：L1 genesis + L2 exchange sig + L3 PF1+PF2 + L4 抽查</li>
@@ -780,18 +862,51 @@ figure.fig figcaption strong{color:var(--text)}
   <div class="defn">
     <span class="dt">DEF.</span> <em>Polynomial Commitment Scheme (PCS)</em>：三元組 <code>(Commit, Open, Verify)</code>。<code>Commit(f)</code> 對多項式 <em>f ∈ 𝔽<sub>p</sub>[X]</em> 產生簡短承諾 <em>c</em>；<code>Open(f, z)</code> 產生在點 <em>z</em> 的 opening proof π；<code>Verify(c, z, y, π)</code> 驗證 <em>f(z) = y</em>。安全性要求 (i) <strong>binding</strong>：prover 無法對同 <em>z</em> 開出兩個不同 <em>y</em>；(ii) <strong>hiding</strong>（選配）：commitment 不洩漏 <em>f</em> 資訊。<em>KZG</em>（Kate–Zaverucha–Goldberg 2010）：<code>c = g<sup>f(τ)</sup></code>，opening 為 <code>π = g<sup>(f(X)−y)/(X−z)|<sub>X=τ</sub></sup></code>，常數大小、pairing-based。
   </div>
-  <ol style="padding-left:1.2rem;margin-top:.3rem;font-size:.93rem">
-    <li style="list-style:decimal">Prover：填 advice → inverse FFT 得 column polynomial → KZG <strong>commit</strong> 送出</li>
-    <li style="list-style:decimal">Verifier：Fiat-Shamir 由 transcript hash 產生 <strong>random challenge</strong> ζ ∈ 𝔽<sub>p</sub></li>
-    <li style="list-style:decimal">Prover：在 ζ 點 <strong>evaluate</strong> 所有多項式 + 建 quotient polynomial <em>h(X)</em> 使 <code>identity = h·Z<sub>H</sub></code></li>
-    <li style="list-style:decimal">Prover：送 <strong>opening proof</strong>（multi-point KZG 用 SHPLONK 批次化）</li>
-    <li style="list-style:decimal">Verifier：常數個 pairing 檢查 gate identity、permutation argument、lookup argument 全部成立</li>
-  </ol>
-  <p style="color:var(--text-dim);margin-top:1rem;font-size:.95rem">驗證者 work 是常數級（幾個 pairing）— 這是 KZG 的甜蜜點。Proof 大小 ~KB 級。</p>
-  <div class="defn" style="margin-top:.4rem">
-    <span class="dt">DEF.</span> <em>Fiat–Shamir transform</em>（CRYPTO '86）：將任一 public-coin interactive proof 轉為 non-interactive — prover 把每輪 verifier 的 random challenge <em>c</em> 替換為 <code>c := H(transcript<sub>so far</sub>)</code>（<em>H</em> 建模為 random oracle）。在 Random Oracle Model (ROM) 下保留 soundness，且 transcript 可被任意第三方驗證。Halo2 的 non-interactive 化即基於 Fiat–Shamir，<em>H</em> 由 Blake2b transcript 實現。
+  <figure class="fig" style="margin-top:.4rem">
+    <svg viewBox="0 0 820 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Prover-Verifier protocol with Fiat-Shamir">
+      <text x="410" y="14" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">Plonk-style 證明流程（Fiat-Shamir 化為 non-interactive）</text>
+      <!-- Actor headers -->
+      <rect x="40" y="24" width="140" height="26" rx="4" fill="#eef2ff" stroke="#4f46e5" stroke-width="1.5"/>
+      <text x="110" y="42" text-anchor="middle" style="font:700 13px 'Inter',sans-serif;fill:#1e3a8a">Prover P</text>
+      <rect x="340" y="24" width="140" height="26" rx="4" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+      <text x="410" y="42" text-anchor="middle" style="font:700 12px 'Inter',sans-serif;fill:#78350f">Transcript H (Blake2b)</text>
+      <rect x="640" y="24" width="140" height="26" rx="4" fill="#dcfce7" stroke="#10b981" stroke-width="1.5"/>
+      <text x="710" y="42" text-anchor="middle" style="font:700 13px 'Inter',sans-serif;fill:#065f46">Verifier V</text>
+      <!-- Lifelines -->
+      <line x1="110" y1="50" x2="110" y2="190" stroke="#4f46e5" stroke-width="1" stroke-dasharray="2 3"/>
+      <line x1="410" y1="50" x2="410" y2="190" stroke="#d97706" stroke-width="1" stroke-dasharray="2 3"/>
+      <line x1="710" y1="50" x2="710" y2="190" stroke="#10b981" stroke-width="1" stroke-dasharray="2 3"/>
+      <!-- Step 1: P -> H commitments -->
+      <line x1="110" y1="68" x2="405" y2="68" stroke="#4f46e5" stroke-width="1.6" marker-end="url(#a30)"/>
+      <text x="257" y="64" text-anchor="middle" style="font:600 10.5px 'Inter',sans-serif;fill:#1a1a1f">① commit({c<tspan style="font-size:8.5px">advice</tspan>}, {c<tspan style="font-size:8.5px">fixed</tspan>}) — KZG</text>
+      <!-- Step 2: H -> P challenge -->
+      <line x1="405" y1="92" x2="115" y2="92" stroke="#d97706" stroke-width="1.6" marker-end="url(#a30)"/>
+      <text x="257" y="88" text-anchor="middle" style="font:600 10.5px 'Inter',sans-serif;fill:#1a1a1f">② ζ := H(transcript) ∈ 𝔽<tspan style="font-size:8.5px">p</tspan></text>
+      <!-- Step 3: P -> H opens + h(X) -->
+      <line x1="110" y1="116" x2="405" y2="116" stroke="#4f46e5" stroke-width="1.6" marker-end="url(#a30)"/>
+      <text x="257" y="112" text-anchor="middle" style="font:600 10.5px 'Inter',sans-serif;fill:#1a1a1f">③ {f<tspan style="font-size:8.5px">i</tspan>(ζ)}, c<tspan style="font-size:8.5px">h</tspan>=Commit(quotient h s.t. id=h·Z<tspan style="font-size:8.5px">H</tspan>)</text>
+      <!-- Step 4: H -> P opening challenge -->
+      <line x1="405" y1="140" x2="115" y2="140" stroke="#d97706" stroke-width="1.6" marker-end="url(#a30)"/>
+      <text x="257" y="136" text-anchor="middle" style="font:600 10.5px 'Inter',sans-serif;fill:#1a1a1f">④ ν := H(...) (opening challenge)</text>
+      <!-- Step 5: P -> V SHPLONK opening proof -->
+      <line x1="110" y1="164" x2="705" y2="164" stroke="#4f46e5" stroke-width="2" marker-end="url(#a30)"/>
+      <text x="407" y="160" text-anchor="middle" style="font:700 11px 'Inter',sans-serif;fill:#1a1a1f">⑤ π = SHPLONK opening (2 G<tspan style="font-size:9px">1</tspan> + k 𝔽<tspan style="font-size:8.5px">p</tspan> elements)</text>
+      <!-- Step 6: V verifies -->
+      <rect x="640" y="178" width="140" height="14" rx="3" fill="#10b981" stroke="#065f46" stroke-width="1"/>
+      <text x="710" y="189" text-anchor="middle" style="font:700 10px 'Inter','Noto Sans TC',sans-serif;fill:#fff">⑥ pairing check ✓ (常數)</text>
+      <!-- Marker -->
+      <defs>
+        <marker id="a30" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,0 L10,5 L0,10 Z" fill="#5a5a70"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>圖：Plonk-style 5 round 互動式證明 → Fiat-Shamir 化為 non-interactive。Prover 與 Transcript H 之間的 ①-④ 全在 prover 本機算出（H 是 hash function 不是 entity），最終只送單一 SHPLONK opening proof π 給 Verifier，V 一次 pairing 驗證 gate identity / permutation argument / lookup argument。</figcaption>
+  </figure>
+  <div class="defn" style="margin-top:.5rem">
+    <span class="dt">DEF.</span> <em>Fiat–Shamir transform</em>（Fiat &amp; Shamir, CRYPTO '86）：將任一 public-coin interactive proof 轉為 non-interactive — prover 把每輪 verifier 的 random challenge <em>c</em> 替換為 <code>c := H(transcript<sub>so far</sub>)</code>（<em>H</em> 建模為 random oracle）。在 Random Oracle Model (ROM) 下保留 soundness，transcript 可被任意第三方獨立驗證。Halo2 的 non-interactivity 即基於 Fiat–Shamir，<em>H</em> 由 Blake2b transcript 實現。
   </div>
-  <p style="color:var(--text-dim);margin-top:.4rem;font-size:.88rem">Verifier work 為常數級（幾個 pairing）— KZG 的 sweet spot。Proof size ~KB 級。</p>
+  <p style="color:var(--text-dim);margin-top:.4rem;font-size:.88rem"><strong>Verifier work O(1)</strong>：~5 個 pairing + 一些 𝔽<sub>p</sub> 算術 ≈ 8 ms（本電路 N=128 實測）。<strong>Proof size 31 KB</strong> 跨 N invariant。</p>
 </section>
 
 <section class="slide" data-part="III" data-slide="31">
