@@ -121,6 +121,12 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text);line-he
 .card.green{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.05)}
 .card.amber{border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.05)}
 
+/* Definition box — 密碼學術語正式定義 */
+.defn{background:#f5f3ff;border-left:3px solid #7c3aed;padding:.55rem .75rem;border-radius:3px;margin:.55rem 0;font-size:.9rem;line-height:1.5}
+.defn .dt{font-weight:700;color:#5b21b6;font-size:.85rem;letter-spacing:.04em;margin-right:.4rem}
+.defn code{background:rgba(124,58,237,.08);padding:0 .22rem;border-radius:2px;font-size:.88em}
+.defn em{font-style:italic;color:#1a1a1f;font-weight:500}
+
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
 .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
 .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem}
@@ -467,27 +473,33 @@ figure.fig figcaption strong{color:var(--text)}
 
 <section class="slide" data-part="II" data-slide="15">
   <div class="slide-meta"><span class="part-label">PF1 Statement</span><span class="slide-num">15 / 87</span></div>
-  <h2>PF1 形式化陳述 — 5 條件</h2>
-  <p style="color:var(--text-dim);margin-top:.2rem;font-size:.95rem">∃ witness <em>w</em> s.t. 對所有 i ∈ [1, N]：</p>
-  <ul style="margin-top:.5rem">
-    <li>(a) <code class="inline">MerkleVerify(p_i, path_i, state_root) = true</code></li>
-    <li>(b) <code class="inline">MerkleVerify(mkt_i, mkt_path_i, market_data_root) = true</code></li>
-    <li>(c) <code class="inline">|BS(S,K_i,T_i,r,q,σ_i) − settle_price_i| ≤ ε_σ</code>（σ 正向驗證）</li>
-    <li>(d) <code class="inline">T_i × 365 = expiry_date_i − today</code>（T 電路內計算）</li>
-    <li>(e) <code class="inline">|Σ w_i · Δ_BS(S,K_i,T_i,r,q,σ_i)| ≤ τ</code>（合規）</li>
+  <h2>PF1 形式化陳述 — NP relation R<sub>PF1</sub></h2>
+  <div class="defn">
+    <span class="dt">DEF.</span> <em>NP relation</em> <code>R ⊆ {0,1}* × {0,1}*</code>：public statement <em>x</em> 與 witness <em>w</em> 的多項式時間可驗證關係；語言 <code>L<sub>R</sub> = {x : ∃w, (x,w) ∈ R}</code>。Prover 要證 <code>x ∈ L<sub>R</sub></code> 且不洩漏 <em>w</em>。
+  </div>
+  <p style="margin-top:.2rem;font-size:.93rem"><em>Statement</em> <code class="inline">x = (state_root, market_data_root, τ, today)</code>；<em>witness</em> <code class="inline">w = ({leaf<sub>i</sub>, path<sub>i</sub>, mkt<sub>i</sub>, mkt_path<sub>i</sub>, σ<sub>i</sub>, ...})</code>。<code>(x, w) ∈ R<sub>PF1</sub></code> iff 對所有 i ∈ [1, N]：</p>
+  <ul style="margin-top:.3rem">
+    <li>(a) <code class="inline">MerkleVerify(p<sub>i</sub>, path<sub>i</sub>, state_root) = true</code></li>
+    <li>(b) <code class="inline">MerkleVerify(mkt<sub>i</sub>, mkt_path<sub>i</sub>, market_data_root) = true</code></li>
+    <li>(c) <code class="inline">|BS(S,K<sub>i</sub>,T<sub>i</sub>,r,q,σ<sub>i</sub>) − settle_price<sub>i</sub>| ≤ ε<sub>σ</sub></code>（σ 正向驗證）</li>
+    <li>(d) <code class="inline">T<sub>i</sub> × 365 = expiry_date<sub>i</sub> − today</code>（到期期限一致性）</li>
+    <li>(e) <code class="inline">|Σ w<sub>i</sub> · Δ<sub>BS</sub>(S,K<sub>i</sub>,T<sub>i</sub>,r,q,σ<sub>i</sub>)| ≤ τ</code>（合規門檻）</li>
   </ul>
-  <p style="color:var(--text-dim);margin-top:1rem;font-size:.95rem">Part V 會把這 5 條件對應到 31 個 custom gate / 66 條多項式約束。</p>
+  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.9rem">Part V 會把這 5 條件對應到 31 個 custom gate / 66 條 multivariate polynomial constraints over 𝔽<sub>p</sub>。</p>
 </section>
 
 <section class="slide" data-part="II" data-slide="16">
   <div class="slide-meta"><span class="part-label">PF2 (out of scope)</span><span class="slide-num">16 / 87</span></div>
   <h2>PF2 存在，本次報告不展內部</h2>
-  <p>PF2 負責「State Transition」：State(T) = State(T−1) + apply(Trades(T))，每筆交易有合法交易所 EdDSA 簽章。</p>
-  <div class="grid-2" style="margin-top:1rem">
-    <div class="card"><h3>PF1（本論文）</h3><p>證明「這組持倉的加權 Δ 合規」<br>涉及超越函數 ln / erf / exp</p></div>
-    <div class="card"><h3>PF2（介面定義，實作另案）</h3><p>證明「這組持倉是從已簽交易正確演化而來」<br>EdDSA Babyjubjub ~4.6K rows/verify（含 subgroup + S&lt;L + domain sep）</p></div>
+  <div class="defn">
+    <span class="dt">DEF.</span> <em>EdDSA</em>（Edwards-curve Digital Signature Algorithm, Bernstein et al. 2012）：deterministic Schnorr-style signature over twisted-Edwards curve <em>E</em>。公鑰 <code>A = [s]B</code>，<em>s</em> 為 scalar secret，<em>B</em> generator of prime-order subgroup 𝔾 of size ℓ。簽章 σ=(R,S) 滿足 <code>[S]B = R + [H(R∥A∥M)]A</code>。<em>Baby Jubjub</em>：over BN254 / BLS12-381 scalar field 的 twisted-Edwards curve（<code>ax²+y²=1+dx²y²</code>），SNARK 電路內做點運算比 secp256k1 / Ed25519 便宜約 5×（因座標元素已經在電路 native field 中）。
   </div>
-  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">PF1 假設 State Tree 完整（Assumption 1）— 這個保證由 PF2 提供。兩個 proof 透過 <code class="inline">state_root</code> 綁定。</p>
+  <p style="margin-top:.3rem;font-size:.92rem">PF2 負責 <em>state transition relation</em>：<code>State(T) = State(T−1) + apply(Trades(T))</code>，每筆交易附合法交易所 EdDSA 簽章 σ。</p>
+  <div class="grid-2" style="margin-top:.5rem">
+    <div class="card"><h3>PF1（本論文）</h3><p>證明「這組持倉的加權 Δ 合規」<br>涉及超越函數 ln / erf / exp</p></div>
+    <div class="card"><h3>PF2（介面定義，實作另案）</h3><p>證明「這組持倉是從已簽交易正確演化而來」<br>EdDSA over Baby Jubjub ~4.6K rows/verify（含 subgroup membership + S&lt;ℓ range + domain separator）</p></div>
+  </div>
+  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.9rem">PF1 假設 State Tree 完整（Assumption 1）— 由 PF2 soundness 提供。兩 proof 透過 public <code class="inline">state_root</code> 綁定。</p>
 </section>
 
 <section class="slide" data-part="II" data-slide="17">
@@ -497,7 +509,10 @@ figure.fig figcaption strong{color:var(--text)}
     <div class="card"><h3>Position State Tree</h3><p>記錄當前持倉快照</p><ul><li><strong>5 欄位</strong>：asset_id, w, K, expiry_date, type</li><li>Depth 7（生產 N_max=128；測試 N=8）</li><li>不足 N_max 填 dummy 葉子（隱藏真實持倉數量）</li></ul></div>
     <div class="card"><h3>Market Data Tree</h3><p>記錄當日市場資料</p><ul><li><strong>9 欄位</strong>：underlying_id, strike, expiry, asset_type, S (spot), r, q, settle_price, <strong>σ</strong></li><li>Depth ~20（涵蓋所有標的 × 合約）</li><li>每日由資料提供者重算並發布 root</li></ul></div>
   </div>
-  <div class="card amber" style="margin-top:1rem"><p><strong>為什麼用 Merkle 而非 Halo2 lookup？</strong> Market data 每日變 — 若用 fixed column lookup 每日得重做 setup + VK。Merkle 讓電路結構一次 setup 永久有效，只有 root 值每日更新。</p></div>
+  <div class="defn">
+    <span class="dt">DEF.</span> <em>Merkle tree</em>（Merkle 1979）：高度 d 的完全二元樹，每個內部節點儲存 <code>h(left ∥ right)</code>，<em>h</em> 為抗碰撞雜湊。<em>Authentication path</em> = 從葉到根的 d 個 sibling hash，允許 verifier 以 O(d) 成本確認某葉屬於 commitment <em>root</em>。在 SNARK 電路內驗證一條 path 要 d 次 hash gate evaluation。
+  </div>
+  <div class="card amber" style="margin-top:.7rem"><p><strong>為什麼用 Merkle 而非 Halo2 lookup？</strong> Market data 每日變 — 若用 fixed column lookup 每日得重做 preprocessing + verification key。Merkle 讓電路結構一次 preprocessing 永久有效，只有 root 值每日更新。</p></div>
   <div class="quote" style="margin-top:.8rem">
     <p>"we describe a method called 'tree authentication' which can be used to authenticate any Y<sub>i</sub> of any user quickly and easily, but which requires minimal storage."</p>
     <span class="cite">— Merkle, <em>A Certified Digital Signature</em> (1979), §6 Tree Authentication <sup class="ref">[11]</sup></span>
@@ -637,12 +652,15 @@ figure.fig figcaption strong{color:var(--text)}
 <section class="slide" data-part="III" data-slide="22">
   <div class="slide-meta"><span class="part-label">Recap: Groth16 / R1CS</span><span class="slide-num">22 / 87</span></div>
   <h2>先回到大家熟悉的 — Groth16 / R1CS / QAP</h2>
-  <ul>
-    <li><strong>R1CS</strong>：constraint 形式固定為 <code class="inline">(A·z) ⊙ (B·z) = C·z</code>，每條 constraint 一個 row</li>
-    <li><strong>QAP</strong>：把 R1CS 轉成多項式 identity，用 pairing 一次驗證</li>
-    <li><strong>Trusted setup</strong>：<strong>每個 circuit</strong> 各做一次 ceremony（toxic waste），circuit 改了重做</li>
-    <li><strong>Proof size</strong>：~3 G1 元素（~200 B，非常小）</li>
-    <li><strong>沒有 lookup</strong>：range check 得一位一位拆</li>
+  <div class="defn">
+    <span class="dt">DEF.</span> <em>zk-SNARK</em>（succinct non-interactive argument of knowledge）for NP relation R：三元組 <code>(Setup, Prove, Verify)</code> 滿足 (i) <strong>completeness</strong> — 誠實 prover 對 <code>(x,w)∈R</code> 必能讓 verifier 接受；(ii) <strong>knowledge soundness</strong> — 任一 PPT prover 若能讓 verifier 接受，則存在 extractor 可抽出合法 <em>w</em>（except with negligible probability）；(iii) <strong>zero-knowledge</strong> — 存在 simulator 不用 <em>w</em> 即可產生與真實 proof 不可區分的 transcript；(iv) <strong>succinctness</strong> — proof size 與 verify time 對 circuit size 為 <code>poly(λ, log|C|)</code>。
+  </div>
+  <ul style="margin-top:.4rem">
+    <li><strong>R1CS (Rank-1 Constraint System)</strong>：constraint 形式固定為 <code class="inline">(A·z) ⊙ (B·z) = C·z</code>，每條 constraint 一個 row</li>
+    <li><strong>QAP (Quadratic Arithmetic Program)</strong>：把 R1CS 轉成多項式 identity <code>A(X)·B(X) − C(X) = H(X)·Z(X)</code>，用 bilinear pairing 一次驗證</li>
+    <li><strong>Trusted setup（CRS）</strong>：<strong>每個 circuit</strong> 各做一次 multi-party ceremony（toxic waste），circuit 改了重做</li>
+    <li><strong>Proof size</strong>：3 G<sub>1</sub> 群元素 ≈ 200 bytes（constant）</li>
+    <li><strong>無 lookup argument</strong>：range check 需位元分解（8-bit → 8 條 constraints）</li>
   </ul>
   <div class="quote" style="margin-top:1rem">
     <p>"We construct a pairing-based (preprocessing) SNARK for arithmetic circuit satisfiability, which is an NP-complete language, where a proof is only 3 group elements and verification consists of checking a single pairing product equation."</p>
@@ -654,7 +672,10 @@ figure.fig figcaption strong{color:var(--text)}
 <section class="slide" data-part="III" data-slide="23">
   <div class="slide-meta"><span class="part-label">Plonkish</span><span class="slide-num">23 / 87</span></div>
   <h2>Halo2 = Plonkish arithmetization</h2>
-  <p class="lead">整個電路是一張「表格」：列 = 一行計算、欄 = 不同類型的變數；gate 是欄之間的多項式關係。</p>
+  <div class="defn">
+    <span class="dt">DEF.</span> <em>Arithmetization</em>：把 NP computation 編碼成代數 / 多項式可驗證形式（R1CS、AIR、Plonkish 皆屬之）。<em>Plonkish</em> = 矩形 trace table（rows × columns）+ 多元多項式 gate constraint + selector column 開關。每個 constraint 是對 cell 值在 𝔽<sub>p</sub> 上的多項式等式，滿足的條件是「所有啟用 gate 的 row 上 polynomial = 0」。
+  </div>
+  <p class="lead" style="margin-top:.4rem">直覺：整個電路是一張「表格」。列 = 一行計算；欄 = 不同類型的變數；gate 是欄之間的多項式關係。</p>
   <div class="bridge">
     <div class="side g"><h4>R1CS (Groth16)</h4><p>固定 <code class="inline">a·b=c</code> 形式</p><p>一條 constraint 一個 row</p><p>一個 row 只有一條 constraint</p></div>
     <div class="arrow">→</div>
@@ -709,31 +730,40 @@ figure.fig figcaption strong{color:var(--text)}
 <section class="slide" data-part="III" data-slide="27">
   <div class="slide-meta"><span class="part-label">Copy Constraints</span><span class="slide-num">27 / 87</span></div>
   <h2>Copy constraint — permutation argument</h2>
-  <div class="bridge">
-    <div class="side g"><h4>R1CS</h4><p>同一變數在多條 constraint 用 — 天然「同一 z[i]」，不需要額外機制</p></div>
-    <div class="arrow">↔</div>
-    <div class="side h"><h4>Halo2</h4><p>不同 cell (row, col) 之間用 permutation argument 綁定 = 同值；<strong>零額外 gate 成本</strong></p></div>
+  <div class="defn">
+    <span class="dt">DEF.</span> <em>Permutation argument</em>（PLONK 原論文 §5）：prover 要證明兩個序列 <code>(a<sub>1</sub>,...,a<sub>n</sub>)</code>、<code>(b<sub>1</sub>,...,b<sub>n</sub>)</code> 互為某 permutation σ 的 re-ordering，透過 grand product argument <code>∏(a<sub>i</sub>+γ)/∏(b<sub>i</sub>+γ) = 1</code>（γ 為 Fiat-Shamir challenge）證明。<em>Copy constraint</em>：把多個 cell 宣告屬於同一 equivalence class，permutation argument 強制它們取相同值，無需額外 gate。
   </div>
-  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">Part V 的 Sigma-to-MDT 8 條約束、pipeline 中間值的銜接，本質都是 copy constraint。</p>
+  <div class="bridge" style="margin-top:.4rem">
+    <div class="side g"><h4>R1CS</h4><p>同一變數在多條 constraint 共用 z[i] — 天然 same-value，不需額外機制</p></div>
+    <div class="arrow">↔</div>
+    <div class="side h"><h4>Halo2</h4><p>不同 cell (row, col) 之間透過 permutation argument 綁定 = 同值；<strong>零額外 gate 成本</strong></p></div>
+  </div>
+  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.9rem">Part V 的 Sigma-to-MDT 8 條約束、pipeline 中介值銜接，本質都是 copy constraint；具體 prover 成本在 grand product poly（+1 column）不在 gate layer。</p>
 </section>
 
 <section class="slide" data-part="III" data-slide="28">
   <div class="slide-meta"><span class="part-label">Lookup</span><span class="slide-num">28 / 87</span></div>
   <h2>Lookup argument — R1CS 沒有的東西</h2>
-  <p>「我這個 advice 值一定落在這張預定義表裡。」</p>
-  <ul>
-    <li><strong>用途</strong>：range check (0 ≤ x &lt; 2⁸)、S-box、非線性查表</li>
+  <div class="defn">
+    <span class="dt">DEF.</span> <em>Lookup argument</em>（Plookup, Halo2）：prover 要證明 advice cell <code>(f<sub>1</sub>,...,f<sub>n</sub>)</code> 之多集合是 table <code>(t<sub>1</sub>,...,t<sub>m</sub>)</code> 多集合的子集（as multisets）。實作為 logarithmic-derivative 或 grand-product argument：<code>∏<sub>i</sub>(γ+f<sub>i</sub>) · ∏<sub>j</sub>(γ+t<sub>j</sub>)<sup>c<sub>j</sub>−1</sup> = ∏<sub>j</sub>(γ+t<sub>j</sub>)<sup>c<sub>j</sub>'</sup></code> 之類的 identity。prover 成本 O(n log n) table scan，gate 上零代價。
+  </div>
+  <p style="margin-top:.3rem;font-size:.92rem">直覺：「這個 advice 值一定落在這張預定義表裡。」</p>
+  <ul style="margin-top:.3rem">
+    <li><strong>用途</strong>：range check (<code class="inline">0 ≤ x &lt; 2⁸</code>)、S-box、非線性查表</li>
     <li><strong>R1CS</strong> 要做 8-bit range check 得拆 8 個位元 = 8 條 constraint</li>
-    <li><strong>Halo2</strong> 一次 lookup 就好，表可由多 circuit 共用</li>
-    <li>本 PF1 的 <strong>ByteTable</strong>（256 entries）是整個電路 range check 的萬能工具</li>
+    <li><strong>Halo2</strong> 一次 lookup 就好，table 可由多 circuit 共用</li>
+    <li>本 PF1 的 <strong>ByteTable</strong>（256 entries）是整個電路 range check 的萬能工具 — 83 lookup arguments 共享此表</li>
   </ul>
 </section>
 
 <section class="slide" data-part="III" data-slide="29">
   <div class="slide-meta"><span class="part-label">Universal SRS</span><span class="slide-num">29 / 87</span></div>
   <h2>Universal SRS — 不是 per-circuit ceremony</h2>
-  <div class="bridge">
-    <div class="side g"><h4>Groth16</h4><p>每個 circuit 各做一次 ceremony，VK 不同；circuit 改了重做</p></div>
+  <div class="defn">
+    <span class="dt">DEF.</span> <em>Structured Reference String (SRS)</em> / <em>Common Reference String (CRS)</em>：trusted setup 產生之公開參數，供 prover/verifier 共同使用。典型 KZG SRS <code>({g<sup>τ<sup>i</sup></sup>}<sub>i=0</sub><sup>d</sup>, g<sub>2</sub>, g<sub>2</sub><sup>τ</sup>)</code>，τ 為 trapdoor（toxic waste，多方 ceremony 後銷毀）。<em>Universal</em> SRS：對所有 degree ≤ d 的 circuit 通用；<em>updatable</em>：任一參與者可 append 新貢獻重新隨機化（Groth–Kohlweiss–Miers–Miers–Sarkar 等方案）。
+  </div>
+  <div class="bridge" style="margin-top:.4rem">
+    <div class="side g"><h4>Groth16</h4><p>每個 circuit 各做一次 ceremony，verification key 不同；circuit 改了重做</p></div>
     <div class="arrow">↔</div>
     <div class="side h"><h4>Halo2 + KZG</h4><p>一次 univariate SRS 所有 circuit 共用；circuit 換了只換 VK，不需新 ceremony</p></div>
   </div>
@@ -747,18 +777,21 @@ figure.fig figcaption strong{color:var(--text)}
 <section class="slide" data-part="III" data-slide="30">
   <div class="slide-meta"><span class="part-label">Prove/Verify</span><span class="slide-num">30 / 87</span></div>
   <h2>Prover / Verifier 流程（Plonk-style）</h2>
-  <ol style="padding-left:1.2rem;margin-top:.5rem">
-    <li style="list-style:decimal">Prover：填 advice → FFT 得多項式 → KZG <strong>commit</strong> 各 column polynomial</li>
-    <li style="list-style:decimal">Verifier：Fiat-Shamir 生 <strong>random challenge</strong> ζ</li>
-    <li style="list-style:decimal">Prover：在 ζ 點 <strong>evaluate</strong> 所有多項式 + 建 quotient poly commitment</li>
-    <li style="list-style:decimal">Prover：送 <strong>opening proof</strong>（KZG proof of evaluation）</li>
-    <li style="list-style:decimal">Verifier：一對 pairing 檢查 gate identity、permutation、lookup 全部成立</li>
+  <div class="defn">
+    <span class="dt">DEF.</span> <em>Polynomial Commitment Scheme (PCS)</em>：三元組 <code>(Commit, Open, Verify)</code>。<code>Commit(f)</code> 對多項式 <em>f ∈ 𝔽<sub>p</sub>[X]</em> 產生簡短承諾 <em>c</em>；<code>Open(f, z)</code> 產生在點 <em>z</em> 的 opening proof π；<code>Verify(c, z, y, π)</code> 驗證 <em>f(z) = y</em>。安全性要求 (i) <strong>binding</strong>：prover 無法對同 <em>z</em> 開出兩個不同 <em>y</em>；(ii) <strong>hiding</strong>（選配）：commitment 不洩漏 <em>f</em> 資訊。<em>KZG</em>（Kate–Zaverucha–Goldberg 2010）：<code>c = g<sup>f(τ)</sup></code>，opening 為 <code>π = g<sup>(f(X)−y)/(X−z)|<sub>X=τ</sub></sup></code>，常數大小、pairing-based。
+  </div>
+  <ol style="padding-left:1.2rem;margin-top:.3rem;font-size:.93rem">
+    <li style="list-style:decimal">Prover：填 advice → inverse FFT 得 column polynomial → KZG <strong>commit</strong> 送出</li>
+    <li style="list-style:decimal">Verifier：Fiat-Shamir 由 transcript hash 產生 <strong>random challenge</strong> ζ ∈ 𝔽<sub>p</sub></li>
+    <li style="list-style:decimal">Prover：在 ζ 點 <strong>evaluate</strong> 所有多項式 + 建 quotient polynomial <em>h(X)</em> 使 <code>identity = h·Z<sub>H</sub></code></li>
+    <li style="list-style:decimal">Prover：送 <strong>opening proof</strong>（multi-point KZG 用 SHPLONK 批次化）</li>
+    <li style="list-style:decimal">Verifier：常數個 pairing 檢查 gate identity、permutation argument、lookup argument 全部成立</li>
   </ol>
   <p style="color:var(--text-dim);margin-top:1rem;font-size:.95rem">驗證者 work 是常數級（幾個 pairing）— 這是 KZG 的甜蜜點。Proof 大小 ~KB 級。</p>
-  <div class="quote" style="margin-top:.8rem;border-left-color:var(--text-dim)">
-    <p><strong>[Paraphrase — 非原文]</strong> Fiat-Shamir 啟發法把「verifier 擲隨機挑戰」替換為「用 hash(transcript) 當挑戰」，將任何 public-coin 互動式證明轉為非互動，只要在 random oracle model 下安全。</p>
-    <span class="cite">— 依 Fiat, Shamir, <em>How to Prove Yourself: Practical Solutions to Identification and Signature Problems</em>, CRYPTO '86 的啟發法精神改寫 <sup class="ref">[13]</sup></span>
+  <div class="defn" style="margin-top:.4rem">
+    <span class="dt">DEF.</span> <em>Fiat–Shamir transform</em>（CRYPTO '86）：將任一 public-coin interactive proof 轉為 non-interactive — prover 把每輪 verifier 的 random challenge <em>c</em> 替換為 <code>c := H(transcript<sub>so far</sub>)</code>（<em>H</em> 建模為 random oracle）。在 Random Oracle Model (ROM) 下保留 soundness，且 transcript 可被任意第三方驗證。Halo2 的 non-interactive 化即基於 Fiat–Shamir，<em>H</em> 由 Blake2b transcript 實現。
   </div>
+  <p style="color:var(--text-dim);margin-top:.4rem;font-size:.88rem">Verifier work 為常數級（幾個 pairing）— KZG 的 sweet spot。Proof size ~KB 級。</p>
 </section>
 
 <section class="slide" data-part="III" data-slide="31">
@@ -826,14 +859,17 @@ figure.fig figcaption strong{color:var(--text)}
 
 <section class="slide" data-part="IV" data-slide="36">
   <div class="slide-meta"><span class="part-label">Why not SHA</span><span class="slide-num">36 / 87</span></div>
-  <h2>為何不用 SHA / Keccak</h2>
-  <ul>
-    <li><strong>SHA-256 在 ZK 電路中</strong> ~25,000 約束 / hash（位元邏輯拆成布林）</li>
-    <li><strong>Poseidon ~64 約束 / row × 65 rows/permutation</strong> — 代數層運算，直接在有限域上</li>
-    <li>Zcash / Filecoin / Polygon 生產驗證、業界標準</li>
-    <li>兩者差約 <strong>兩個數量級</strong> — 這個選擇決定整個系統是否可行</li>
+  <h2>為何不用 SHA / Keccak — algebraic hash</h2>
+  <div class="defn">
+    <span class="dt">DEF.</span> <em>Algebraic / arithmetization-friendly hash</em>（或 SNARK-friendly hash）：設計目標為在大素數有限域 𝔽<sub>p</sub> 上原生運算、用 low-degree polynomial 可表達的 hash function。對比傳統 hash（SHA-256 / Keccak）以 bit-level boolean 運算為主，編碼到 SNARK 需將每個 bit 分解為 𝔽<sub>p</sub> 元素 ⇒ 大量 boolean constraint <code>b·(1−b)=0</code>。代表族：Poseidon、Rescue、Griffin、Reinforced Concrete；共通特徵為 S-box 用 <em>x<sup>α</sup></em>（α 小常數，如 3、5、7）+ MDS 擴散。
+  </div>
+  <ul style="margin-top:.4rem">
+    <li><strong>SHA-256 arithmetised</strong>：~25,000 約束 / hash（boolean 拆位 + carry chain）</li>
+    <li><strong>Poseidon ~64 約束 / row × 65 rows/permutation</strong> — 代數層運算，直接在 𝔽<sub>p</sub> 上</li>
+    <li>Zcash / Filecoin / Polygon zkEVM 生產驗證，業界事實標準</li>
+    <li>兩者差約 <strong>兩個數量級</strong> — 選擇決定整個系統 feasibility</li>
   </ul>
-  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">PF1 的 Merkle 驗證（Part A + A'）佔總 rows 85%。如果用 SHA，整個電路直接爆表。</p>
+  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.9rem">PF1 Merkle (Part A + A') 佔總 rows ~85%。SHA-arithmetised 代價下整個電路直接爆表。</p>
 </section>
 
 <section class="slide" data-part="IV" data-slide="37">
