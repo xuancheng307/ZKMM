@@ -1117,12 +1117,44 @@ figure.fig figcaption strong{color:var(--text)}
 <section class="slide" data-part="III" data-slide="32">
   <div class="slide-meta"><span class="part-label">MockProver</span><span class="slide-num">32 / 87</span></div>
   <h2>MockProver vs release proving</h2>
-  <ul>
-    <li><strong>MockProver</strong>：不做密碼學，只檢查約束滿足 — 開發階段用、秒級</li>
-    <li><strong>Release (KZG)</strong>：實際 commitment + FFT + Fiat-Shamir — benchmark 用</li>
-    <li>兩者語義相同（約束通過 ⟺ proof 可產出）、但效能差幾個量級</li>
-  </ul>
-  <p style="color:var(--text-dim);margin-top:.8rem;font-size:.95rem">本研究的 B1-B14 copy constraint 審計、negative tests 都先用 MockProver 快速迭代。</p>
+  <figure class="fig" style="margin:.3rem 0">
+    <svg viewBox="0 0 820 175" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MockProver vs release dev loop">
+      <text x="410" y="14" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">兩條 prover 路徑 — 同 witness、同 constraint，差幾個數量級</text>
+      <!-- Witness source -->
+      <rect x="20" y="80" width="120" height="40" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.4"/>
+      <text x="80" y="98" text-anchor="middle" style="font:700 11px 'Inter',sans-serif;fill:#1e3a8a">電路 + witness</text>
+      <text x="80" y="113" text-anchor="middle" style="font:9.5px monospace;fill:#1e40af">PortfolioCircuit</text>
+      <!-- Branch -->
+      <line x1="140" y1="100" x2="180" y2="100" stroke="#5a5a70" stroke-width="1.5"/>
+      <line x1="180" y1="100" x2="180" y2="55" stroke="#5a5a70" stroke-width="1.5"/>
+      <line x1="180" y1="100" x2="180" y2="145" stroke="#5a5a70" stroke-width="1.5"/>
+      <line x1="180" y1="55" x2="220" y2="55" stroke="#5a5a70" stroke-width="1.5" marker-end="url(#a32)"/>
+      <line x1="180" y1="145" x2="220" y2="145" stroke="#5a5a70" stroke-width="1.5" marker-end="url(#a32)"/>
+      <!-- MockProver path -->
+      <rect x="220" y="35" width="180" height="40" rx="6" fill="#dcfce7" stroke="#10b981" stroke-width="1.4"/>
+      <text x="310" y="53" text-anchor="middle" style="font:700 11px 'Inter',sans-serif;fill:#065f46">MockProver</text>
+      <text x="310" y="68" text-anchor="middle" style="font:9.5px sans-serif;fill:#047857">只檢查約束滿足，跳過密碼學</text>
+      <text x="410" y="60" style="font:9.5px monospace;fill:#10b981">→ ~&lt; 1 s</text>
+      <rect x="500" y="35" width="280" height="40" rx="6" fill="#f0fdf4" stroke="#10b981" stroke-width="1"/>
+      <text x="640" y="53" text-anchor="middle" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#065f46">用途：positive tests（160）+ negative tests（10 攻擊）</text>
+      <text x="640" y="68" text-anchor="middle" style="font:9px sans-serif;fill:#047857">B1-B14 copy constraint 審計、A2 gate edge case</text>
+      <!-- Release path -->
+      <rect x="220" y="125" width="180" height="40" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.4"/>
+      <text x="310" y="143" text-anchor="middle" style="font:700 11px 'Inter',sans-serif;fill:#5b21b6">Release (KZG / SHPLONK)</text>
+      <text x="310" y="158" text-anchor="middle" style="font:9.5px sans-serif;fill:#6d28d9">完整 commit + FFT + Fiat-Shamir + pairing</text>
+      <text x="410" y="150" style="font:9.5px monospace;fill:#7c3aed">→ 89 s @ N=128</text>
+      <rect x="500" y="125" width="280" height="40" rx="6" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1"/>
+      <text x="640" y="143" text-anchor="middle" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#5b21b6">用途：benchmark + 真實 proof / verify / size 量測</text>
+      <text x="640" y="158" text-anchor="middle" style="font:9px sans-serif;fill:#6d28d9">P1：N=8 / 32 / 128 三點驗 SHPLONK invariance</text>
+      <!-- Equivalence -->
+      <text x="410" y="105" text-anchor="middle" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#dc2626">語義等價：MockProver pass ⟺ release prove 可產出（差別只在效能）</text>
+      <defs>
+        <marker id="a32" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#5a5a70"/></marker>
+      </defs>
+    </svg>
+    <figcaption>圖：兩條 prover 路徑共用同一電路 + witness。MockProver 用於 dev loop 的快速 positive/negative test 迭代（~&lt;1 s）；release 用於 benchmark 量測（89 s @ N=128）。語義等價但效能差 ~100×。</figcaption>
+  </figure>
+  <p style="color:var(--text-dim);margin-top:.4rem;font-size:.88rem">本研究 B1-B14 copy constraint 審計、A2 gate negative tests 全部先 MockProver 快速迭代；P1 KZG benchmark 才換 release。</p>
 </section>
 
 <section class="slide" data-part="III" data-slide="33">
@@ -1581,7 +1613,52 @@ meta.create_gate("horner_per_step", |meta| {
   let rem  = meta.query_advice(rem_col, cur);
   vec![q * (next * S + rem - acc * x - c)]
 });</pre>
-  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">d=12 多項式 → 12 rows；kernel 精度 ~1.2 ULP / segment。</p>
+  <p style="color:var(--text-dim);margin-top:.4rem;font-size:.92rem">d=12 多項式 → 12 rows；kernel 精度 ~1.2 ULP / segment。</p>
+  <figure class="fig" style="margin:.3rem 0">
+    <svg viewBox="0 0 820 165" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Horner unrolling">
+      <text x="410" y="14" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">Horner 巢狀展開：P(x) = c<sub>3</sub>x³+c<sub>2</sub>x²+c<sub>1</sub>x+c<sub>0</sub> → ((c<sub>3</sub>·x+c<sub>2</sub>)·x+c<sub>1</sub>)·x+c<sub>0</sub></text>
+      <!-- Horner ladder: 4 rows showing iterative acc update -->
+      <g style="font-family:'Inter',monospace">
+        <!-- Row 1: init acc = c_3 -->
+        <rect x="40" y="32" width="60" height="26" fill="#fef3c7" stroke="#d97706" stroke-width="1"/>
+        <text x="70" y="49" text-anchor="middle" style="font:600 10.5px monospace;fill:#78350f">acc₀ = c₃</text>
+        <!-- Step 1: acc1 = acc0 * x + c2 -->
+        <line x1="100" y1="45" x2="138" y2="45" stroke="#5a5a70" stroke-width="1.4" marker-end="url(#a46)"/>
+        <text x="119" y="40" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">·x +c₂</text>
+        <rect x="138" y="32" width="120" height="26" fill="#dbeafe" stroke="#2563eb" stroke-width="1"/>
+        <text x="198" y="49" text-anchor="middle" style="font:600 10.5px monospace;fill:#1e3a8a">acc₁ = c₃x + c₂</text>
+        <!-- Step 2: acc2 = acc1 * x + c1 -->
+        <line x1="258" y1="45" x2="296" y2="45" stroke="#5a5a70" stroke-width="1.4" marker-end="url(#a46)"/>
+        <text x="277" y="40" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">·x +c₁</text>
+        <rect x="296" y="32" width="170" height="26" fill="#dbeafe" stroke="#2563eb" stroke-width="1"/>
+        <text x="381" y="49" text-anchor="middle" style="font:600 10.5px monospace;fill:#1e3a8a">acc₂ = c₃x² + c₂x + c₁</text>
+        <!-- Step 3: acc3 = acc2 * x + c0 -->
+        <line x1="466" y1="45" x2="504" y2="45" stroke="#5a5a70" stroke-width="1.4" marker-end="url(#a46)"/>
+        <text x="485" y="40" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">·x +c₀</text>
+        <rect x="504" y="32" width="220" height="26" fill="#dcfce7" stroke="#10b981" stroke-width="1"/>
+        <text x="614" y="49" text-anchor="middle" style="font:700 10.5px monospace;fill:#065f46">acc₃ = c₃x³ + c₂x² + c₁x + c₀ = P(x)</text>
+        <text x="724" y="49" style="font:9px sans-serif;fill:#10b981">→ 結果</text>
+
+        <!-- Constraint per step -->
+        <text x="40" y="85" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">每步約束：</text>
+        <text x="120" y="85" style="font:11px monospace;fill:#1a1a1f">q · ( acc<sub>next</sub> · S + rem − acc · x − coeff ) = 0</text>
+        <text x="120" y="100" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#55596b">└─ S = 2<sup>48</sup> 截斷右移、rem ∈ [0, S) 由 ByteTable lookup 強制</text>
+        <text x="120" y="115" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#55596b">└─ coeff 由 fixed column 提供（per segment 12 個）</text>
+      </g>
+      <!-- 12-row stripe for d=12 -->
+      <g style="font-family:'Inter',monospace">
+        <text x="40" y="138" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">d=12 → 12 row 順序執行：</text>
+        <rect x="190" y="128" width="380" height="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="1"/>
+        <text x="380" y="139" text-anchor="middle" style="font:9.5px sans-serif;fill:#5b21b6">row<sub>0</sub> → row<sub>1</sub> → ... → row<sub>11</sub>（12 次 acc·x+c<sub>i</sub> 累積）</text>
+        <text x="585" y="139" style="font:9.5px monospace;fill:#7c3aed">≈ 1.2 ULP / seg</text>
+      </g>
+      <text x="410" y="160" text-anchor="middle" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#55596b">vs 標準展開 c<sub>0</sub>+c<sub>1</sub>x+c<sub>2</sub>x²+...：需要存 d 個冪次 + d 個乘法 + d 個加法。Horner 把整體壓成 d 個 fused-mul-add</text>
+      <defs>
+        <marker id="a46" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#5a5a70"/></marker>
+      </defs>
+    </svg>
+    <figcaption>圖：Horner 巢狀計算 d=3 範例（實際 d=12）— 每 row 一次 fused-mul-add（acc · x + coeff），下一 row 接過 acc。比標準 Σ c<sub>i</sub>x<sup>i</sup> 展開省一半運算量，且每步約束統一形式 → 同 gate 重用 12 次。</figcaption>
+  </figure>
 </section>
 
 <section class="slide" data-part="V" data-slide="47">
@@ -2254,7 +2331,35 @@ meta.create_gate("horner_per_step", |meta| {
       <tr><td>Min k</td><td><strong>8</strong></td><td>lookup 表 pad 到 2ᵏ−6 的 minimum 保留</td></tr>
     </tbody>
   </table>
-  <p style="color:var(--text-dim);margin-top:.5rem;font-size:.9rem">94 advice 看似多，其實是 column-packing 策略 — 平行安排讓 rows-intensive 的 Merkle 不被 Δ pipeline 擠兌。Proof size O(columns) 固定 31,872 bytes（slide 65）。</p>
+  <figure class="fig" style="margin:.3rem 0">
+    <svg viewBox="0 0 820 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plonkish columns stacked">
+      <text x="410" y="14" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">Column composition — total 145 columns（94 advice + 16 fixed + 1 instance + 34 selectors）</text>
+      <!-- Stacked horizontal bar -->
+      <g style="font-family:'Inter',monospace">
+        <!-- advice 94 / 145 ≈ 64.8% -->
+        <rect x="40" y="36" width="505" height="34" fill="#dbeafe" stroke="#2563eb" stroke-width="1"/>
+        <text x="293" y="51" text-anchor="middle" style="font:700 12px sans-serif;fill:#1e3a8a">advice · 94 (64.8%)</text>
+        <text x="293" y="63" text-anchor="middle" style="font:9.5px sans-serif;fill:#1e40af">prover-filled, blinded</text>
+        <!-- fixed 16 / 145 ≈ 11.0% -->
+        <rect x="545" y="36" width="86" height="34" fill="#ede9fe" stroke="#7c3aed" stroke-width="1"/>
+        <text x="588" y="51" text-anchor="middle" style="font:700 11px sans-serif;fill:#5b21b6">fixed · 16 (11%)</text>
+        <text x="588" y="63" text-anchor="middle" style="font:9px sans-serif;fill:#6d28d9">Remez + ByteTable</text>
+        <!-- instance 1 / 145 ≈ 0.7% -->
+        <rect x="631" y="36" width="6" height="34" fill="#fef3c7" stroke="#d97706" stroke-width="1"/>
+        <text x="634" y="80" text-anchor="middle" style="font:9px sans-serif;fill:#78350f">inst</text>
+        <text x="634" y="91" text-anchor="middle" style="font:9px sans-serif;fill:#78350f">·1</text>
+        <!-- selector 34 / 145 ≈ 23.4% -->
+        <rect x="637" y="36" width="183" height="34" fill="#dcfce7" stroke="#10b981" stroke-width="1"/>
+        <text x="728" y="51" text-anchor="middle" style="font:700 11px sans-serif;fill:#065f46">selector · 34 (23%)</text>
+        <text x="728" y="63" text-anchor="middle" style="font:9px sans-serif;fill:#047857">31 custom gate flags</text>
+      </g>
+      <!-- Lookup separately -->
+      <text x="40" y="92" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#dc2626">+ 83 lookup arguments</text>
+      <text x="200" y="92" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#dc2626">（不算 column；每個 lookup = 1 個 grand-product 約束 + 共用 ByteTable 256 entries）</text>
+    </svg>
+    <figcaption>圖：Plonkish 145 column 組成 — advice 占 65%（prover-filled），selector 占 23%（每 custom gate 一個），fixed 11%（Remez 係數 + Poseidon round constants + ByteTable），instance 僅 1（4 public roots）。proof size = O(columns) → 跨 N 不變 31,872 bytes。</figcaption>
+  </figure>
+  <p style="color:var(--text-dim);margin-top:.4rem;font-size:.88rem">94 advice 看似多，其實是 column-packing 策略 — 平行安排讓 rows-intensive 的 Merkle 不被 Δ pipeline 擠兌。Proof size O(columns) 固定 31,872 bytes（slide 65）。</p>
 </section>
 
 <section class="slide" data-part="VI" data-slide="70">
