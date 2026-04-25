@@ -1478,14 +1478,40 @@ N(x)   = 0.5 + 0.5 · erf(x / √2)</pre>
 <section class="slide" data-part="V" data-slide="44">
   <div class="slide-meta"><span class="part-label">Fixed-point</span><span class="slide-num">44 / 87</span></div>
   <h2>Fixed-point pp=48</h2>
-  <p>所有中間值 = integer × 2⁻⁴⁸。S = 2⁴⁸ ≈ 281 兆（14.4 位十進位精度）。</p>
-  <ul>
-    <li><strong>加法</strong> ↔ 整數加法（field element）</li>
-    <li><strong>乘法</strong> → a·b = w·S + rem，rem 右移 48 位（6-byte decomposition + ByteTable lookup）</li>
-    <li><strong>除法</strong> → w·b + rem = a·S，rem 做 8-byte 分解（除數可能 &gt; 2⁴⁸）</li>
-    <li><strong>sqrt</strong> → Newton 迭代，電路內 sqrt_verify: d·(d−1) = 0 where d = a − b（1 ULP）</li>
+  <div class="defn">
+    <span class="dt">DEF.</span> <em>Fixed-point representation</em> at precision <em>p</em>：實數 x ∈ ℝ 用整數 X = round(x · 2<sup>p</sup>) ∈ ℤ 表示，scale factor S = 2<sup>p</sup>。資料線寬選 ≥ p + |log<sub>2</sub> max|x|| 位以避免溢位。本電路 p = 48，X ∈ 𝔽<sub>p</sub>（BLS12-381 scalar field, ~254 bit），最高可表 |x| ≈ 2<sup>206</sup> 不溢位。
+  </div>
+  <figure class="fig" style="margin:.3rem 0">
+    <svg viewBox="0 0 820 110" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="pp=48 bit layout">
+      <text x="410" y="14" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">pp=48 bit 佈局：x = X / 2<sup>48</sup>，X 為 𝔽<sub>p</sub> field element</text>
+      <!-- Bit bar -->
+      <rect x="20" y="30" width="780" height="34" fill="#f9fafb" stroke="#9ca3af" stroke-width="1"/>
+      <!-- Sign / integer / fraction segments -->
+      <rect x="20" y="30" width="50" height="34" fill="#fef2f2" stroke="#dc2626" stroke-width="1"/>
+      <text x="45" y="50" text-anchor="middle" style="font:9.5px 'Inter',monospace;fill:#991b1b">sign</text>
+      <text x="45" y="60" text-anchor="middle" style="font:8.5px 'Inter',monospace;fill:#991b1b">2's compl</text>
+      <rect x="70" y="30" width="380" height="34" fill="#dbeafe" stroke="#2563eb" stroke-width="1"/>
+      <text x="260" y="50" text-anchor="middle" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#1e3a8a">integer part（高 ~205 bits headroom）</text>
+      <text x="260" y="61" text-anchor="middle" style="font:9px monospace;fill:#1e40af">X &gt;&gt; 48</text>
+      <line x1="450" y1="26" x2="450" y2="68" stroke="#7c3aed" stroke-width="2.5"/>
+      <text x="450" y="22" text-anchor="middle" style="font:700 11px 'Inter',monospace;fill:#7c3aed">↓ binary point</text>
+      <rect x="450" y="30" width="350" height="34" fill="#dcfce7" stroke="#10b981" stroke-width="1"/>
+      <text x="625" y="50" text-anchor="middle" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#065f46">fractional part（48 bits = 14.4 dec digits）</text>
+      <text x="625" y="61" text-anchor="middle" style="font:9px monospace;fill:#047857">X mod 2<sup>48</sup></text>
+      <!-- Examples -->
+      <text x="20" y="84" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#1a1a1f"><tspan style="font-weight:700">範例：</tspan></text>
+      <text x="65" y="84" style="font:9.5px monospace;fill:#1a1a1f">x = 0.539963545623 → X = 151,986,226,428,854 / 2<sup>48</sup>（slide 67 N(d₁) 實測值）</text>
+      <text x="20" y="98" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#1a1a1f"><tspan style="font-weight:700">1 ULP：</tspan></text>
+      <text x="65" y="98" style="font:9.5px monospace;fill:#1a1a1f">2<sup>−48</sup> ≈ 3.55 × 10<sup>−15</sup>（基本量化單位 — 任何 fp 運算的最小可分辨增量）</text>
+    </svg>
+    <figcaption>圖：pp=48 整數編碼 — sign + integer headroom + 48-bit fraction。binary point 在 bit 48 處。所有 fp 運算（add/mul/div/sqrt）皆在 𝔽<sub>p</sub> 上對 X 做整數運算，scale 由電路內隱含維持。</figcaption>
+  </figure>
+  <ul style="font-size:.92rem;margin-top:.3rem">
+    <li><strong>加法</strong>：a + b → A + B（無 scale 變動，整數加法）</li>
+    <li><strong>乘法</strong>：a·b → A·B = W·S + rem，W = ⌊A·B/2<sup>48</sup>⌋（rem 6-byte decomp + ByteTable lookup ∈ [0, S)）</li>
+    <li><strong>除法</strong>：a/b → W·B + rem = A·S（rem 8-byte，除數可能 &gt; 2<sup>48</sup>）</li>
+    <li><strong>sqrt</strong>：Newton 迭代外算 W，電路 verify <code class="inline">d·(d−1) = 0</code>，d = a − b·b/S（1 ULP）</li>
   </ul>
-  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">端到端絕對誤差 ~2×10⁻¹⁴ — 遠超任何金融應用的精度需求。</p>
 </section>
 
 <section class="slide" data-part="V" data-slide="45">
@@ -1560,11 +1586,39 @@ meta.create_gate("horner_per_step", |meta| {
 
 <section class="slide" data-part="V" data-slide="47">
   <div class="slide-meta"><span class="part-label">Why polynomial</span><span class="slide-num">47 / 87</span></div>
-  <h2>為何用多項式逼近？</h2>
-  <ul>
-    <li>ln / erf / exp 在有限域上沒有 closed form — 電路只有 + 和 ×</li>
-    <li><strong>Taylor</strong>：展開點附近好，離開急速發散 — 需要極多項</li>
-    <li><strong>Minimax (Remez)</strong>：等紋波誤差、最壞誤差最小 — 由 Chebyshev 等振盪定理保證最優</li>
+  <h2>為何用多項式逼近？Taylor vs Minimax</h2>
+  <div class="defn">
+    <span class="dt">DEF.</span> <em>Remez minimax polynomial</em> of degree d for f on [a,b]：求多項式 p* ∈ ℝ[X]<sub>≤d</sub> 使 <code>‖f − p*‖<sub>∞</sub> = min<sub>p</sub> max<sub>x∈[a,b]</sub> |f(x) − p(x)|</code>。Chebyshev 等振盪定理：p* 是唯一解，誤差 e(x) = f(x) − p*(x) 在區間內至少 d+2 個點以相等絕對值正負交替取極值。Remez (1934) 演算法用迭代逼近找到這 d+2 個 alternating points。
+  </div>
+  <figure class="fig" style="margin:.3rem 0">
+    <svg viewBox="0 0 820 165" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Taylor vs Minimax error">
+      <text x="410" y="14" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">同次數多項式逼近誤差曲線（示意）— Taylor 局部最佳 vs Minimax 區間最佳</text>
+      <!-- Axes -->
+      <line x1="60" y1="138" x2="780" y2="138" stroke="#9ca3af" stroke-width="1"/>
+      <line x1="60" y1="30" x2="60" y2="138" stroke="#9ca3af" stroke-width="1"/>
+      <text x="40" y="35" text-anchor="end" style="font:9.5px monospace;fill:#55596b">+ε</text>
+      <text x="48" y="86" text-anchor="end" style="font:9.5px monospace;fill:#55596b">0</text>
+      <line x1="55" y1="84" x2="780" y2="84" stroke="#d1d5db" stroke-width="1" stroke-dasharray="2 2"/>
+      <text x="40" y="138" text-anchor="end" style="font:9.5px monospace;fill:#55596b">−ε</text>
+      <text x="60" y="155" text-anchor="middle" style="font:9.5px monospace;fill:#55596b">a</text>
+      <text x="780" y="155" text-anchor="middle" style="font:9.5px monospace;fill:#55596b">b</text>
+      <text x="420" y="155" text-anchor="middle" style="font:9.5px monospace;fill:#7c3aed">展開點 c</text>
+      <line x1="420" y1="80" x2="420" y2="92" stroke="#7c3aed" stroke-width="1.5"/>
+      <!-- Taylor error: nearly 0 at c, blowing up at ends -->
+      <path d="M60 38 Q 240 60, 420 84 Q 600 60, 780 38" fill="none" stroke="#dc2626" stroke-width="2"/>
+      <text x="100" y="50" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#dc2626">Taylor: 在 c 接近 0</text>
+      <text x="100" y="62" style="font:9.5px sans-serif;fill:#dc2626">遠離 c 急速發散（端點誤差 huge）</text>
+      <!-- Minimax error: equi-oscillating between -ε/2 and +ε/2 -->
+      <path d="M60 110 Q 110 58, 160 110 Q 210 58, 260 110 Q 310 58, 360 110 Q 410 58, 460 110 Q 510 58, 560 110 Q 610 58, 660 110 Q 710 58, 760 110 L 780 110" fill="none" stroke="#10b981" stroke-width="2"/>
+      <text x="555" y="125" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#10b981">Minimax: 等紋波，d+2 個極值點</text>
+      <text x="555" y="137" style="font:9.5px sans-serif;fill:#10b981">最壞誤差最小（區間 uniformly 好）</text>
+    </svg>
+    <figcaption>圖（示意）：兩種同次數多項式逼近誤差。Taylor 在展開點 c 完美但端點失控；Minimax 用 Chebyshev 等振盪原理把誤差「壓平」分散到 d+2 個 alternating extrema，使區間內最壞誤差最小。</figcaption>
+  </figure>
+  <ul style="font-size:.92rem;margin-top:.3rem">
+    <li>ln / erf / exp 在有限域 𝔽<sub>p</sub> 上無 closed form — 電路只有 + 和 ×</li>
+    <li><strong>Taylor</strong>：展開點附近好，離開急速發散 → pp=48 下需 ~50+ 次才覆蓋整段</li>
+    <li><strong>Minimax (Remez)</strong>：等紋波誤差，最壞誤差最小 — Chebyshev 等振盪定理保證唯一最優解</li>
     <li>pp=48 d=14 相同次數下：<strong>erf Minimax 比 Taylor 準 2.6×10⁸ 倍、ln 準 6.8×10¹⁰ 倍</strong></li>
   </ul>
 </section>
@@ -1637,10 +1691,63 @@ meta.create_gate("horner_per_step", |meta| {
   <div class="slide-meta"><span class="part-label">Piecewise</span><span class="slide-num">49 / 87</span></div>
   <h2>Piecewise — ln 4 段、erf 12 段</h2>
   <p>單一多項式在寬區間會遇到「量化飽和」— 高次係數的定點量化誤差被放大。切窄段後每段 d=12 足夠。</p>
-  <ul>
-    <li><strong>ln</strong>：[1, 2) 等分 4 段 × width 0.25 + leading-bit decomposition</li>
-    <li><strong>erf</strong>：[0, 4] × 等分 12 段 × width 0.5 + saturation tail（|x| &gt; 4 夾到 S）</li>
-    <li>d=12 是經過 degree sweep 找到的最優點（逼近誤差 + 截斷累積的 U 曲線最低點）</li>
+  <figure class="fig" style="margin:.3rem 0">
+    <svg viewBox="0 0 820 175" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Piecewise segmentation">
+      <text x="410" y="14" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">區間切段策略 — 每段獨立 Remez d=12 逼近</text>
+      <!-- ln subdivision -->
+      <text x="20" y="48" style="font:700 12px 'Inter','Noto Sans TC',sans-serif;fill:#1e3a8a">ln(m)：[1, 2) 等分 4 段（width 0.25）</text>
+      <line x1="60" y1="64" x2="780" y2="64" stroke="#9ca3af" stroke-width="1"/>
+      <g style="font-family:'Inter',monospace">
+        <rect x="60" y="56" width="180" height="16" fill="#dbeafe" stroke="#2563eb" stroke-width="1"/>
+        <text x="150" y="68" text-anchor="middle" style="font:9.5px monospace;fill:#1e3a8a">[1.00, 1.25)</text>
+        <rect x="240" y="56" width="180" height="16" fill="#bfdbfe" stroke="#2563eb" stroke-width="1"/>
+        <text x="330" y="68" text-anchor="middle" style="font:9.5px monospace;fill:#1e3a8a">[1.25, 1.50)</text>
+        <rect x="420" y="56" width="180" height="16" fill="#dbeafe" stroke="#2563eb" stroke-width="1"/>
+        <text x="510" y="68" text-anchor="middle" style="font:9.5px monospace;fill:#1e3a8a">[1.50, 1.75)</text>
+        <rect x="600" y="56" width="180" height="16" fill="#bfdbfe" stroke="#2563eb" stroke-width="1"/>
+        <text x="690" y="68" text-anchor="middle" style="font:9.5px monospace;fill:#1e3a8a">[1.75, 2.00)</text>
+        <text x="60" y="86" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">1.00</text>
+        <text x="240" y="86" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">1.25</text>
+        <text x="420" y="86" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">1.50</text>
+        <text x="600" y="86" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">1.75</text>
+        <text x="780" y="86" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">2.00</text>
+      </g>
+      <!-- erf subdivision -->
+      <text x="20" y="112" style="font:700 12px 'Inter','Noto Sans TC',sans-serif;fill:#5b21b6">erf(z)：[0, 4] 等分 12 段（width 0.5） + saturation tail |z|&gt;4 → ±1</text>
+      <line x1="60" y1="128" x2="660" y2="128" stroke="#9ca3af" stroke-width="1"/>
+      <g style="font-family:'Inter',monospace">
+        <!-- 12 segments width 50 each from x=60 -->
+        <rect x="60" y="120" width="50" height="16" fill="#ede9fe" stroke="#7c3aed" stroke-width="1"/>
+        <rect x="110" y="120" width="50" height="16" fill="#c4b5fd" stroke="#7c3aed" stroke-width="1"/>
+        <rect x="160" y="120" width="50" height="16" fill="#ede9fe" stroke="#7c3aed" stroke-width="1"/>
+        <rect x="210" y="120" width="50" height="16" fill="#c4b5fd" stroke="#7c3aed" stroke-width="1"/>
+        <rect x="260" y="120" width="50" height="16" fill="#ede9fe" stroke="#7c3aed" stroke-width="1"/>
+        <rect x="310" y="120" width="50" height="16" fill="#c4b5fd" stroke="#7c3aed" stroke-width="1"/>
+        <rect x="360" y="120" width="50" height="16" fill="#ede9fe" stroke="#7c3aed" stroke-width="1"/>
+        <rect x="410" y="120" width="50" height="16" fill="#c4b5fd" stroke="#7c3aed" stroke-width="1"/>
+        <rect x="460" y="120" width="50" height="16" fill="#ede9fe" stroke="#7c3aed" stroke-width="1"/>
+        <rect x="510" y="120" width="50" height="16" fill="#c4b5fd" stroke="#7c3aed" stroke-width="1"/>
+        <rect x="560" y="120" width="50" height="16" fill="#ede9fe" stroke="#7c3aed" stroke-width="1"/>
+        <rect x="610" y="120" width="50" height="16" fill="#c4b5fd" stroke="#7c3aed" stroke-width="1"/>
+        <!-- Saturation tail -->
+        <rect x="660" y="120" width="120" height="16" fill="#fee2e2" stroke="#dc2626" stroke-width="1"/>
+        <text x="720" y="132" text-anchor="middle" style="font:9.5px monospace;fill:#991b1b">saturation → ±1</text>
+        <text x="60" y="150" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">0</text>
+        <text x="160" y="150" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">1</text>
+        <text x="260" y="150" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">2</text>
+        <text x="360" y="150" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">3</text>
+        <text x="460" y="150" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">4</text>
+        <text x="660" y="150" text-anchor="middle" style="font:9px sans-serif;fill:#dc2626">|z|&gt;4</text>
+        <text x="780" y="150" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">∞</text>
+        <text x="60" y="168" text-anchor="middle" style="font:8.5px monospace;fill:#7c3aed">12 個 0.5-寬段（共 d=12 × 12 = 144 條 fixed coeffs）</text>
+      </g>
+    </svg>
+    <figcaption>圖：兩個函數的分段策略對比 — ln 因 leading-bit 把任意正實數 reduce 到 [1,2) 故只需 4 段；erf 對稱性讓 [0,4] 12 段已涵蓋（|z|&gt;4 時 erf(z)≈±1 直接 saturate）。每段獨立 Remez d=12 → 共 ln 48 條 + erf 144 條 fixed coefficient。</figcaption>
+  </figure>
+  <ul style="font-size:.92rem;margin-top:.3rem">
+    <li><strong>ln</strong>：先 leading-bit 拆 x = 2<sup>e</sup>·m → m 落 [1,2)；該段 4 等分 + Horner d=12</li>
+    <li><strong>erf</strong>：[0, 4] 等分 12 段 × width 0.5；|z| &gt; 4 saturation tail（夾到 S）</li>
+    <li>d=12 是 degree sweep 最優點（逼近誤差 ↓ vs 截斷累積 ↑ 的 U 曲線最低）</li>
   </ul>
 </section>
 
@@ -1689,13 +1796,41 @@ meta.create_gate("horner_per_step", |meta| {
 
 <section class="slide" data-part="V" data-slide="51">
   <div class="slide-meta"><span class="part-label">Saturation</span><span class="slide-num">51 / 87</span></div>
-  <h2>Saturation 處理</h2>
-  <p>erf(x) → 1 當 |x| 很大；x &gt; 4 直接夾到 S。電路要能「雙向」保證：</p>
-  <ul>
-    <li><code class="inline">sat=1</code> ⇒ abs_in ≥ (N−1)·SEG_WIDTH（否則惡意 prover 可提前飽和）</li>
-    <li><code class="inline">sat=0</code> ⇒ seg_idx &lt; N−1（否則可能繞過 saturation 直接套錯段）</li>
-  </ul>
-  <div class="card amber" style="margin-top:.8rem"><p><strong>惡意 prover 故事：</strong> 想讓 d₁ 很負時偽造 erf → −1（過飽和），或想繞過 segment 選擇套錯係數 — 這些都被 A2 gate 封閉。</p></div>
+  <h2>Saturation 處理 — 兩個方向都要鎖</h2>
+  <p>erf(x) → 1 當 |x| 很大；x &gt; 4 直接夾到 S。電路必須<strong>雙向</strong>強制 sat 與 abs_in 一致：</p>
+  <figure class="fig" style="margin:.3rem 0">
+    <svg viewBox="0 0 820 165" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Saturation bidirectional gate">
+      <text x="410" y="14" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">攻擊面 → 防禦：兩條 sat 約束封閉 prover 自由度</text>
+      <!-- erf curve sketch -->
+      <line x1="60" y1="100" x2="780" y2="100" stroke="#9ca3af" stroke-width="1"/>
+      <line x1="420" y1="36" x2="420" y2="138" stroke="#d1d5db" stroke-width="1" stroke-dasharray="2 2"/>
+      <text x="60" y="155" text-anchor="middle" style="font:9.5px monospace;fill:#55596b">−6</text>
+      <text x="240" y="155" text-anchor="middle" style="font:9.5px monospace;fill:#55596b">−4</text>
+      <text x="420" y="155" text-anchor="middle" style="font:9.5px monospace;fill:#55596b">0</text>
+      <text x="600" y="155" text-anchor="middle" style="font:9.5px monospace;fill:#55596b">+4</text>
+      <text x="780" y="155" text-anchor="middle" style="font:9.5px monospace;fill:#55596b">+6</text>
+      <!-- erf curve approximation -->
+      <path d="M60 50 L 200 50 Q 240 50, 280 80 Q 380 120, 420 100 Q 460 80, 560 80 Q 600 80, 600 50 Q 600 35, 780 35" stroke="#7c3aed" stroke-width="0" fill="none"/>
+      <path d="M60 38 L 240 38 Q 360 38, 420 100 Q 480 162, 600 162 L 780 162" stroke="#7c3aed" stroke-width="2" fill="none"/>
+      <text x="60" y="32" style="font:9.5px monospace;fill:#7c3aed">+1 (sat to S)</text>
+      <text x="780" y="172" text-anchor="end" style="font:9.5px monospace;fill:#7c3aed">−1 (sat to −S)</text>
+      <!-- Saturation regions shaded -->
+      <rect x="60" y="22" width="180" height="120" fill="#fee2e2" opacity="0.3"/>
+      <rect x="600" y="22" width="180" height="120" fill="#fee2e2" opacity="0.3"/>
+      <rect x="240" y="22" width="360" height="120" fill="#dcfce7" opacity="0.3"/>
+      <text x="150" y="80" text-anchor="middle" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#991b1b">sat=1 區</text>
+      <text x="690" y="80" text-anchor="middle" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#991b1b">sat=1 區</text>
+      <text x="420" y="80" text-anchor="middle" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#065f46">sat=0：12 個 piecewise 段選一</text>
+      <!-- Attack arrows + defense -->
+      <text x="20" y="50" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#dc2626">攻擊 A：</text>
+      <text x="80" y="50" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#dc2626">d₁ 很小但偽造 sat=1（過飽和）</text>
+      <text x="20" y="64" style="font:600 9.5px 'Inter','Noto Sans TC',sans-serif;fill:#10b981">↳ 防禦：sat=1 ⇒ abs_in ≥ (N−1)·W = 4 → sat_excess ≥ 0 失敗</text>
+      <text x="20" y="118" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#dc2626">攻擊 B：</text>
+      <text x="80" y="118" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#dc2626">d₁ 很大但 sat=0（繞過 saturation 套錯段）</text>
+      <text x="20" y="132" style="font:600 9.5px 'Inter','Noto Sans TC',sans-serif;fill:#10b981">↳ 防禦：sat=0 ⇒ seg_idx &lt; N−1 = 11 → 落最末段 byte decomp 失敗</text>
+    </svg>
+    <figcaption>圖：erf 雙向 saturation 防禦 — 紅區 |z| &gt; 4 應 sat=1；綠區 |z| ≤ 4 應 sat=0 且 seg_idx ∈ [0, 11]。任一方向偽造（sat=1 但小 / sat=0 但超出 12 段）皆被 A2 gate 的 byte decomposition 約束擋下。</figcaption>
+  </figure>
 </section>
 
 <section class="slide" data-part="V" data-slide="52">
