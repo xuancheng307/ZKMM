@@ -347,12 +347,37 @@ figure.fig figcaption strong{color:var(--text)}
   <div class="slide-meta"><span class="part-label">ZK Value</span><span class="slide-num">06 / 87</span></div>
   <h2>ZK 能提供什麼</h2>
   <p class="lead">「我能證明某件事是真的，但不透露為什麼是真的。」</p>
-  <ul>
-    <li><strong>Completeness</strong> — 誠實 prover 總能通過</li>
-    <li><strong>Knowledge Soundness</strong> — 惡意 prover 不能偽造通過（且真的「知道」witness）</li>
-    <li><strong>Zero-knowledge</strong> — 驗證者除了「命題為真」外什麼都學不到</li>
-  </ul>
-  <div class="card amber" style="margin-top:1rem"><p><strong>關鍵：</strong>ZK 電路裡只有有限域上的加法和乘法 — 沒有 <code class="inline">if</code>、沒有迴圈、沒有浮點。這是本論文要解決的核心工程問題。</p></div>
+  <figure class="fig" style="margin:.3rem 0">
+    <svg viewBox="0 0 820 165" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ZK three properties">
+      <text x="410" y="14" text-anchor="middle" style="font:600 12px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">zk-Proof 三性質（Goldwasser–Micali–Rackoff 1985 / Bellare–Goldreich 1992）</text>
+      <!-- Three property cards -->
+      <g style="font-family:'Inter','Noto Sans TC',sans-serif">
+        <!-- Completeness -->
+        <rect x="40" y="32" width="240" height="118" rx="8" fill="#dcfce7" stroke="#10b981" stroke-width="1.6"/>
+        <text x="160" y="56" text-anchor="middle" style="font:700 14px sans-serif;fill:#065f46">Completeness</text>
+        <text x="160" y="76" text-anchor="middle" style="font:11px monospace;fill:#047857">∀(x,w)∈R: V<sup>P(w)</sup>(x) accepts</text>
+        <text x="160" y="100" text-anchor="middle" style="font:10.5px sans-serif;fill:#064e3b">誠實 prover 對合法 (x,w)</text>
+        <text x="160" y="115" text-anchor="middle" style="font:10.5px sans-serif;fill:#064e3b">必能讓 verifier 接受</text>
+        <text x="160" y="138" text-anchor="middle" style="font:600 10px sans-serif;fill:#10b981">"真的能用"</text>
+        <!-- Knowledge Soundness -->
+        <rect x="290" y="32" width="240" height="118" rx="8" fill="#fee2e2" stroke="#dc2626" stroke-width="1.6"/>
+        <text x="410" y="56" text-anchor="middle" style="font:700 14px sans-serif;fill:#991b1b">Knowledge Soundness</text>
+        <text x="410" y="76" text-anchor="middle" style="font:11px monospace;fill:#b91c1c">∃ extractor K: K<sup>P*</sup>(x)→w s.t. (x,w)∈R</text>
+        <text x="410" y="100" text-anchor="middle" style="font:10.5px sans-serif;fill:#7f1d1d">惡意 prover 若能讓 V 接受</text>
+        <text x="410" y="115" text-anchor="middle" style="font:10.5px sans-serif;fill:#7f1d1d">必「真的知道」witness（possess）</text>
+        <text x="410" y="138" text-anchor="middle" style="font:600 10px sans-serif;fill:#dc2626">"防偽 + 防臆造"</text>
+        <!-- Zero-knowledge -->
+        <rect x="540" y="32" width="240" height="118" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.6"/>
+        <text x="660" y="56" text-anchor="middle" style="font:700 14px sans-serif;fill:#5b21b6">Zero-Knowledge</text>
+        <text x="660" y="76" text-anchor="middle" style="font:11px monospace;fill:#6d28d9">∃ Sim: Sim(x) ≈<sub>c</sub> View<sub>V</sub>(P(w),V)</text>
+        <text x="660" y="100" text-anchor="middle" style="font:10.5px sans-serif;fill:#4c1d95">verifier 從 transcript 學不到</text>
+        <text x="660" y="115" text-anchor="middle" style="font:10.5px sans-serif;fill:#4c1d95">超出「x ∈ L_R」之外的事</text>
+        <text x="660" y="138" text-anchor="middle" style="font:600 10px sans-serif;fill:#7c3aed">"witness 隱私"</text>
+      </g>
+    </svg>
+    <figcaption>圖：zk-Proof 系統的三大形式化性質。Completeness 保證可用、Knowledge Soundness 保證「無 witness 不可偽」（透過 extractor K 抽出 w 證 prover possess witness）、Zero-Knowledge 保證隱私（simulator Sim 不需 w 即可生 transcript）。</figcaption>
+  </figure>
+  <div class="card amber" style="margin-top:.4rem"><p style="font-size:.9rem"><strong>關鍵：</strong>ZK 電路裡只有有限域 𝔽<sub>p</sub> 上的加法和乘法 — 沒有 <code class="inline">if</code>、沒有迴圈、沒有浮點。這是本論文要解決的核心工程問題。</p></div>
   <div class="quote" style="margin-top:1rem">
     <p>"Zero-knowledge proofs are defined as those proofs that convey no additional knowledge other than the correctness of the proposition in question."</p>
     <span class="cite">— Goldwasser, Micali, Rackoff, <em>The Knowledge Complexity of Interactive Proof Systems</em>, SIAM J. Comput. 18(1):186–208 (1989), Abstract <sup class="ref">[1]</sup></span>
@@ -619,20 +644,58 @@ figure.fig figcaption strong{color:var(--text)}
   <div class="slide-meta"><span class="part-label">Cross-tree Binding</span><span class="slide-num">18 / 87</span></div>
   <h2>Cross-tree 8 條 copy constraints</h2>
   <p>Position leaf 和 Market Data leaf 透過 8 條 copy constraint 綁定 — 防資產錯配。</p>
-  <table class="tbl">
-    <thead><tr><th>Position leaf</th><th>約束</th><th>Market Data leaf</th></tr></thead>
-    <tbody>
-      <tr><td class="mono">underlying_id</td><td>=</td><td class="mono">underlying_id</td></tr>
-      <tr><td class="mono">K</td><td>=</td><td class="mono">strike</td></tr>
-      <tr><td class="mono">expiry_date</td><td>=</td><td class="mono">expiry</td></tr>
-      <tr><td class="mono">asset_type</td><td>=</td><td class="mono">asset_type</td></tr>
-      <tr><td class="mono">K (input to Δ)</td><td>=</td><td class="mono">strike</td></tr>
-      <tr><td class="mono">S (input to Δ)</td><td>=</td><td class="mono">spot</td></tr>
-      <tr><td class="mono">r (input to Δ)</td><td>=</td><td class="mono">r</td></tr>
-      <tr><td class="mono">q (input to Δ)</td><td>=</td><td class="mono">q</td></tr>
-    </tbody>
-  </table>
-  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">前 4 條 = 合約複合唯一鍵；後 4 條把市場參數直接綁進 Delta 管線。Copy constraint 用 PLONK 原生 permutation argument，<strong>零額外 gate 成本</strong>。</p>
+  <figure class="fig" style="margin:.3rem 0">
+    <svg viewBox="0 0 820 215" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cross-tree 8-constraint binding">
+      <text x="410" y="13" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">8 條 cross-tree copy constraint（permutation argument · 零 gate 成本）</text>
+      <!-- Position leaf box (left) -->
+      <rect x="20" y="30" width="160" height="172" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+      <text x="100" y="48" text-anchor="middle" style="font:700 12px 'Inter','Noto Sans TC',sans-serif;fill:#1e3a8a">Position leaf (5)</text>
+      <text x="30" y="68" style="font:11px monospace;fill:#1e40af">• underlying_id</text>
+      <text x="30" y="86" style="font:11px monospace;fill:#1e40af">• K (strike)</text>
+      <text x="30" y="104" style="font:11px monospace;fill:#1e40af">• expiry_date</text>
+      <text x="30" y="122" style="font:11px monospace;fill:#1e40af">• asset_type</text>
+      <text x="30" y="140" style="font:11px monospace;fill:#1e40af">• w (qty)</text>
+      <!-- Δ pipeline middle box -->
+      <rect x="320" y="80" width="160" height="80" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="400" y="98" text-anchor="middle" style="font:700 12px 'Inter','Noto Sans TC',sans-serif;fill:#5b21b6">Δ pipeline 輸入</text>
+      <text x="330" y="118" style="font:11px monospace;fill:#6d28d9">K, S, r, q, σ, T</text>
+      <text x="330" y="136" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#7c3aed">→ ln, erf, exp, fp_mul</text>
+      <!-- MDT leaf box (right) -->
+      <rect x="640" y="30" width="160" height="172" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+      <text x="720" y="48" text-anchor="middle" style="font:700 12px 'Inter','Noto Sans TC',sans-serif;fill:#78350f">Market Data leaf (9)</text>
+      <text x="650" y="68" style="font:11px monospace;fill:#92400e">• underlying_id</text>
+      <text x="650" y="86" style="font:11px monospace;fill:#92400e">• strike</text>
+      <text x="650" y="104" style="font:11px monospace;fill:#92400e">• expiry</text>
+      <text x="650" y="122" style="font:11px monospace;fill:#92400e">• asset_type</text>
+      <text x="650" y="140" style="font:11px monospace;fill:#92400e">• spot S</text>
+      <text x="650" y="158" style="font:11px monospace;fill:#92400e">• r, q, settle, σ</text>
+      <!-- 4 contract key bindings (red curves cross-tree) -->
+      <g fill="none" stroke="#dc2626" stroke-width="1.4" stroke-dasharray="3 2">
+        <path d="M180 65 C 320 65, 500 65, 640 65"/>
+        <path d="M180 83 C 320 83, 500 83, 640 83"/>
+        <path d="M180 101 C 320 101, 500 101, 640 101"/>
+        <path d="M180 119 C 320 119, 500 119, 640 119"/>
+      </g>
+      <text x="410" y="62" text-anchor="middle" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#dc2626">① uid = uid</text>
+      <text x="410" y="80" text-anchor="middle" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#dc2626">② K = strike</text>
+      <text x="410" y="98" text-anchor="middle" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#dc2626">③ expiry_date = expiry</text>
+      <text x="410" y="116" text-anchor="middle" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#dc2626">④ asset_type = asset_type</text>
+      <text x="200" y="190" style="font:600 9.5px 'Inter','Noto Sans TC',sans-serif;fill:#dc2626">前 4 條：合約唯一鍵 — 防資產錯配</text>
+      <!-- 4 market param bindings (purple from MDT to delta pipeline) -->
+      <g fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-dasharray="2 2">
+        <path d="M640 138 C 540 138, 510 120, 480 120"/>
+        <path d="M640 156 C 540 156, 510 130, 480 130"/>
+        <path d="M640 102 C 540 102, 510 110, 480 110"/>
+        <path d="M640 84 C 560 84, 520 100, 480 100"/>
+      </g>
+      <text x="200" y="204" style="font:600 9.5px 'Inter','Noto Sans TC',sans-serif;fill:#7c3aed">後 4 條：市場參數 K/S/r/q → Δ pipeline（紫線）</text>
+      <defs>
+        <marker id="a18" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#5a5a70"/></marker>
+      </defs>
+    </svg>
+    <figcaption>圖：8 條 cross-tree copy constraint — 紅虛線 ①-④ 直接綁兩個 leaf 的合約唯一鍵（防 prover 把 GOOG 持倉套到 AAPL 的 settle 計算）；紫虛線 ⑤-⑧ 把 MDT 提供的市場參數 (S, r, q, K) 直接導入 Δ pipeline，prover 無法繞過 MDT 自填參數。</figcaption>
+  </figure>
+  <p style="color:var(--text-dim);margin-top:.4rem;font-size:.88rem">前 4 條 = 合約複合唯一鍵；後 4 條把市場參數直接綁進 Delta 管線。Copy constraint 用 PLONK 原生 permutation argument，<strong>零額外 gate 成本</strong>。</p>
 </section>
 
 <section class="slide" data-part="II" data-slide="19">
@@ -1124,6 +1187,29 @@ figure.fig figcaption strong{color:var(--text)}
     <li><strong>Partial rounds</strong>：只有第一個 element 過 S-box，其餘線性 — 省約束</li>
     <li><strong>PF1 實作 (BLS12-381, t=3)</strong>：<strong>8 full + 57 partial = 65 rows / permutation</strong></li>
   </ul>
+  <figure class="fig" style="margin:.3rem 0">
+    <svg viewBox="0 0 820 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Poseidon round structure">
+      <text x="410" y="14" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">Poseidon HADES 結構（4 full + 57 partial + 4 full = 65 rounds）</text>
+      <!-- Full rounds head (4) -->
+      <rect x="20" y="28" width="80" height="40" fill="#7c3aed" stroke="#5b21b6" stroke-width="1"/>
+      <text x="60" y="46" text-anchor="middle" style="font:600 11px 'Inter',sans-serif;fill:#fff">4 full</text>
+      <text x="60" y="60" text-anchor="middle" style="font:9.5px 'Inter',sans-serif;fill:#fff">3 S-box / row</text>
+      <!-- Partial rounds (57) -->
+      <rect x="100" y="28" width="600" height="40" fill="#c4b5fd" stroke="#7c3aed" stroke-width="1"/>
+      <text x="400" y="46" text-anchor="middle" style="font:600 12px 'Inter',sans-serif;fill:#3b0764">57 partial rounds</text>
+      <text x="400" y="60" text-anchor="middle" style="font:9.5px 'Inter',sans-serif;fill:#4c1d95">1 S-box / row（其餘 t-1 線性 MDS）</text>
+      <!-- Full rounds tail (4) -->
+      <rect x="700" y="28" width="80" height="40" fill="#7c3aed" stroke="#5b21b6" stroke-width="1"/>
+      <text x="740" y="46" text-anchor="middle" style="font:600 11px 'Inter',sans-serif;fill:#fff">4 full</text>
+      <text x="740" y="60" text-anchor="middle" style="font:9.5px 'Inter',sans-serif;fill:#fff">3 S-box / row</text>
+      <!-- Annotations below -->
+      <text x="60" y="86" text-anchor="middle" style="font:600 10px 'Inter','Noto Sans TC',sans-serif;fill:#5b21b6">統計 / linear<br/>full diffusion</text>
+      <text x="400" y="83" text-anchor="middle" style="font:600 10px 'Inter','Noto Sans TC',sans-serif;fill:#7c3aed">代數攻擊抗性主力（partial 省 ~67% S-box）</text>
+      <text x="400" y="95" text-anchor="middle" style="font:9.5px 'Inter',sans-serif;fill:#7c3aed">12 + 285 = 297 約束</text>
+      <text x="740" y="86" text-anchor="middle" style="font:600 10px 'Inter','Noto Sans TC',sans-serif;fill:#5b21b6">end full<br/>diffusion</text>
+    </svg>
+    <figcaption>圖：HADES 三段式 round 結構 — 頭尾 full S-box layer 提供 algebraic / statistical 攻擊雙重抗性，中段 partial rounds 大量省 S-box（57 rounds × 2 = 114 個 S-box 不需在 PF1 電路內 evaluate）。</figcaption>
+  </figure>
   <table class="tbl" style="margin-top:.8rem">
     <thead><tr><th>Round type</th><th>Constraints / row</th><th>Rows</th><th>總 constraints</th></tr></thead>
     <tbody>
@@ -1212,12 +1298,48 @@ figure.fig figcaption strong{color:var(--text)}
   <pre>d1 = [ln(S/K) + (r - q + σ²/2) · T] / (σ · √T)
 Δ_call = e^(-qT) · N(d1)
 N(x)   = 0.5 + 0.5 · erf(x / √2)</pre>
-  <ul style="margin-top:.5rem">
-    <li><strong>ln(S/K)</strong> — piecewise Remez 4 segments × width 0.25</li>
-    <li><strong>erf(d1/√2)</strong> → N(d1) — piecewise Remez 12 segments × width 0.5 + saturation</li>
-    <li><strong>exp(−qT)</strong> — range reduction + Remez d=12 Horner on [0, ln2)（與 ln/erf 共用 kernel）</li>
-    <li>σ√T、σ²/2 — fp_mul + sqrt_verify (Newton)</li>
-  </ul>
+  <figure class="fig" style="margin:.4rem 0">
+    <svg viewBox="0 0 820 175" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="BS Delta decomposition tree">
+      <text x="410" y="14" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">Δ<sub>call</sub> 數學分解 → 三個超越函數（共用 d=12 Horner kernel）</text>
+      <!-- Root: Delta_call -->
+      <rect x="350" y="26" width="120" height="32" rx="6" fill="#dcfce7" stroke="#10b981" stroke-width="1.5"/>
+      <text x="410" y="46" text-anchor="middle" style="font:700 12px 'Inter',sans-serif;fill:#065f46">Δ<sub>call</sub></text>
+      <!-- Mid: e^(-qT) and N(d1) -->
+      <rect x="180" y="74" width="120" height="32" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.4"/>
+      <text x="240" y="94" text-anchor="middle" style="font:600 11px 'Inter',sans-serif;fill:#78350f">e<sup>−qT</sup></text>
+      <rect x="500" y="74" width="120" height="32" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.4"/>
+      <text x="560" y="94" text-anchor="middle" style="font:600 11px 'Inter',sans-serif;fill:#78350f">N(d<sub>1</sub>) = ½ + ½·erf(d<sub>1</sub>/√2)</text>
+      <!-- Edges -->
+      <line x1="380" y1="58" x2="240" y2="74" stroke="#5a5a70" stroke-width="1.4" marker-end="url(#a43)"/>
+      <line x1="440" y1="58" x2="560" y2="74" stroke="#5a5a70" stroke-width="1.4" marker-end="url(#a43)"/>
+      <text x="305" y="74" text-anchor="middle" style="font:9.5px monospace;fill:#55596b">×</text>
+      <!-- Leaf functions -->
+      <rect x="20" y="128" width="120" height="34" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.4"/>
+      <text x="80" y="146" text-anchor="middle" style="font:700 11px 'Inter',sans-serif;fill:#5b21b6">exp(r) − 1</text>
+      <text x="80" y="158" text-anchor="middle" style="font:9.5px 'Inter',sans-serif;fill:#6d28d9">range reduce + 1 seg d=12</text>
+      <rect x="170" y="128" width="120" height="34" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.4"/>
+      <text x="230" y="146" text-anchor="middle" style="font:700 11px 'Inter',sans-serif;fill:#5b21b6">ln(m)</text>
+      <text x="230" y="158" text-anchor="middle" style="font:9.5px 'Inter',sans-serif;fill:#6d28d9">leading-bit + 4 seg d=12</text>
+      <rect x="340" y="128" width="120" height="34" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.4"/>
+      <text x="400" y="146" text-anchor="middle" style="font:700 11px 'Inter',sans-serif;fill:#5b21b6">erf(z)</text>
+      <text x="400" y="158" text-anchor="middle" style="font:9.5px 'Inter',sans-serif;fill:#6d28d9">12 seg d=12 + saturation</text>
+      <rect x="510" y="128" width="130" height="34" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.4"/>
+      <text x="575" y="146" text-anchor="middle" style="font:700 11px 'Inter',sans-serif;fill:#1e3a8a">σ√T (Newton)</text>
+      <text x="575" y="158" text-anchor="middle" style="font:9.5px 'Inter',sans-serif;fill:#1e40af">sqrt_verify gate</text>
+      <rect x="660" y="128" width="130" height="34" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.4"/>
+      <text x="725" y="146" text-anchor="middle" style="font:700 11px 'Inter',sans-serif;fill:#1e3a8a">fp_mul / fp_div</text>
+      <text x="725" y="158" text-anchor="middle" style="font:9.5px 'Inter',sans-serif;fill:#1e40af">pp48 算術原語</text>
+      <!-- Edges to leaves -->
+      <line x1="240" y1="106" x2="80" y2="128" stroke="#5a5a70" stroke-width="1" stroke-dasharray="2 2"/>
+      <line x1="560" y1="106" x2="230" y2="128" stroke="#5a5a70" stroke-width="1" stroke-dasharray="2 2"/>
+      <line x1="560" y1="106" x2="400" y2="128" stroke="#5a5a70" stroke-width="1" stroke-dasharray="2 2"/>
+      <text x="410" y="115" text-anchor="middle" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#7c3aed">透過 d<sub>1</sub> 的中介值流</text>
+      <defs>
+        <marker id="a43" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#5a5a70"/></marker>
+      </defs>
+    </svg>
+    <figcaption>圖：BS Δ<sub>call</sub> 拆成兩條子鏈（discount factor / cumulative normal）→ 三個超越函數（exp / ln / erf）+ 兩個 fp 原語（√, ×, ÷）。**所有超越函數共用同一個 d=12 Horner kernel**，差異僅在 segment 數和 range reduction 策略。</figcaption>
+  </figure>
   <p style="color:var(--amber);margin-top:.5rem;font-size:.9rem">⚠ Δ_put 由 put-call parity：Δ_put = Δ_call − e^(-qT)，只需一個減法閘。</p>
   <div class="quote" style="margin-top:.8rem">
     <p>"The partial derivative w₁ of the valuation formula is of interest, because it determines the ratio of shares of stock to options in the hedged position. … In equation (13), N(d) is the cumulative normal density function."</p>
@@ -1397,12 +1519,44 @@ meta.create_gate("horner_per_step", |meta| {
 <section class="slide" data-part="V" data-slide="50">
   <div class="slide-meta"><span class="part-label">Lead-bit</span><span class="slide-num">50 / 87</span></div>
   <h2>ln 的 leading-bit decomposition</h2>
-  <p>把 x &gt; 0 寫成 x = 2ᵉ · m, m ∈ [1, 2)；ln(x) = e·ln(2) + ln(m)。</p>
-  <pre>// lead_bit gate (3 constraints):
-//   v = (S + r) · 2^e + low       // v = (S+r)·2^e + low
-//   low 做 3-byte decomposition   // 確保 low &lt; 2^e
-//   gap 做 3-byte decomposition   // 確保 r+S 在 [S, 2S)</pre>
-  <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">exp 用類似結構的 int_div gate：qT ÷ ln(2) → (k, r)，r ∈ [0, ln2)；Horner 算 w = exp(r) − 1（單段 Remez d=12，max 2.81 ULP），重建 exp(qT) = 2ᵏ × (w + S)，S = 2⁴⁸。與 ln/erf 共用 kernel。</p>
+  <p>把 x &gt; 0 寫成 x = 2<sup>e</sup> · m, m ∈ [1, 2)；ln(x) = e·ln(2) + ln(m)。</p>
+  <figure class="fig" style="margin:.4rem 0">
+    <svg viewBox="0 0 820 145" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ln leading-bit decomposition">
+      <text x="410" y="14" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">ln(x) range reduction：bit-aligned 拆解 → ln(m) on [1, 2)</text>
+      <!-- Number line -->
+      <line x1="40" y1="58" x2="780" y2="58" stroke="#9ca3af" stroke-width="1"/>
+      <line x1="40" y1="56" x2="40" y2="62" stroke="#9ca3af" stroke-width="1"/>
+      <line x1="780" y1="56" x2="780" y2="62" stroke="#9ca3af" stroke-width="1"/>
+      <text x="40" y="78" text-anchor="middle" style="font:9.5px 'Inter',monospace;fill:#55596b">2<tspan style="font-size:8px">−48</tspan></text>
+      <text x="780" y="78" text-anchor="middle" style="font:9.5px 'Inter',monospace;fill:#55596b">2<tspan style="font-size:8px">+48</tspan></text>
+      <!-- Power of 2 marks -->
+      <g style="font-family:'Inter',monospace;font-size:9px;fill:#7c3aed">
+        <line x1="200" y1="54" x2="200" y2="62" stroke="#7c3aed" stroke-width="1.2"/>
+        <text x="200" y="50" text-anchor="middle">2<tspan style="font-size:7.5px">e</tspan></text>
+        <line x1="350" y1="54" x2="350" y2="62" stroke="#7c3aed" stroke-width="1.2"/>
+        <text x="350" y="50" text-anchor="middle">2<tspan style="font-size:7.5px">e+1</tspan></text>
+        <line x1="500" y1="54" x2="500" y2="62" stroke="#7c3aed" stroke-width="1.2"/>
+        <text x="500" y="50" text-anchor="middle">2<tspan style="font-size:7.5px">e+2</tspan></text>
+        <line x1="650" y1="54" x2="650" y2="62" stroke="#7c3aed" stroke-width="1.2"/>
+        <text x="650" y="50" text-anchor="middle">2<tspan style="font-size:7.5px">e+3</tspan></text>
+      </g>
+      <!-- x position mark -->
+      <line x1="265" y1="40" x2="265" y2="76" stroke="#dc2626" stroke-width="2"/>
+      <text x="265" y="36" text-anchor="middle" style="font:700 11px 'Inter',monospace;fill:#dc2626">x</text>
+      <text x="265" y="92" text-anchor="middle" style="font:9.5px 'Inter',sans-serif;fill:#dc2626">prover witness</text>
+      <!-- m = x / 2^e in [1,2) -->
+      <rect x="200" y="100" width="150" height="22" fill="#dcfce7" stroke="#10b981" stroke-width="1.2"/>
+      <text x="275" y="116" text-anchor="middle" style="font:600 11px 'Inter',sans-serif;fill:#065f46">m = x / 2<sup>e</sup> ∈ [1, 2)</text>
+      <line x1="265" y1="76" x2="275" y2="100" stroke="#10b981" stroke-width="1" stroke-dasharray="2 2"/>
+      <!-- Pipeline -->
+      <text x="40" y="140" style="font:600 10.5px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">電路內：</text>
+      <text x="115" y="140" style="font:10.5px 'Inter','Noto Sans TC',sans-serif;fill:#1a1a1f">① lead_bit gate 找 e（3-byte decomposition guard）</text>
+      <text x="445" y="140" style="font:10.5px 'Inter','Noto Sans TC',sans-serif;fill:#1a1a1f">② Horner d=12 算 ln(m) on [1,2) 4 段</text>
+      <text x="40" y="128" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#55596b">                  ③ ln(x) = e · ln(2) + ln(m) （重建）</text>
+    </svg>
+    <figcaption>圖：ln 的兩階段 range reduction — ① <code>lead_bit</code> gate 把 x 拆成 (e, m) 帶 3-byte decomposition 證明 m∈[1,2)；② Horner kernel 在 4 個 sub-segment 上對 ln(m) 多項式逼近；③ 重建 ln(x) = e·ln(2) + ln(m)。</figcaption>
+  </figure>
+  <p style="color:var(--text-dim);margin-top:.4rem;font-size:.88rem">exp 用對偶結構的 <code class="inline">int_div</code> gate：qT ÷ ln(2) → (k, r)，r ∈ [0, ln2)；Horner 算 w = exp(r) − 1（單段 Remez d=12，max 2.81 ULP），重建 exp(qT) = 2<sup>k</sup> × (w + S)，S = 2<sup>48</sup>。與 ln/erf 共用 kernel。</p>
 </section>
 
 <section class="slide" data-part="V" data-slide="51">
@@ -1437,6 +1591,41 @@ meta.create_gate("horner_per_step", |meta| {
 // ② Horner:   w = exp(r) − 1          (Remez d=12, 單段, max 2.81 ULP)
 // ③ q_exp_recon:  exp(qT) = 2^k × (w + S),  S = 2^48
 // ④ discount: exp(−qT) = S² / exp(qT)  (fp_div)</pre>
+  <figure class="fig" style="margin:.4rem 0">
+    <svg viewBox="0 0 820 95" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="exp Horner pipeline">
+      <text x="410" y="13" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">exp(−qT) 4-step pipeline（共用 ln/erf kernel）</text>
+      <g style="font-family:'Inter','Noto Sans TC',sans-serif">
+        <!-- Step 1 int_div -->
+        <rect x="20" y="28" width="170" height="44" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.4"/>
+        <text x="105" y="46" text-anchor="middle" style="font:700 11px sans-serif;fill:#78350f">① int_div</text>
+        <text x="105" y="62" text-anchor="middle" style="font:9.5px monospace;fill:#92400e">qT ÷ ln2 → (k, r)</text>
+        <!-- Step 2 Horner -->
+        <rect x="220" y="28" width="170" height="44" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.4"/>
+        <text x="305" y="46" text-anchor="middle" style="font:700 11px sans-serif;fill:#5b21b6">② Horner d=12</text>
+        <text x="305" y="62" text-anchor="middle" style="font:9.5px monospace;fill:#6d28d9">w = exp(r)−1 (max 2.81 ULP)</text>
+        <!-- Step 3 reconstruct -->
+        <rect x="420" y="28" width="170" height="44" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.4"/>
+        <text x="505" y="46" text-anchor="middle" style="font:700 11px sans-serif;fill:#1e3a8a">③ q_exp_recon</text>
+        <text x="505" y="62" text-anchor="middle" style="font:9.5px monospace;fill:#1e40af">exp(qT) = 2<sup>k</sup>·(w+S)</text>
+        <!-- Step 4 discount -->
+        <rect x="620" y="28" width="170" height="44" rx="6" fill="#dcfce7" stroke="#10b981" stroke-width="1.4"/>
+        <text x="705" y="46" text-anchor="middle" style="font:700 11px sans-serif;fill:#065f46">④ fp_div</text>
+        <text x="705" y="62" text-anchor="middle" style="font:9.5px monospace;fill:#047857">exp(−qT) = S² / exp(qT)</text>
+        <!-- Arrows -->
+        <line x1="190" y1="50" x2="218" y2="50" stroke="#5a5a70" stroke-width="1.5" marker-end="url(#a53)"/>
+        <line x1="390" y1="50" x2="418" y2="50" stroke="#5a5a70" stroke-width="1.5" marker-end="url(#a53)"/>
+        <line x1="590" y1="50" x2="618" y2="50" stroke="#5a5a70" stroke-width="1.5" marker-end="url(#a53)"/>
+        <!-- Labels under arrows -->
+        <text x="105" y="86" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">range reduce</text>
+        <text x="305" y="86" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">poly approx 共用 kernel</text>
+        <text x="505" y="86" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">recon to fp48</text>
+        <text x="705" y="86" text-anchor="middle" style="font:9px sans-serif;fill:#55596b">negate exponent</text>
+      </g>
+      <defs>
+        <marker id="a53" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#5a5a70"/></marker>
+      </defs>
+    </svg>
+  </figure>
   <ul style="margin-top:.4rem">
     <li><strong>單段 Remez</strong>（非 piecewise）—— r ∈ [0, ln2) 窄區間，1 段已夠；<code class="inline">EXP_PP48_HORNER</code> in <code class="inline">coefficients/exp_pp48.rs</code></li>
     <li><strong>Horner 算 </strong><code class="inline">exp(r) − 1</code>（非直接 exp(r)）：fp48 表示下 w 已 ≪ S，加 S 還原為 fp48；避免域極值處的截斷誤差放大</li>
@@ -1454,6 +1643,52 @@ meta.create_gate("horner_per_step", |meta| {
 // σV18: |bs − settle| ≤ ABS_TOL           (0.02 × 2^48)
 // σV19: |bs − settle| ≤ REL_TOL·settle/S  (0.5% × 2^48)
 // AND 兩閘：min(ABS, REL) 才通過 — 保守語意</pre>
+  <figure class="fig" style="margin:.3rem 0">
+    <svg viewBox="0 0 820 145" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sigma MDT data flow">
+      <text x="410" y="14" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">σ 從 MDT 到 Δ pipeline 的 dataflow（雙重容差確保 σ 與 settle 互相 cross-check）</text>
+      <!-- MDT leaf -->
+      <rect x="20" y="38" width="160" height="48" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.4"/>
+      <text x="100" y="56" text-anchor="middle" style="font:700 11px 'Inter',sans-serif;fill:#78350f">Market Data leaf</text>
+      <text x="100" y="71" text-anchor="middle" style="font:9.5px monospace;fill:#92400e">{uid, K, expiry, type,</text>
+      <text x="100" y="83" text-anchor="middle" style="font:9.5px monospace;fill:#92400e">S, r, q, settle, σ}</text>
+      <!-- Merkle path verify -->
+      <rect x="200" y="38" width="140" height="48" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.4"/>
+      <text x="270" y="56" text-anchor="middle" style="font:700 11px 'Inter',sans-serif;fill:#1e3a8a">Merkle path verify</text>
+      <text x="270" y="71" text-anchor="middle" style="font:9.5px sans-serif;fill:#1e40af">depth ~20 → mkt_root</text>
+      <text x="270" y="83" text-anchor="middle" style="font:9.5px sans-serif;fill:#1e40af">(public input)</text>
+      <line x1="180" y1="62" x2="198" y2="62" stroke="#5a5a70" stroke-width="1.5" marker-end="url(#a54)"/>
+      <!-- Sigma copy constraint -->
+      <rect x="360" y="20" width="140" height="38" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.4"/>
+      <text x="430" y="36" text-anchor="middle" style="font:700 10.5px 'Inter',sans-serif;fill:#5b21b6">σ → delta.sigma_cell</text>
+      <text x="430" y="50" text-anchor="middle" style="font:9px monospace;fill:#6d28d9">copy constraint</text>
+      <line x1="340" y1="55" x2="358" y2="40" stroke="#7c3aed" stroke-width="1.4" marker-end="url(#a54)"/>
+      <!-- Settle copy -->
+      <rect x="360" y="68" width="140" height="38" rx="6" fill="#dcfce7" stroke="#10b981" stroke-width="1.4"/>
+      <text x="430" y="84" text-anchor="middle" style="font:700 10.5px 'Inter',sans-serif;fill:#065f46">settle → bs_price.target</text>
+      <text x="430" y="98" text-anchor="middle" style="font:9px monospace;fill:#047857">copy constraint</text>
+      <line x1="340" y1="68" x2="358" y2="85" stroke="#10b981" stroke-width="1.4" marker-end="url(#a54)"/>
+      <!-- bs_price gate -->
+      <rect x="520" y="38" width="120" height="48" rx="6" fill="#fee2e2" stroke="#dc2626" stroke-width="1.4"/>
+      <text x="580" y="56" text-anchor="middle" style="font:700 11px 'Inter',sans-serif;fill:#991b1b">bs_price gate</text>
+      <text x="580" y="71" text-anchor="middle" style="font:9.5px sans-serif;fill:#b91c1c">forward BS(σ, K, T,</text>
+      <text x="580" y="83" text-anchor="middle" style="font:9.5px sans-serif;fill:#b91c1c">r, q, S) → bs</text>
+      <line x1="500" y1="40" x2="518" y2="58" stroke="#7c3aed" stroke-width="1.4" marker-end="url(#a54)"/>
+      <!-- AND tolerance -->
+      <rect x="660" y="38" width="140" height="48" rx="6" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.6"/>
+      <text x="730" y="55" text-anchor="middle" style="font:700 10.5px 'Inter',sans-serif;fill:#5b21b6">AND 雙重容差</text>
+      <text x="730" y="69" text-anchor="middle" style="font:9px monospace;fill:#6d28d9">|bs−settle| ≤ ABS_TOL</text>
+      <text x="730" y="80" text-anchor="middle" style="font:9px monospace;fill:#6d28d9">∧ ≤ REL_TOL·settle/S</text>
+      <line x1="500" y1="86" x2="660" y2="62" stroke="#10b981" stroke-width="1.4" marker-end="url(#a54)"/>
+      <line x1="640" y1="62" x2="660" y2="62" stroke="#dc2626" stroke-width="1.4" marker-end="url(#a54)"/>
+      <!-- Bottom: result -->
+      <text x="410" y="124" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#1a1a1f">惡意 prover 改 σ → MDT root 對不上（Merkle 拒）</text>
+      <text x="410" y="140" text-anchor="middle" style="font:11px 'Inter','Noto Sans TC',sans-serif;fill:#55596b">同改 σ + settle → bs_price forward 與 settle 的 |bs−settle| 仍超 tol（雙閘拒）</text>
+      <defs>
+        <marker id="a54" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#5a5a70"/></marker>
+      </defs>
+    </svg>
+    <figcaption>圖：σ 從 MDT 9-field leaf 透過 Merkle 驗證 → copy constraint 綁進 Δ pipeline；同時 bs_price gate forward 算 BS 價，AND 雙閘 (ABS_TOL ∧ REL_TOL) 確保 σ 與 settle 互鎖，prover 無法獨立竄改任一。</figcaption>
+  </figure>
   <p style="color:var(--text-dim);margin-top:.6rem;font-size:.92rem">另有 8 條 cross-tree copy constraint（Part II slide 18），把 (underlying_id, K, expiry, type) + (S, r, q) + K 鎖進 state_root 和 market_data_root — 零 gate 成本。σ 由 MDT copy 進電路是額外的內部 copy constraint，不算入跨樹 8 條。</p>
   <div class="card amber" style="margin-top:.6rem"><p><strong>惡意 prover 故事：</strong> 改 σ → MDT root 對不上（Merkle 先拒）；若同時改 MDT 與 settle 配合假 σ，bs_price forward-compute 與 settle 的 |bs−settle| gap 仍會被 σV18/σV19 偵測。</p></div>
 </section>
@@ -1889,7 +2124,37 @@ meta.create_gate("horner_per_step", |meta| {
     <li style="list-style:decimal;margin-bottom:.35rem"><strong>T_min 7 日硬下限</strong>：非股票部位強制 <code class="inline">t_days − 7 ≥ 0</code>（2-byte 分解 + byte lookup），排除短期 pin risk 與流動性陷阱</li>
     <li style="list-style:decimal;margin-bottom:.35rem"><strong>σ 由 MDT 直接提供</strong>：Market Data leaf 由 8 → 9 欄位（新增 σ 於 index 8），Poseidon 5 次 permutation（zero-padding on odd tail）；σ 以 copy constraint 綁進 delta pipeline，<em>bs_price 未退役</em>，仍做完整 BS 反解驗證與 settle cross-check</li>
   </ol>
-  <p style="color:var(--text-dim);margin-top:.4rem;font-size:.88rem">Commits <code class="inline">9cf6f45</code> / <code class="inline">bf6bf8d</code>（容差）、<code class="inline">bbc9eaa</code>（T_min）、<code class="inline">43310f6</code>（σ）；以上皆為工程精進，<strong>不影響</strong>核心 ZK-POK 數學 soundness。</p>
+  <figure class="fig" style="margin:.3rem 0">
+    <svg viewBox="0 0 820 110" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="3 engineering enhancements">
+      <text x="410" y="14" text-anchor="middle" style="font:600 11px 'Inter','Noto Sans TC',sans-serif;fill:#4f46e5">3 項工程強化（2026-04-17 commit 序列）</text>
+      <!-- Timeline -->
+      <line x1="60" y1="55" x2="780" y2="55" stroke="#9ca3af" stroke-width="1.5"/>
+      <!-- Markers -->
+      <g style="font-family:'Inter','Noto Sans TC',sans-serif">
+        <!-- Commit 1: tolerance -->
+        <circle cx="180" cy="55" r="7" fill="#dc2626" stroke="#fff" stroke-width="2"/>
+        <text x="180" y="40" text-anchor="middle" style="font:600 10px sans-serif;fill:#991b1b">9cf6f45+bf6bf8d</text>
+        <text x="180" y="74" text-anchor="middle" style="font:700 11px sans-serif;fill:#1a1a1f">① 雙重容差 AND</text>
+        <text x="180" y="88" text-anchor="middle" style="font:9.5px sans-serif;fill:#55596b">ABS 0.02 ∧ REL 0.5%·settle/S</text>
+        <text x="180" y="102" text-anchor="middle" style="font:9px sans-serif;fill:#7c3aed">σV18+σV19 共同生效</text>
+        <!-- Commit 2: T_min -->
+        <circle cx="420" cy="55" r="7" fill="#10b981" stroke="#fff" stroke-width="2"/>
+        <text x="420" y="40" text-anchor="middle" style="font:600 10px sans-serif;fill:#065f46">bbc9eaa</text>
+        <text x="420" y="74" text-anchor="middle" style="font:700 11px sans-serif;fill:#1a1a1f">② T_min 7 日硬下限</text>
+        <text x="420" y="88" text-anchor="middle" style="font:9.5px sans-serif;fill:#55596b">非股票部位：t_days−7 ≥ 0</text>
+        <text x="420" y="102" text-anchor="middle" style="font:9px sans-serif;fill:#7c3aed">2-byte decomp + byte lookup</text>
+        <!-- Commit 3: sigma MDT -->
+        <circle cx="660" cy="55" r="7" fill="#7c3aed" stroke="#fff" stroke-width="2"/>
+        <text x="660" y="40" text-anchor="middle" style="font:600 10px sans-serif;fill:#5b21b6">43310f6</text>
+        <text x="660" y="74" text-anchor="middle" style="font:700 11px sans-serif;fill:#1a1a1f">③ σ 進 MDT (8→9 fields)</text>
+        <text x="660" y="88" text-anchor="middle" style="font:9.5px sans-serif;fill:#55596b">5 perm sponge (zero-pad)</text>
+        <text x="660" y="102" text-anchor="middle" style="font:9px sans-serif;fill:#7c3aed">copy constraint to delta</text>
+      </g>
+      <text x="60" y="60" style="font:9.5px 'Inter','Noto Sans TC',sans-serif;fill:#55596b">2026-04-17</text>
+    </svg>
+    <figcaption>圖：3 項工程強化的 commit timeline — 都不動核心 ZK-POK 數學 soundness，純工程層補強（容差語意 / 流動性下限 / σ 信任源）。</figcaption>
+  </figure>
+  <p style="color:var(--text-dim);margin-top:.3rem;font-size:.85rem">Commits <code class="inline">9cf6f45</code> / <code class="inline">bf6bf8d</code>（容差）、<code class="inline">bbc9eaa</code>（T_min）、<code class="inline">43310f6</code>（σ）；以上皆為工程精進，<strong>不影響</strong>核心 ZK-POK 數學 soundness。</p>
 </section>
 
 <section class="slide part-closer" data-part="VII" data-slide="79">
